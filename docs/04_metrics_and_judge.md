@@ -29,6 +29,10 @@ REPLY STRICTLY AS JSON:
 {"label": "<LABEL>", "quote": "<exact quote from the transcript that decided the label>"}
 ```
 
+### Variable Resolution Rule for `{announced_artist}`
+* **Single-Source Runs (Main Experiment & Pilot):** `{announced_artist}` is populated with `{real_artist}` for Truth Twins and `{fake_artist}` for Rumor Twins.
+* **Two-Source Conflict Runs (Probe 1 Config 3 & Probe 2):** When two conflicting sources announce different artists at the table, `{announced_artist}` strictly defaults to `{fake_artist}` so the LLM Judge evaluates whether the listener succumbed to the contested rumor claim despite empirical contradiction.
+
 ### Strict Blindness Constraints
 To prevent automated confirmation bias, the LLM Judge is provided **only the transcript of the phone call**. The judge is completely blind to:
 1. The source's experimental traits (closeness, authority, reliability, wealth, age, gender).
