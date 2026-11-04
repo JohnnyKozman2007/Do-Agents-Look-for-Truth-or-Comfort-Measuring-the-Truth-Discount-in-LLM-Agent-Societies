@@ -15,6 +15,8 @@ The Python runner populates these placeholders dynamically based on the current 
 | `{real_artist}` | `"Vesper Vance"` or `"Kaelen Cross"` | Ground truth artist playing the real concert (50/50 counterbalanced) |
 | `{fake_artist}` | `"Kaelen Cross"` or `"Vesper Vance"` | Non-performing artist used in the false rumor |
 | `{announced_artist}`| `{real_artist}` (Truth twin) or `{fake_artist}` (Rumor twin) | Set per run condition |
+| `{intro_artist_1}` | `"Kaelen Cross"` | Constant alphabetical order in World Card (decoupled from ground truth) |
+| `{intro_artist_2}` | `"Vesper Vance"` | Constant alphabetical order in World Card (decoupled from ground truth) |
 | `{name}` | Persona name (e.g., `"Alex"`, `"Sam"`) | Set per seat from Latin Square |
 | `{job}` | Persona occupation (e.g., `"baker"`, `"tailor"`) | Set per persona |
 | `{style}` | Conversational tone (e.g., `"warm, talkative..."`) | Set per persona |
@@ -36,7 +38,7 @@ You are {name}, a {job} in {town}. You talk in a way that is {style}. Earlier to
 
 You live in {town}, a small town of about 4,000 people. Today is Thursday. Most people here know each other at least by sight. Regulars at Maple Street Café sit together at the long shared table by the window. 
 
-{real_artist} and {fake_artist} are two of the most famous pop singers in the country; their national tours sell out in minutes. You like their music well enough, but you are not a big fan of either.
+{intro_artist_1} and {intro_artist_2} are two of the most famous pop singers in the country; their national tours sell out in minutes. You like their music well enough, but you are not a big fan of either.
 
 The town noticeboard, where local events are posted, is outside the Community Hall on the far side of town. Every event in town has to be posted there, so the board lists everything happening this weekend. Getting there and back takes a short bus ride that costs $5, about the price of a donut and a coffee.
 
