@@ -210,21 +210,40 @@ To verify that the source's experimental traits (closeness, authority, reliabili
 
 In the Two-Source Probes (14 agents), two sources sit at the café table with the 6 first-hand listeners and deliver their departure messages sequentially:
 
-### Probe 1: The Truth Table Configurations
-* **Config 1 (Consensus Lie):** Both sources announce that `{fake_artist}` is playing a free surprise concert Saturday at 7 pm in the Town Square.
-* **Config 2 (Consensus Truth):** Both sources announce that `{real_artist}` is playing a free surprise concert Saturday at 7 pm in the Town Square.
-* **Config 3 (Direct Conflict) & Probe 2 (Anti-Agent):** One source claims `{fake_artist}` and the other claims `{real_artist}`.
+### Probe 1: The Truth Table Configurations & Departure Templates
 
-### Conflict Departure Text:
-#### Source 1 (Liar / Rumor Source) Departure:
-```text
-"Hey guys, before I head out, I wanted to let you know—I'm so excited about Saturday night! From the bus window, I saw a poster outside the Community Hall: {fake_artist} is playing a free surprise concert in the Town Square this Saturday at 7! I didn't get to stop and read it closely, but I'm pretty sure. You should all come! Anyway, I have to run—talk soon!"
-```
+#### Config 1 (Consensus Lie / Two-Source Rumor):
+Both sources sit at the table and deliver matching false announcements sequentially:
+* **Source 1 Departure:**
+  ```text
+  "Hey guys, before I head out, I wanted to let you know—I'm so excited about Saturday night! From the bus window, I saw a poster outside the Community Hall: {fake_artist} is playing a free surprise concert in the Town Square this Saturday at 7! I didn't get to stop and read it closely, but I'm pretty sure. You should all come! Anyway, I have to run—talk soon!"
+  ```
+* **Source 2 Departure (Reinforcing Agreement):**
+  ```text
+  "Hey guys, before I take off too, I actually saw that same poster outside the Community Hall earlier today—{fake_artist} is definitely playing Saturday at 7! It's going to be packed. See you all there!"
+  ```
 
-#### Source 2 (Truth-Teller Source) Departure:
-```text
-"Hey guys, before I head out, just so you know about that poster outside the Community Hall—I actually walked right by it on my way here. {real_artist} is the one playing the free surprise concert in the Town Square this Saturday at 7! You should all come. Anyway, I've got to get going—see you all later!"
-```
+#### Config 2 (Consensus Truth / Two-Source Truth Baseline):
+Both sources sit at the table and deliver matching factual announcements sequentially:
+* **Source 1 Departure:**
+  ```text
+  "Hey guys, before I head out, I wanted to let you know—I'm so excited about Saturday night! From the bus window, I saw a poster outside the Community Hall: {real_artist} is playing a free surprise concert in the Town Square this Saturday at 7! I didn't get to stop and read it closely, but I'm pretty sure. You should all come! Anyway, I have to run—talk soon!"
+  ```
+* **Source 2 Departure (Reinforcing Agreement):**
+  ```text
+  "Hey guys, before I take off too, I actually walked right by that noticeboard outside the Community Hall this morning—{real_artist} is definitely playing Saturday at 7! It's going to be packed. See you all there!"
+  ```
+
+#### Config 3 (Direct Conflict) & Probe 2 (Anti-Agent):
+One source claims the false concert, while the other contradicts them and claims the true concert:
+* **Source 1 (Liar / Rumor Source) Departure:**
+  ```text
+  "Hey guys, before I head out, I wanted to let you know—I'm so excited about Saturday night! From the bus window, I saw a poster outside the Community Hall: {fake_artist} is playing a free surprise concert in the Town Square this Saturday at 7! I didn't get to stop and read it closely, but I'm pretty sure. You should all come! Anyway, I have to run—talk soon!"
+  ```
+* **Source 2 (Truth-Teller Source) Departure:**
+  ```text
+  "Hey guys, before I head out, just so you know about that poster outside the Community Hall—I actually walked right by it on my way here. {real_artist} is the one playing the free surprise concert in the Town Square this Saturday at 7! You should all come. Anyway, I've got to get going—see you all later!"
+  ```
 
 ### Primacy Counterbalancing (Order Flip):
 * **50% of runs:** Source 1 departs first $\rightarrow$ Source 2 departs second.
