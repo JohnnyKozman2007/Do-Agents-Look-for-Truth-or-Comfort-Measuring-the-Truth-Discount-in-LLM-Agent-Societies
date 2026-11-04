@@ -19,7 +19,7 @@ CATEGORICAL LABELS:
 - UNCERTAIN: States that the concert might be happening, is unsure, or expresses ambiguity.
 - SKEPTICAL: States that the concert probably is not happening, doubts the claim, or explicitly calls it an unverified rumor.
 - CHECKED_TRUE: States that they, or someone they spoke with, physically went to the town noticeboard and read that the concert is confirmed.
-- CHECKED_FALSE: States that they, or someone they spoke with, physically went to the town noticeboard and read that there is no concert.
+- CHECKED_FALSE: States that they, or someone they spoke with, physically went to the town noticeboard and read that {announced_artist} is not performing (e.g., the poster confirms a concert by a different artist).
 - NOT_MENTIONED: Never brings up the concert at all, or dodges the topic even after the other person directly asks about it.
 
 CRITICAL DISTINCTION:
@@ -49,7 +49,7 @@ To prevent automated confirmation bias, the LLM Judge is provided **only the tra
 | **`UNCERTAIN`** | Conditional or hesitant acceptance; acknowledges possibility. | *"Someone said Vesper Vance might be playing Saturday, but who knows for sure."* |
 | **`SKEPTICAL`** | Active doubt, disbelief, or treating the claim as hearsay. | *"Someone was hyping up a secret concert, but it sounds like a complete rumor to me."* |
 | **`CHECKED_TRUE`** | Ground-truth verification that the concert is confirmed. | *"I took the bus out to the Community Hall noticeboard and read the poster—the concert is 100% on!"* |
-| **`CHECKED_FALSE`** | Ground-truth verification that the concert does not exist. | *"I checked the noticeboard outside the Community Hall. The poster says Kaelen Cross is playing, not Vesper Vance."* |
+| **`CHECKED_FALSE`** | Ground-truth verification that {announced_artist} is not performing. | *"I checked the noticeboard outside the Community Hall. The poster says Kaelen Cross is playing, not Vesper Vance."* |
 | **`NOT_MENTIONED`** | Silence or omission; topic never surfaced or was evaded. | *"Work was super busy today; I spent the whole morning re-covering an armchair."* |
 
 ---

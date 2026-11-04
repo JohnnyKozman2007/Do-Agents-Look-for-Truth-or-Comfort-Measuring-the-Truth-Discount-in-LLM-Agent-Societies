@@ -11,7 +11,7 @@ Every agent in the town shares a common baseline understanding of the world. The
 ### The World Card (Canonical Text)
 > *"You live in Alder Creek, a small town of about 4,000 people. Today is Thursday. Most people here know each other at least by sight. Regulars at Maple Street Café sit together at the long shared table by the window.*  
 > 
-> *{real_artist} and {fake_artist} are two of the most famous pop singers in the country; their national tours sell out in minutes. You like their music well enough, but you are not a big fan of either.*  
+> *{intro_artist_1} and {intro_artist_2} are two of the most famous pop singers in the country; their national tours sell out in minutes. You like their music well enough, but you are not a big fan of either.*  
 > 
 > *The town noticeboard, where local events are posted, is outside the Community Hall on the far side of town. Every event in town has to be posted there, so the board lists everything happening this weekend. Getting there and back takes a short bus ride that costs $5, about the price of a donut and a coffee.*  
 > 
@@ -41,6 +41,7 @@ Neither artist name is permanently tied to the truth or the lie:
 * **In 50% of runs:** `Vesper Vance` is the real concert, and `Kaelen Cross` is the false rumor.
 * **In the other 50% of runs:** `Kaelen Cross` is the real concert, and `Vesper Vance` is the false rumor.
 * *Result:* Across the dataset, any phonetic or stylistic preference the LLM might have for one name cancels out completely.
+* **Shared Introduction Order Decoupling:** In the World Card, `{intro_artist_1}` and `{intro_artist_2}` use fixed alphabetical order (`Kaelen Cross` then `Vesper Vance`), completely decoupled from which artist is `{real_artist}` or `{fake_artist}` in that seed. This ensures that the introductory lore leaks zero information about ground truth.
 
 ---
 
