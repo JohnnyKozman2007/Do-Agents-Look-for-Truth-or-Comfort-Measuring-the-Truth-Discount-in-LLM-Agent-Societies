@@ -118,9 +118,9 @@ Every town has **13 fixed seats**:
 
 ### The 13-Seed Latin Square Rotation:
 To eliminate position and persona bias, the code shifts the 13 personas through the 13 seats across the 13 seeds of each cell:
-* **Seed 0:** Persona 0 is Source; Personas 1–6 are Layer 1; Personas 7–12 are Layer 2.
-* **Seed 1:** Persona 12 is Source; Personas 0–5 are Layer 1; Personas 6–11 are Layer 2.
-* ...up to **Seed 12**.
+* **Layout 0:** Persona 1 is Source; Personas 2–7 are Layer 1; Personas 8–13 are Layer 2.
+* **Layout 1:** Persona 2 is Source; Personas 3–8 are Layer 1; Personas 9–13 and 1 are Layer 2.
+* ...up to **Layout 12** (Persona 13 is Source). The exact seat maps are in `configs/pilot_config.json`.
 
 #### Mathematical Symmetry:
 Across the 13 seeds, **every single persona**:

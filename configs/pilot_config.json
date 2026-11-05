@@ -4,7 +4,7 @@
     "study_name": "Do Agents Look for Truth or Comfort? Measuring the Truth Discount in LLM Agent Societies",
     "target_venue": "Social Sim '27 (Submission: Nov 20, 2026)",
     "module": "pilot",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "town_name": "Alder Creek",
     "town_population": 4000,
     "simulation_day": "Thursday",
@@ -28,7 +28,7 @@
         "display_name": "DeepSeek-V4-Flash",
         "provider": "DeepInfra",
         "endpoint": "https://api.deepinfra.com/v1/openai/chat/completions",
-        "model_id": "deepseek-ai/DeepSeek-V3",
+        "model_id": "deepseek-ai/DeepSeek-V4-Flash",
         "role": "primary_simulation_model"
       },
       {
@@ -36,16 +36,16 @@
         "display_name": "Qwen3.8-Flash",
         "provider": "DeepInfra",
         "endpoint": "https://api.deepinfra.com/v1/openai/chat/completions",
-        "model_id": "Qwen/Qwen2.5-72B-Instruct",
+        "model_id": "Qwen/Qwen3.8-Flash",
         "role": "replication_simulation_model"
       }
     ],
     "judge_models": [
       {
-        "key": "claude_3_5_sonnet",
-        "display_name": "Claude-3.5-Sonnet",
+        "key": "claude_haiku_5_5",
+        "display_name": "Claude Haiku 5.5",
         "provider": "Anthropic",
-        "model_id": "claude-3-5-sonnet-20241022",
+        "model_id": "claude-haiku-5-5",
         "role": "primary_blind_evaluator"
       },
       {
@@ -53,7 +53,7 @@
         "display_name": "GPT-4o",
         "provider": "OpenAI",
         "model_id": "gpt-4o",
-        "role": "secondary_blind_evaluator"
+        "role": "secondary_evaluator_audit_sample_only"
       }
     ],
     "local_hardware_backup": {
@@ -74,6 +74,7 @@
       "temperature": 0.7,
       "top_p": 0.95,
       "max_tokens": 120,
+      "disable_thinking": true,
       "presence_penalty": 0.0,
       "frequency_penalty": 0.0
     },
@@ -86,18 +87,25 @@
       "temperature": 0.0,
       "top_p": 1.0,
       "max_tokens": 5,
+      "disable_thinking": true,
       "presence_penalty": 0.0,
       "frequency_penalty": 0.0
     },
     "blind_judge_turns": {
       "scene": "post_scene_5",
       "description": "Categorical scoring of phone call transcripts into 6 pre-defined labels.",
-      "temperature": 0.0,
-      "top_p": 1.0,
       "max_tokens": 250,
-      "response_format": {
-        "type": "json_object"
-      }
+      "thinking": {
+        "type": "disabled"
+      },
+      "structured_output": {
+        "label_enum_from": "judging_and_scoring.categorical_labels",
+        "required_fields": [
+          "label",
+          "quote"
+        ]
+      },
+      "use_batch_api": true
     }
   },
   "artists": {
@@ -112,14 +120,15 @@
       "intro_artist_2": "Vesper Vance"
     },
     "counterbalancing_schedule": {
-      "rule": "50/50 seed split across repetitions to mathematically cancel phonetic/stylistic bias.",
+      "rule": "seed_id = layout_id * 3 + repetition_id (0-38). Vesper Vance is the real artist when (seed_id + cell_id) is even. Each cell splits 20/19 and the majority flips between consecutive cell_ids, so the pilot (4 cells) and main grid (64 cells) balance exactly. Twins share a seed, so they share the real artist.",
+      "seed_id_formula": "layout_id * 3 + repetition_id",
       "even_seeds": {
-        "seed_parity": "even",
+        "seed_parity": "even (seed_id + cell_id)",
         "real_artist": "Vesper Vance",
         "fake_artist": "Kaelen Cross"
       },
       "odd_seeds": {
-        "seed_parity": "odd",
+        "seed_parity": "odd (seed_id + cell_id)",
         "real_artist": "Kaelen Cross",
         "fake_artist": "Vesper Vance"
       }
@@ -132,7 +141,7 @@
         "source_self": "You have been close friends with everyone at this table for years. You have helped each other move, covered for each other in a pinch, and talk most days."
       },
       "stranger": {
-        "listener_line": "You have never really spoken with {source_name}. You know {them} only by sight, from around town.",
+        "listener_line": "You have never really spoken with {source_name}. You know {source_name} only by sight, from around town.",
         "source_self": "You have never really spoken with anyone at this table. You know them only by sight, from around town."
       }
     },
@@ -1388,11 +1397,17 @@
   },
   "prompts_and_templates": {
     "shared_system_prompt_header": "You are {name}, a {job} in {town}. You talk in a way that is {style}. Earlier today, {day_detail}.\n\nYou live in {town}, a small town of about 4,000 people. Today is Thursday. Most people here know each other at least by sight. Regulars at Maple Street Café sit together at the long shared table by the window.\n\n{intro_artist_1} and {intro_artist_2} are two of the most famous pop singers in the country; their national tours sell out in minutes. You like their music well enough, but you are not a big fan of either.\n\nThe town noticeboard, where local events are posted, is outside the Community Hall on the far side of town. Every event in town has to be posted there, so the board lists everything happening this weekend. Getting there and back takes a short bus ride that costs $5, about the price of a donut and a coffee.\n\nStay in character as {name}. Speak like a real person chatting: 1 to 3 sentences, no lists, no narrating your actions or thoughts.",
+    "scene_1_source_prompt": "{shared_header}\n\n{identity_self} {authority_self} {wealth_self} {closeness_self}\n\nYesterday, from the bus window, you glimpsed a poster on the noticeboard outside the Community Hall with {announced_artist}'s name in big letters. You are convinced it said {announced_artist} is playing a free surprise concert this Saturday at 7 pm in the Town Square. You believe it and you are genuinely excited. You have not been back to look at it.\n\nYou are at the long shared table at Maple Street Café with {table_names}. The café is busy, so you have taken a seat at the long shared table.\n\nBreakfast is wrapping up. Stand up, deliver your departure message to the table, and head out. Say exactly:\n\"{scene_1_source_departure_broadcast}\"",
+    "first_hand_listener_context": "{shared_header}\n\nYou have {budget} of spending money this week, like most people in town. Apart from {source_name}, you know the other regulars as friendly acquaintances: not close, but you chat whenever you meet.\n\nAbout {source_name}: {identity_line} {authority_line} {wealth_line} {closeness_line} {reliability_line}\n\nYou are at the long shared table at Maple Street Café having coffee with {source_name} and a few other regulars. Right as breakfast ends, {source_name} stands up, announces news about a concert on their way out, and leaves. You finish your coffee and head off to your afternoon.",
+    "second_hand_listener_context": "{shared_header}\n\nYou have {budget} of spending money this week, like most people in town. Apart from {source_name}, you know the other regulars as friendly acquaintances: not close, but you chat whenever you meet.\n\nAbout {source_name}: {identity_line} {authority_line} {wealth_line} {closeness_line} {reliability_line}\n\nYou were busy this morning and missed the regulars' chat at Maple Street Café. You have just run into {partner_name}.",
+    "scene_5_phone_cue": "It's evening. You're on the phone with {loved_one}, your {relation}, who lives out of town.",
     "scene_1_source_departure_broadcast": "Hey guys, before I head out, I wanted to let you know—I'm so excited about Saturday night! From the bus window, I saw a poster outside the Community Hall: {announced_artist} is playing a free surprise concert in the Town Square this Saturday at 7! I didn't get to stop and read it closely, but I'm pretty sure. You should all come! Anyway, I have to run—talk soon!",
     "scene_2_and_4_check_prompt": "The chat is over and you have a free hour. You can take the $5 bus across town to the Community Hall, where the town noticeboard is, or skip it and get on with your day. Reply with one word: GO or SKIP.",
     "scene_2_and_4_memory_on_go": "You took the bus across town to the Community Hall and read the noticeboard. It has one poster on it:\nFREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome.",
     "scene_3_second_hand_scripted_opener": "Hey {partner_name}! Sorry I missed the café this morning. What did I miss?",
     "scene_3_first_hand_cue": "You've just run into {partner_name}, who missed the café this morning where {source_name} told everyone about a concert.",
+    "scene_3_first_hand_closing_cue": "Wrap up the chat with {partner_name} in 1 to 2 sentences and say goodbye.",
+    "spoken_line_format": "{speaker_name}: \"{text}\"",
     "scene_5_phone_call_funnel": [
       {
         "step": 1,
@@ -1455,7 +1470,7 @@
       "Judge is completely blind to world condition (rumor vs truth twin).",
       "Judge is completely blind to whether the agent chose GO or SKIP."
     ],
-    "judge_model_independence": "Judge must strictly be an external model NOT used in the simulation runs (Claude-3.5-Sonnet or GPT-4o).",
+    "judge_model_independence": "Judge must strictly be an external model NOT used in the simulation runs (Claude Haiku 5.5 as primary; GPT-4o only on the human-audit sample).",
     "human_audit_protocol": {
       "sample_size": 100,
       "metric": "Cohen's Kappa",

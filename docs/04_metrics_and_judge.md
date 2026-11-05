@@ -100,7 +100,7 @@ To eliminate circular evaluation and stylistic bias, the LLM Judge adheres to st
 
 ### Model Vendor Flexibility
 The evaluator model is intentionally not locked to a single proprietary vendor. The team can utilize any frontier evaluator model based on available researcher credits:
-* **Anthropic:** Claude-3.5-Sonnet (Recommended)
+* **Anthropic:** Claude Haiku 5.5 (Recommended; move up to Claude Sonnet 5.5 if the pilot audit gives κ < 0.85)
 * **OpenAI:** GPT-4o
 * **Google:** Gemini 1.5 Pro
 
@@ -134,6 +134,7 @@ To account for this clustering:
    $$Y_{ijs} = \beta_0 + \beta_1 \text{Truth}_{ijs} + \sum_{k=1}^6 \beta_k \text{Knob}_{k,ijs} + \sum_{k=1}^6 \gamma_k (\text{Truth}_{ijs} \times \text{Knob}_{k,ijs}) + u_s + \epsilon_{ijs}$$
    where $u_s \sim \mathcal{N}(0, \sigma_u^2)$ is the town-level random effect.
 3. Standard errors are clustered at the town level.
+4. The real artist (Vesper Vance or Kaelen Cross) is included as a covariate, absorbing the 20/19 split within each cell.
 
 ---
 
