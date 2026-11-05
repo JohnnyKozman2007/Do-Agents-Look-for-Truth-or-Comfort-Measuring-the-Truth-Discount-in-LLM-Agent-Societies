@@ -56,7 +56,7 @@ The source receives their own self-identity, authority, wealth, and relationship
 | Knob | Level | Listener Context Line (`{..._line}`) | Source Self-Identity Line (`{..._self}`) |
 | :--- | :--- | :--- | :--- |
 | **Closeness** | **Close Friend** | `You and {source_name} have been close friends for years. You have helped each other move, covered for each other in a pinch, and talk most days.` | `You have been close friends with everyone at this table for years. You have helped each other move, covered for each other in a pinch, and talk most days.` |
-| **Closeness** | **Stranger** | `You have never really spoken with {source_name}. You know {them} only by sight, from around town.` | `You have never really spoken with anyone at this table. You know them only by sight, from around town.` |
+| **Closeness** | **Stranger** | `You have never really spoken with {source_name}. You know {source_name} only by sight, from around town.` | `You have never really spoken with anyone at this table. You know them only by sight, from around town.` |
 | **Authority** | **Mayor** | `{source_name} is the town's elected mayor, who runs town meetings and makes local decisions.` | `You are the town's elected mayor; you run town meetings and make local decisions.` |
 | **Authority** | **Citizen** | `{source_name} is an ordinary resident of the town, with no official role.` | `You are an ordinary resident of the town, with no official role.` |
 | **Reliability**| **Good Record**| `Around town, {source_name} has a reputation: the news {source_name} passes on usually turns out to be right.` | *(None — omitted from source)* |
@@ -165,9 +165,11 @@ You were busy this morning and missed the regulars' chat at Maple Street Café. 
 3. **Turn 3 (Second-Hand Reaction):**  
    Second-hand agent reacts naturally to whatever news was shared.
 4. **Turn 4 (First-Hand Closing):**  
-   First-hand agent closes the conversation.
+   Prompt cue: `"Wrap up the chat with {partner_name} in 1 to 2 sentences and say goodbye."`
 
 *Runner Tracking:* The code logs whether the first-hand listener explicitly passed on the poster text (if they checked), quoting the line where it occurred.
+
+*Message Format:* Lines spoken by other agents are added to each agent's history as `{speaker_name}: "{text}"`, the same way in every scene and run.
 
 ---
 

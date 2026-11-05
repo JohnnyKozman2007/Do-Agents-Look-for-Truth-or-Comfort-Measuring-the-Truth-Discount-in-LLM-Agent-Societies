@@ -61,7 +61,7 @@ To eliminate negation bias while keeping the emotional excitement ("juiciness") 
 
 #### 50/50 Name Counterbalancing
 To guarantee that neither artist's name inherently sounds more believable or attractive to the LLM:
-* Across seeds and layouts, **Vesper Vance is the real concert in exactly 50% of runs**, and **Kaelen Cross is the real concert in the other 50% of runs** (and vice versa for the false rumor).
+* Across the study, **Vesper Vance is the real concert in exactly 50% of runs**, and **Kaelen Cross is the real concert in the other 50%** (and vice versa for the false rumor). Each cell's 39 seeds split 20/19, and the majority artist flips between consecutive cells, so the totals balance exactly.
 
 ---
 
@@ -157,6 +157,7 @@ We establish two explicit execution plans so that funding constraints never leav
 * **How it works:** Both DeepSeek-V4-Flash and Qwen3.8-Flash execute the **full 7,644-run suite**.
 * **Total Runs Across Both Models:** $7,644 \times 2 = \mathbf{15,288\text{ total runs}}$.
 * **Cost Estimate:** At DeepInfra rates (~$0.014/run for DeepSeek and ~$0.024/run for Qwen), the full dual run costs ~$320 total (~$12 for the 312 pilot runs).
+* **Judge Cost (estimate):** Claude Haiku 5.5 through the Batch API adds about $1–2 for the pilot and about $30 for the full dual run.
 * **Scientific Value:** This is the gold standard for publication. It eliminates the need for a separate mini-replication block because Model 2 replicates the *entire* paper.
 
 ### Plan B: Core Replication Execution (Documented Budget Fallback)
