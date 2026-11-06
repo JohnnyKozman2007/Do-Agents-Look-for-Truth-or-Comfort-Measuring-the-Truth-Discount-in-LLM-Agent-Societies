@@ -29,6 +29,12 @@ def concert_mentioned(text: str, artists: list[str]) -> bool:
     return re.search(pattern, text, re.IGNORECASE) is not None
 
 
+def evidence_line(text: str, real_artist: str) -> bool:
+    """A line passes on board evidence if it names the real artist and the (notice)board."""
+    return (re.search(rf"\b{re.escape(real_artist)}\b", text, re.IGNORECASE) is not None
+            and re.search(r"\b(?:notice\s?board|board)\b", text, re.IGNORECASE) is not None)
+
+
 async def _phase(tasks: list[Any]) -> None:
     # Await every started callback before persisting a failure bundle.
     outcomes = await asyncio.gather(*tasks, return_exceptions=True)
@@ -56,13 +62,13 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
         **run, "schema_version": "truth-discount-offline-0.1",
         "evidence_kind": "synthetic_fixture", "study_eligible": False,
         "config_version": config["meta"]["version"], "config_sha256": digest(config),
-        "run_status": "completed", "error": None, "source_mode": "offline_generated_exact_prompt",
+        "run_status": "completed", "error": None, "source_mode": "scripted_insert",
         "source_exact_text_match": None,
         "scene_statuses": {str(i): "not_executed" for i in range(1, 6)},
         "scene_1_departure_broadcast_text": None,
         "scene_2_first_hand_decisions": [], "scene_3_catch_up_transcripts": [],
         "scene_3_poster_evidence_passed": [], "scene_4_second_hand_decisions": [],
-        "scene_5_phone_transcripts": [], "scene_5_funnel_step_mentioned": {},
+        "scene_5_phone_transcripts": [], "scene_5_funnel_step_mentioned": {}, "scene_5_mention_step_confirmed": {},
         "judge_inputs": [], "judge_evaluations": [], "calls": [],
         "timestamps": {"started_utc": datetime.now(timezone.utc).isoformat()},
         "token_usage": {"provider_api_calls": 0, "input_tokens": None, "output_tokens": None,
@@ -157,15 +163,12 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
         add_other(second, names[first], closing)
         lines.append({"turn": 4, "seat_id": first, "speaker": names[first], "text": closing, "scripted": False})
         checked = next(d for d in town["scene_2_first_hand_decisions"] if d["seat_id"] == first)
-        cell = next(c for c in config["pilot_cells"] if c["cell_id"] == run["cell_id"])
-        poster_line = next(c["ground_truth_noticeboard"] for c in cell["conditions"]
-                           if c["condition_type"] == run["condition_type"])
-        poster = render_template(poster_line, values_f)
-        quotes = [line["text"] for line in lines if line["seat_id"] == first and poster in line["text"]]
+        quotes = [line["text"] for line in lines
+                  if line["seat_id"] == first and evidence_line(line["text"], run["real_artist"])]
         town["scene_3_poster_evidence_passed"].append({
             "first_hand_seat": first, "second_hand_seat": second, "partner_checked": checked["decision"] == "GO",
-            "literal_poster_quote_found": bool(quotes), "supporting_quotes": quotes,
-            "rule": "literal_full_poster_match_only_not_semantic_adjudication"})
+            "evidence_passed": checked["decision"] == "GO" and bool(quotes), "supporting_quotes": quotes,
+            "rule": "checked_then_named_real_artist_and_board_in_one_line"})
 
     async def phone(seat: int) -> None:
         values = render_values(config, run, seat)
@@ -202,13 +205,17 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
             raw = await call(seat, 5, 0, kind="judge", judge_input=judge_input)
             result = {"seat_id": seat, **parse_judge_response(raw, transcript), "provenance": "synthetic_judge_callback"}
         town["judge_evaluations"].append(result)
+        # A reply that only repeats the step-4 question ("no concert news") is not a real mention.
+        confirmed = result.get("status") == "valid" and result.get("label") != "NOT_MENTIONED"
+        town["scene_5_mention_step_confirmed"][str(seat)] = mention_step if confirmed else None
 
     try:
         town["scene_statuses"]["1"] = "started"
-        broadcast = await call(0, 1, 1, "Share your departure message now.")
+        # The departure line is scripted: insert it word for word so both twins hear identical text.
+        broadcast = render_template(templates["scene_1_source_departure_broadcast"], render_values(config, run, 0))
+        histories[0].append({"role": "assistant", "content": broadcast})
         town["scene_1_departure_broadcast_text"] = broadcast
-        fixed = render_template(templates["scene_1_source_departure_broadcast"], render_values(config, run, 0))
-        town["source_exact_text_match"] = broadcast == fixed
+        town["source_exact_text_match"] = True
         for seat in range(1, 7):
             add_other(seat, names[0], broadcast)
         town["scene_statuses"]["1"] = "completed"

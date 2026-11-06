@@ -5,14 +5,14 @@
   "towns": 4,
   "pairs": 2,
   "completed_towns": 4,
-  "fixture_callbacks": 284,
+  "fixture_callbacks": 280,
   "judged_phone_inputs": 32,
   "config_version": "1.1.0",
   "configured_plan_towns": 624,
   "configured_plan_towns_per_model": 312,
   "generated_utc_date": "2026-11-06",
   "validation_command": "bash scripts/offline_check.sh",
-  "unit_tests_passed": 80,
+  "unit_tests_passed": 82,
   "proof_limit": "Deterministic synthetic software fixtures only. No named model executed, provider cost measured, empirical result, or judge-validity finding.",
   "config_file_sha256": "e6976707d346acf72bc4e5b7f5b300bd5eeb4a598374b61141c95b0189dbe471"
 }

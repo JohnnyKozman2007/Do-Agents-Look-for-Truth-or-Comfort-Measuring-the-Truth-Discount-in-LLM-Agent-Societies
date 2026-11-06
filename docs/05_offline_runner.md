@@ -33,11 +33,11 @@ Pass `--config path/to/pilot_config.json` to `validate`, `manifest` or `demo` to
 
 ## Scene execution and information access
 
-1. The source receives its persona, source traits and the requested departure text. It never receives its own reliability description. The runner preserves the backend's actual broadcast and records `source_exact_text_match`. A mismatch remains in the trace. The runner does not replace it with the template or automatically abort the town.
+1. The source's departure line is scripted, so the runner inserts it word for word without a model call. Rumor and truth twins therefore hear identical wording apart from the artist name. The source's prompt never includes its own reliability description.
 2. Six first-hand listeners independently choose GO or SKIP. GO deducts $5 from that listener's $40 budget and adds the official noticeboard observation to their history.
 3. Six fixed pairs have four spoken catch-up turns: a scripted second-hand opener followed by three generated responses. A complete town makes 18 catch-up generation calls. The second-hand listener receives only their partner's spoken replies, including any evidence the partner chooses to share.
 4. Six second-hand listeners make their own checking decisions. Only their own GO adds a direct noticeboard observation to their history.
-5. Each listener follows the evening phone funnel. The runner checks the listener's reply for a concert or either artist name. A mention at steps 1–4 leads to the follow-up at step 5 and caller wrap-up at step 6. There is no generated response after step 6. Four replies without a mention produce a runner-assigned `NOT_MENTIONED`, without a judge call.
+5. Each listener follows the evening phone funnel. The runner checks the listener's reply for a concert or either artist name. A mention at steps 1–4 leads to the follow-up at step 5 and caller wrap-up at step 6. There is no generated response after step 6. Four replies without a mention produce a runner-assigned `NOT_MENTIONED`, without a judge call. `scene_5_mention_step_confirmed` keeps the mention step only when the judge's label is not `NOT_MENTIONED`, so a reply that just repeats the step-4 question does not count as a mention.
 
 Agent histories remain separate. Shared background uses the configured alphabetical artist order. The judge receives the rubric, the announced artist and the phone dialogue. The runner does not add source traits, the truth condition, checking actions or private histories to that input. A listener can still disclose those facts in their own dialogue.
 
@@ -72,6 +72,6 @@ Descriptive belief scores map FACT and CHECKED_TRUE to 1, UNCERTAIN to 0.5, and 
 
 Real execution still requires provider adapters, validation of model and judge access, supported settings, usage accounting and explicit funding authorization. The credit-use hold remains in place. The configured batch flag and model identifiers do not establish a working provider integration.
 
-This implementation does not run the full 64-cell study or two-source probes. It does not implement LMM estimation, Holm correction, the human judge audit or empirical reliability analysis. The optional post-scoring manipulation check is also outside this version. Its poster-relay flag detects an exact full-poster quotation and does not adjudicate semantic paraphrases.
+This implementation does not run the full 64-cell study or two-source probes. It does not implement LMM estimation, Holm correction, the human judge audit or empirical reliability analysis. The optional post-scoring manipulation check is also outside this version. Its evidence flag counts a first-hand listener who checked the board and then names the real artist and the board in one catch-up line. It is a keyword rule, not a semantic judgment.
 
 The existing method documents make stronger claims about complete bias cancellation, deterministic model behavior and immunity to omission bias. The offline implementation does not establish those claims. Its `seed_id` identifies the planned layout, repetition and artist assignment, not a provider random seed. The fixture outputs establish software behavior only. Keep these method questions separate from implementation validation and resolve them before interpreting real results.
