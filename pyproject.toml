@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "truth-discount-runner"
+version = "0.1.0"
+description = "Offline pilot orchestration and trace validation"
+requires-python = ">=3.11"
+authors = [{name = "Ahmed Tariq"}]
+
+[project.scripts]
+truth-discount = "truth_discount.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
