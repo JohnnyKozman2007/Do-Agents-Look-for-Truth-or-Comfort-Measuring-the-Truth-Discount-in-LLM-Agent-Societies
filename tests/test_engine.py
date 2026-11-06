@@ -96,7 +96,11 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         result = await self.execute(backend)
         self.assertEqual(result["run_status"], "completed")
         self.assertEqual(result["scene_statuses"], {str(scene): "completed" for scene in range(1, 6)})
-        self.assertEqual({request.scene for request in backend.requests if not judge_request(request)}, {1, 2, 3, 4, 5})
+        self.assertEqual({request.scene for request in backend.requests if not judge_request(request)}, {2, 3, 4, 5})
+        self.assertTrue(result["source_exact_text_match"])
+        self.assertEqual(result["scene_1_departure_broadcast_text"], backend.broadcast)
+        for seat in range(1, 7):
+            self.assertIn(backend.broadcast, result["agent_histories"][str(seat)][1]["content"])
         catchup = [request for request in backend.requests if request.scene == 3]
         self.assertEqual(len(catchup), 18)
         for seat in range(1, 7):
@@ -155,13 +159,22 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         for values in config["experimental_knobs"]["reliability"].values():
             values["listener_line"] += " PRIVATE_RELIABILITY_SENTINEL."
         backend = ControlledBackend(config, self.run)
-        await self.execute(backend, config=config)
-        source_requests = [request for request in backend.requests if request.scene == 1]
-        self.assertEqual(len(source_requests), 1)
-        self.assertNotIn("PRIVATE_RELIABILITY_SENTINEL", prompt_text(source_requests[0]))
+        result = await self.execute(backend, config=config)
+        self.assertFalse(any(request.scene == 1 for request in backend.requests))
+        self.assertNotIn("PRIVATE_RELIABILITY_SENTINEL", result["agent_histories"]["0"][0]["content"])
         listener_decisions = [request for request in backend.requests if request.scene == 2]
         self.assertEqual(len(listener_decisions), 6)
         self.assertTrue(all("PRIVATE_RELIABILITY_SENTINEL" in prompt_text(request) for request in listener_decisions))
+
+    async def test_evidence_passed_needs_a_check_plus_artist_and_board(self):
+        backend = ControlledBackend(self.config, self.run, go_seats={1}, relay=True)
+        result = await self.execute(backend)
+        flags = {p["first_hand_seat"]: p["evidence_passed"] for p in result["scene_3_poster_evidence_passed"]}
+        self.assertEqual(flags, {seat: seat == 1 for seat in range(1, 7)})
+        run = copy.deepcopy(self.run)
+        run["run_id"] += "-no-check"
+        result = await self.execute(ControlledBackend(self.config, run, relay=True), run=run)
+        self.assertFalse(any(p["evidence_passed"] for p in result["scene_3_poster_evidence_passed"]))
 
     async def test_judge_receives_phone_and_rubric_without_private_context(self):
         config = copy.deepcopy(self.config)
@@ -216,11 +229,26 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         backend = ControlledBackend(self.config, self.run, mention_step=4)
         result = await self.execute(backend)
         self.assertEqual(result["scene_5_funnel_step_mentioned"], {str(seat): 4 for seat in range(1, 13)})
+        self.assertEqual(result["scene_5_mention_step_confirmed"], {str(seat): 4 for seat in range(1, 13)})
         for phone in result["scene_5_phone_transcripts"]:
             lines = phone["lines"]
             self.assertEqual([line["funnel_step"] for line in lines if line["speaker"] == "listener"], [1, 2, 3, 4, 5])
             self.assertEqual(lines[-1]["speaker"], "caller")
             self.assertEqual(lines[-1]["funnel_step"], 6)
+
+    async def test_step_four_echo_judged_not_mentioned_is_not_confirmed(self):
+        class EchoBackend(ControlledBackend):
+            async def generate(self, request):
+                if not judge_request(request):
+                    return await super().generate(request)
+                self.requests.append(copy.deepcopy(request))
+                response = GenerationResponse(text=json.dumps({"label": "NOT_MENTIONED", "quote": ""}))
+                self.responses.append((copy.deepcopy(request), copy.deepcopy(response)))
+                return response
+
+        result = await self.execute(EchoBackend(self.config, self.run, mention_step=4))
+        self.assertEqual(result["scene_5_funnel_step_mentioned"], {str(seat): 4 for seat in range(1, 13)})
+        self.assertEqual(result["scene_5_mention_step_confirmed"], {str(seat): None for seat in range(1, 13)})
 
     async def test_fixture_modes_execute_without_any_network_connection(self):
         with patch("socket.socket.connect", side_effect=AssertionError("Network forbidden in offline test")):

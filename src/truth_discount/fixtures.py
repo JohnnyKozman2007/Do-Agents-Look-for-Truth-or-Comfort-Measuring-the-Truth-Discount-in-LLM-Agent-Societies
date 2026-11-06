@@ -26,11 +26,6 @@ class FixtureBackend:
             return GenerationResponse(self._judge(text))
         if request.kind == "decision":
             return GenerationResponse("GO" if self.mode == "mixed" and request.seat % 2 else "SKIP")
-        if request.scene == 1:
-            match = re.search(r'Say exactly:\s*\n"([\s\S]+)"\s*$', request.messages[0]["content"])
-            if match is None:
-                raise ValueError("source fixture could not locate the configured broadcast")
-            return GenerationResponse(match.group(1))
         if self.mode == "silent":
             return GenerationResponse("Work kept me busy today, and I am looking forward to resting.")
         if request.scene == 3 and request.turn == 3:

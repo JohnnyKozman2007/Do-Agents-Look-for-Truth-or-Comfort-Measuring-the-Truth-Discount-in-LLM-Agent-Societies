@@ -127,13 +127,11 @@ def audit_town(directory: Path) -> dict[str, Any]:
         return [c for c in calls if c["scene"] == scene and c["seat_id"] == seat and c["kind"] == kind
                 and c["status"] == "completed" and (turn is None or c["turn"] == turn)]
 
-    source = completed(1, 0, "chat", 1)
-    broadcast = source[0]["response"] if len(source) == 1 else None
-    _require(town["scene_1_departure_broadcast_text"] == broadcast, "broadcast replay mismatch")
+    _require(not any(c["scene"] == 1 for c in calls), "scripted broadcast must not call a model")
     fixed = render_template(config["prompts_and_templates"]["scene_1_source_departure_broadcast"],
                             render_values(config, town, 0))
-    _require(town["source_exact_text_match"] == (broadcast == fixed if broadcast is not None else None),
-             "broadcast adherence mismatch")
+    _require(town["scene_1_departure_broadcast_text"] == fixed and town["source_exact_text_match"] is True,
+             "broadcast replay mismatch")
 
     from .runner import concert_mentioned, parse_check_decision
     decisions = town["scene_2_first_hand_decisions"] + town["scene_4_second_hand_decisions"]
@@ -249,6 +247,10 @@ def audit_town(directory: Path) -> dict[str, Any]:
             _require(len(observed) == 1, "judgment has no unique completed callback")
             expected_label = parse_judge_response(observed[0]["response"], lines)
         _require(all(row.get(k) == v for k, v in expected_label.items()), "judge parser replay mismatch")
+        confirmed = expected_label["status"] == "valid" and expected_label["label"] != "NOT_MENTIONED"
+        _require(town["scene_5_mention_step_confirmed"].get(str(seat)) ==
+                 (town["scene_5_funnel_step_mentioned"][str(seat)] if confirmed else None),
+                 "confirmed mention step mismatch")
     crosswalk = [json.loads(x) for x in (directory / "judge_crosswalk_PRIVATE.jsonl").read_text().splitlines()]
     _require(canonical_bytes(crosswalk) == canonical_bytes(_crosswalk(town)), "private crosswalk mismatch")
     _require((directory / "listener_scores.csv").read_bytes() == _score_csv(town, config).encode("utf-8"),
