@@ -9,10 +9,12 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from truth_discount.cli import main
 from truth_discount.config import load_config
 from truth_discount.contracts import clone
@@ -135,7 +137,7 @@ class LiveCliTests(unittest.TestCase):
     def test_mocked_adapter_collection_replays_and_remains_nonempirical(self):
         from truth_discount.budget import BudgetLedger
         from truth_discount.providers import ProviderBackend
-        from truth_discount.artifacts import audit_town, summarize
+        from truth_discount.artifacts import audit_town
         runs = select_runs(self.config)[:2]
         http = MockHTTP()
         with patch.dict(os.environ, {"TEST_PROVIDER_KEY": "FAKE_NOT_A_REAL_KEY"}), \

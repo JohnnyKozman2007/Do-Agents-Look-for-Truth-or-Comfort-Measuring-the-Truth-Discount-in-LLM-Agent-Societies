@@ -288,8 +288,8 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         result = await self.execute(backend)
         self.assertEqual(len(result["calls"]), len(backend.responses))
         directory = self.output_root / self.run["run_id"]
-        self.assertEqual(json.loads((directory / "town.json").read_text()), result)
-        self.assertEqual([json.loads(line) for line in (directory / "trace.jsonl").read_text().splitlines()], result["calls"])
+        self.assertEqual(json.loads((directory / "town.json").read_text(encoding="utf-8")), result)
+        self.assertEqual([json.loads(line) for line in (directory / "trace.jsonl").read_text(encoding="utf-8").splitlines()], result["calls"])
         self.assertEqual(result["evidence_kind"], "synthetic_fixture")
         self.assertIs(result["study_eligible"], False)
         self.assertEqual(result["token_usage"]["provider_api_calls"], 0)
@@ -420,7 +420,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.CancelledError):
             await self.execute(CancelBackend(self.config, self.run))
         path = self.output_root / self.run["run_id"] / "town.json"
-        town = json.loads(path.read_text())
+        town = json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(town["run_status"], "cancelled")
         self.assertEqual(town["scene_statuses"]["2"], "failed")
         self.assertEqual(town["scene_statuses"]["3"], "not_executed")
@@ -464,7 +464,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
         self.assertEqual(backend.settled, set(range(1, 7)))
-        town = json.loads((self.output_root / self.run["run_id"] / "town.json").read_text())
+        town = json.loads((self.output_root / self.run["run_id"] / "town.json").read_text(encoding="utf-8"))
         self.assertEqual(town["run_status"], "cancelled")
         self.assertEqual(town["scene_statuses"]["2"], "failed")
         active_calls = [c for c in town["calls"] if c["scene"] == 2]
@@ -491,7 +491,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
                         and c["seat_id"] == line["seat_id"] and c["turn"] == line["turn"])
             self.assertEqual(call["status"], "completed")
             self.assertEqual(line["text"], call["response"])
-        saved = json.loads((self.output_root / self.run["run_id"] / "town.json").read_text())
+        saved = json.loads((self.output_root / self.run["run_id"] / "town.json").read_text(encoding="utf-8"))
         saved_pair = next(p for p in saved["scene_3_catch_up_transcripts"] if p["first_hand_seat"] == 1)
         self.assertEqual(saved_pair, pair)
         self.assertNotIn(1, {p["first_hand_seat"] for p in saved["scene_3_poster_evidence_passed"]})

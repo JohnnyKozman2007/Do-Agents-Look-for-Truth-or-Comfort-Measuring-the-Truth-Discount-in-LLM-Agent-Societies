@@ -91,7 +91,7 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.usage["pricing_sha256"], digest({k: manifest()["routes"]["agent"][k]
             for k in ("input_usd_per_million", "output_usd_per_million", "cached_input_usd_per_million")}))
         self.assertEqual(self.ledger.summary()["reserved_usd"], 0)
-        self.assertNotIn(KEY, self.path.read_text())
+        self.assertNotIn(KEY, self.path.read_text(encoding="utf-8"))
         self.assertEqual(backend.evidence_kind, "mocked_provider")
 
     async def test_openai_explicit_route_and_output_token_parameter(self):
@@ -323,20 +323,20 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
             await self.backend(transport=bad).generate(request())
         self.assertNotIn(KEY, str(error.exception))
         self.assertNotIn(KEY, json.dumps(error.exception.receipt))
-        self.assertNotIn(KEY, self.path.read_text())
+        self.assertNotIn(KEY, self.path.read_text(encoding="utf-8"))
         self.assertEqual(len(self.calls), 1)
         self.assertTrue(self.ledger.summary()["blocked"])
 
     async def test_successful_echoed_key_id_is_redacted_before_persistence(self):
         result = await self.backend(body=response(id=KEY)).generate(request())
         self.assertEqual(result.usage["request_id"], "[REDACTED]")
-        self.assertNotIn(KEY, self.path.read_text())
+        self.assertNotIn(KEY, self.path.read_text(encoding="utf-8"))
 
     async def test_echoed_key_in_generated_text_cannot_escape_to_history(self):
         body = response(choices=[{"message": {"content": "The server echoed " + KEY}}])
         with self.assertRaises(ProviderError) as error:
             await self.backend(body=body).generate(request())
-        self.assertNotIn(KEY, str(error.exception) + json.dumps(error.exception.receipt) + self.path.read_text())
+        self.assertNotIn(KEY, str(error.exception) + json.dumps(error.exception.receipt) + self.path.read_text(encoding="utf-8"))
         self.assertEqual(error.exception.receipt["cost_status"], "calculated_from_usage")
         self.assertAlmostEqual(self.ledger.summary()["settled_usd"], .000076)
         self.assertFalse(self.ledger.summary()["blocked"])
@@ -367,7 +367,7 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ProviderError) as error:
             await self.backend(transport=bad).generate(request())
         self.assertEqual(error.exception.receipt["attempts"][0]["http_status"], 429)
-        self.assertNotIn(KEY, str(error.exception) + self.path.read_text())
+        self.assertNotIn(KEY, str(error.exception) + self.path.read_text(encoding="utf-8"))
         self.assertTrue(self.ledger.summary()["blocked"])
 
     async def test_timeout_and_cancellation_hold_reservation(self):

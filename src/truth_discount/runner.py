@@ -13,7 +13,7 @@ from typing import Any
 
 from .config import render_contexts, render_template, render_values
 from .contracts import (Backend, GenerationRequest, GenerationResponse, MalformedGeneration,
-                        canonical_bytes, capture, clone, digest, usage_totals)
+                        capture, clone, digest, usage_totals)
 from .scoring import make_judge_input, parse_judge_response, town_metrics
 
 

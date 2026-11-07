@@ -15,7 +15,7 @@ from truth_discount.scoring import (  # noqa: E402
 
 
 def load_config():
-    return json.loads((ROOT / "configs" / "pilot_config.json").read_text())
+    return json.loads((ROOT / "configs" / "pilot_config.json").read_text(encoding="utf-8"))
 
 
 def evaluations(labels):
