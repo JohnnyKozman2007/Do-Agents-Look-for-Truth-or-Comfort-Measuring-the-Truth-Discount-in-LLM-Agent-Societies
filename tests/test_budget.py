@@ -104,7 +104,7 @@ class BudgetTests(unittest.TestCase):
         reservation = ledger.reserve(.1)
         with self.assertRaises(BudgetError):
             ledger.settle(reservation, .01, {"error_body": "secret"})
-        self.assertNotIn("secret", self.path.read_text())
+        self.assertNotIn("secret", self.path.read_text(encoding="utf-8"))
 
     def test_failed_durable_write_prevents_later_requests(self):
         ledger = self.ledger()
@@ -224,7 +224,7 @@ class BudgetTests(unittest.TestCase):
         self.path.write_text(legacy)
         with self.assertRaisesRegex(BudgetError, "old single-file"):
             BudgetLedger(self.path, 1)
-        self.assertEqual(self.path.read_text(), legacy)
+        self.assertEqual(self.path.read_text(encoding="utf-8"), legacy)
 
     def test_checkpoint_binds_identity_and_survives_reopening(self):
         ledger = self.ledger()

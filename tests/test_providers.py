@@ -91,7 +91,7 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.usage["pricing_sha256"], digest({k: manifest()["routes"]["agent"][k]
             for k in ("input_usd_per_million", "output_usd_per_million", "cached_input_usd_per_million")}))
         self.assertEqual(self.ledger.summary()["reserved_usd"], 0)
-        self.assertNotIn(KEY, self.path.read_text())
+        self.assertNotIn(KEY, self.path.read_text(encoding="utf-8"))
         self.assertEqual(backend.evidence_kind, "mocked_provider")
 
     async def test_openai_explicit_route_and_output_token_parameter(self):
@@ -323,20 +323,20 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
             await self.backend(transport=bad).generate(request())
         self.assertNotIn(KEY, str(error.exception))
         self.assertNotIn(KEY, json.dumps(error.exception.receipt))
-        self.assertNotIn(KEY, self.path.read_text())
+        self.assertNotIn(KEY, self.path.read_text(encoding="utf-8"))
         self.assertEqual(len(self.calls), 1)
         self.assertTrue(self.ledger.summary()["blocked"])
 
     async def test_successful_echoed_key_id_is_redacted_before_persistence(self):
         result = await self.backend(body=response(id=KEY)).generate(request())
         self.assertEqual(result.usage["request_id"], "[REDACTED]")
-        self.assertNotIn(KEY, self.path.read_text())
+        self.assertNotIn(KEY, self.path.read_text(encoding="utf-8"))
 
     async def test_echoed_key_in_generated_text_cannot_escape_to_history(self):
         body = response(choices=[{"message": {"content": "The server echoed " + KEY}}])
         with self.assertRaises(ProviderError) as error:
             await self.backend(body=body).generate(request())
-        self.assertNotIn(KEY, str(error.exception) + json.dumps(error.exception.receipt) + self.path.read_text())
+        self.assertNotIn(KEY, str(error.exception) + json.dumps(error.exception.receipt) + self.path.read_text(encoding="utf-8"))
         self.assertEqual(error.exception.receipt["cost_status"], "calculated_from_usage")
         self.assertAlmostEqual(self.ledger.summary()["settled_usd"], .000076)
         self.assertFalse(self.ledger.summary()["blocked"])
@@ -367,7 +367,7 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ProviderError) as error:
             await self.backend(transport=bad).generate(request())
         self.assertEqual(error.exception.receipt["attempts"][0]["http_status"], 429)
-        self.assertNotIn(KEY, str(error.exception) + self.path.read_text())
+        self.assertNotIn(KEY, str(error.exception) + self.path.read_text(encoding="utf-8"))
         self.assertTrue(self.ledger.summary()["blocked"])
 
     async def test_timeout_and_cancellation_hold_reservation(self):
@@ -439,6 +439,32 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ProviderError):
                 await self.backend(body=body).generate(request())
             self.assertTrue(self.ledger.summary()["blocked"])
+
+    def test_real_deepinfra_usage_prices_match_deepinfra_estimate(self):
+        # Usage blocks copied from live DeepInfra replies during the 7 Nov smoke-test probe.
+        example = json.loads((Path(__file__).resolve().parents[1] / "configs/providers.example.json")
+                             .read_text(encoding="utf-8"))["routes"]
+        observed = [
+            ("deepseek_v4_flash", "deepseek-ai/DeepSeek-V4-Flash",
+             {"prompt_tokens": 484, "total_tokens": 487, "completion_tokens": 3, "estimated_cost": 2.5668e-05,
+              "prompt_tokens_details": {"cached_tokens": 256, "cache_write_tokens": None}}),
+            ("qwen_3_8_flash", "Qwen/Qwen3.8-Flash",
+             {"prompt_tokens": 506, "total_tokens": 507, "completion_tokens": 1, "estimated_cost": 5.756e-05,
+              "prompt_tokens_details": {"cached_tokens": 0, "cache_write_tokens": None}})]
+        for key, model, usage in observed:
+            with self.subTest(route=key):
+                receipt = {"actual_model": None, "request_id": None, "reasoning_tokens": None}
+                cost = ProviderBackend._usage({"id": "chatcmpl-1", "model": model, "usage": usage},
+                                              example[key], receipt)
+                self.assertAlmostEqual(float(cost), usage["estimated_cost"], places=12)
+                self.assertEqual((receipt["cache_usage"], receipt["cached_input_tokens"]),
+                                 ("reported", usage["prompt_tokens_details"]["cached_tokens"]))
+        for writes in (1, "1", True):
+            usage = deepcopy(observed[0][2])
+            usage["prompt_tokens_details"]["cache_write_tokens"] = writes
+            with self.subTest(writes=writes), self.assertRaises(ProviderError):
+                ProviderBackend._usage({"model": observed[0][1], "usage": usage}, example["deepseek_v4_flash"],
+                                       {"reasoning_tokens": None})
 
     def test_secret_endpoint_and_invalid_numeric_manifest_rejected(self):
         changes = [{"endpoint": "https://evil.example/chat"}, {"api_key": KEY},

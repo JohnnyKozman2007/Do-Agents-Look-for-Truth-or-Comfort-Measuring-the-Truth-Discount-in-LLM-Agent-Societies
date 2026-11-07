@@ -6,9 +6,11 @@ from decimal import Decimal
 import hashlib
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from truth_discount.artifacts import (InvalidBundle, archived_attempt_paths, audit_town,
                                      save_town, summarize)
 from truth_discount.config import build_manifest, load_config, render_contexts
@@ -213,9 +215,9 @@ class ReplayVersionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(report["cost_usd"])
         self.assertGreater(report["simulated_cost_usd"], 0)
         self.assertNotIn("paired_fixture_metrics", report)
-        self.assertIn("mocked_provider", (directory / "listener_scores.csv").read_text())
-        self.assertIn("Mocked provider", (directory / "transcript.md").read_text())
-        manifest = json.loads((directory / "manifest.json").read_text())
+        self.assertIn("mocked_provider", (directory / "listener_scores.csv").read_text(encoding="utf-8"))
+        self.assertIn("Mocked provider", (directory / "transcript.md").read_text(encoding="utf-8"))
+        manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual((manifest["schema_version"], manifest["evidence_kind"]), (CURRENT, "mocked_provider"))
 
     async def test_missing_provider_usage_remains_unknown(self):
@@ -555,13 +557,31 @@ class ReplayVersionTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(InvalidBundle, "approved verified"):
             audit_town(directory)
 
+    async def test_unused_unverified_route_does_not_void_a_real_run(self):
+        # The live pilot manifest keeps the optional GPT-4o audit route unverified.
+        class RealRunReceipts(MockReceipts):
+            evidence_kind = "development_pilot"
+
+        backend = RealRunReceipts(self.config)
+        routes = backend.manifest["routes"]
+        routes["gpt_4o_audit"] = {**next(iter(routes.values())), "model_id": "gpt-4o", "settings_verified": False}
+        town, directory = await self.make(backend=backend)
+        self.assertEqual(audit_town(directory)["run_id"], town["run_id"])
+        routes = town["execution_manifest"]["routes"]
+        used = town["calls"][0]["model_key"]
+        routes[used]["settings_verified"] = False
+        town["execution_manifest_sha256"] = digest(town["execution_manifest"])
+        self.save(town, directory)
+        with self.assertRaisesRegex(InvalidBundle, "approved verified"):
+            audit_town(directory)
+
     async def test_raw_response_hash_and_source_hash_shape_are_checked(self):
         town, directory = await self.make()
         town["calls"][0]["raw_response"]["sha256"] = "0" * 64
         self.save(town, directory)
         with self.assertRaisesRegex(InvalidBundle, "raw response hash"):
             audit_town(directory)
-        manifest = json.loads((directory / "manifest.json").read_text())
+        manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
         manifest["source_files_sha256"]["runner.py"] = "not-a-hash"
         (directory / "manifest.json").write_text(json.dumps(manifest))
         with self.assertRaisesRegex(InvalidBundle, "source hashes"):

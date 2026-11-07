@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
 from typing import Any
 
 from .config import build_manifest, render_contexts
@@ -111,6 +112,28 @@ def _set_aside(output: Path, directory: Path) -> str:
             return target.relative_to(output).as_posix()
 
 
+REPLACE_ATTEMPTS = 40
+
+
+def _replace(temporary: str, path: Path) -> None:
+    """os.replace, retried while another program briefly holds the target open.
+
+    Windows refuses to replace a file that an antivirus scan, search indexer or
+    editor has open, even for a moment. The checkpoint is rewritten after every
+    ledger event, so one such collision used to mark the whole ledger as failed.
+    A hanging editor once held it for over 10 seconds, so waits now total about
+    40 seconds before the error is treated as a real storage failure.
+    """
+    for attempt in range(REPLACE_ATTEMPTS):
+        try:
+            os.replace(temporary, path)
+            return
+        except PermissionError:
+            if attempt == REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(min(2.0, 0.05 * (attempt + 1)))
+
+
 def _atomic_json(path: Path, value: dict) -> None:
     """Durably replace a small state file before allowing another paid request."""
     temporary = None
@@ -120,7 +143,7 @@ def _atomic_json(path: Path, value: dict) -> None:
             json.dump(value, stream, sort_keys=True, allow_nan=False)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        _replace(temporary, path)
         if os.name != "nt":
             directory = os.open(path.parent, os.O_RDONLY)
             try:
@@ -139,7 +162,7 @@ def _audit_expected(directory: Path, config: dict, providers: dict, run: dict,
     try:
         town = audit_town(directory)
     except (OSError, ValueError, KeyError, TypeError) as error:
-        raise ValueError("saved town cannot be verified; preserve it for review: " + str(directory)) from error
+        raise ValueError(f"saved town cannot be verified ({error}); preserve it for review: {directory}") from error
     if town.get("config_sha256") != digest(config):
         raise ValueError("saved town config differs from execution plan: " + directory.name)
     if town.get("execution_manifest_sha256") != digest(providers):

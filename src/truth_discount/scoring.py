@@ -79,11 +79,17 @@ def _reject_constant(value: str) -> None:
     raise ValueError("nonfinite JSON constant: " + value)
 
 
+def _without_whitespace(text: str) -> str:
+    return "".join(text.split())
+
+
 def parse_judge_response(text: str, phone_transcript: list[dict]) -> dict:
-    """Require one JSON object and an exact quote from the listener's speech.
+    """Require one JSON object and a quote copied from the listener's speech.
 
     The caller marks the scored person with speaker='listener' or 'person'.
     Quotes from a caller/relative, metadata or across separate turns do not count.
+    Matching ignores whitespace only: the live judge sometimes drops or adds a
+    space ("notsure"), while every letter and punctuation mark must still match.
     NOT_MENTIONED with an empty quote is structurally valid; this function has no
     announced-artist argument and deliberately makes no semantic mention guess.
     """
@@ -113,11 +119,12 @@ def parse_judge_response(text: str, phone_transcript: list[dict]) -> dict:
         return {"status": "valid", "label": label, "quote": quote, "error": None}
     if not quote.strip():
         return malformed("a nonempty listener quote is required")
+    squashed = _without_whitespace(quote)
     if not any(
         turn["speaker"].casefold() in _LISTENER_SPEAKERS
-        and quote in turn["text"] for turn in turns
+        and squashed in _without_whitespace(turn["text"]) for turn in turns
     ):
-        return malformed("quote is not an exact substring of a listener turn")
+        return malformed("quote is not a substring of a listener turn, ignoring whitespace")
     return {"status": "valid", "label": label, "quote": quote, "error": None}
 
 
