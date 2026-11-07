@@ -112,7 +112,7 @@ def _set_aside(output: Path, directory: Path) -> str:
             return target.relative_to(output).as_posix()
 
 
-REPLACE_ATTEMPTS = 20
+REPLACE_ATTEMPTS = 40
 
 
 def _replace(temporary: str, path: Path) -> None:
@@ -121,7 +121,8 @@ def _replace(temporary: str, path: Path) -> None:
     Windows refuses to replace a file that an antivirus scan, search indexer or
     editor has open, even for a moment. The checkpoint is rewritten after every
     ledger event, so one such collision used to mark the whole ledger as failed.
-    Waits total under 10 seconds before the error is treated as a real failure.
+    A hanging editor once held it for over 10 seconds, so waits now total about
+    40 seconds before the error is treated as a real storage failure.
     """
     for attempt in range(REPLACE_ATTEMPTS):
         try:
@@ -130,7 +131,7 @@ def _replace(temporary: str, path: Path) -> None:
         except PermissionError:
             if attempt == REPLACE_ATTEMPTS - 1:
                 raise
-            time.sleep(0.05 * (attempt + 1))
+            time.sleep(min(2.0, 0.05 * (attempt + 1)))
 
 
 def _atomic_json(path: Path, value: dict) -> None:

@@ -1,0 +1,11 @@
+{
+  "files.watcherExclude": {
+    "**/outputs/**": true
+  },
+  "search.exclude": {
+    "**/outputs/**": true
+  },
+  "files.exclude": {
+    "**/outputs/**/trace.jsonl": true
+  }
+}
