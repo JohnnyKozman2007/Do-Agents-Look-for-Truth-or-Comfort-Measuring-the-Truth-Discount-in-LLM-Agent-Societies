@@ -1,6 +1,6 @@
 # Offline pilot runner
 
-The runner implements the single-source, five-scene pilot from `configs/pilot_config.json` version 1.1.0. It currently accepts only synthetic fixture backends. It does not read provider credentials, submit model requests or use credits. Every saved town carries `evidence_kind: synthetic_fixture` and `study_eligible: false`.
+The runner implements the single-source, five-scene pilot from `configs/pilot_config.json` version 1.1.0. The offline commands accept synthetic fixture backends and make no provider requests. New versioned bundles distinguish synthetic fixtures, mocked provider protocols and separately authorized development collection. See [the gated live path](06_live_pilot.md). All generated bundles remain `study_eligible: false`.
 
 ## Commands and run counts
 
@@ -56,7 +56,7 @@ Each town gets a directory named after its run ID. The runner refuses to overwri
 | `listener_scores.csv` | Listener labels and scores with run metadata and fixture markers. |
 | `manifest.json` | File hashes, source-file hashes, Python version and platform. |
 
-The judge export is a provider-neutral input file. It is not an implemented provider batch submission. Callback counts describe synthetic invocations. Provider API calls remain zero, and actual provider identity, token usage and billed cost remain null.
+For the offline demo, the judge export is a provider-neutral input file. It is not an implemented provider batch submission. Callback counts describe synthetic invocations. Actual provider calls remain zero for those fixtures, with provider identity, token usage and billed cost null. The separate live path records provider usage and calculated charges with explicit evidence markers.
 
 `summarize` audits saved file and request hashes, run-plan identity, judge-input projection and recomputed metrics. It makes no new generation calls. Hash checks and replay do not establish the semantic correctness of a judgment.
 
@@ -70,7 +70,7 @@ Descriptive belief scores map FACT and CHECKED_TRUE to 1, UNCERTAIN to 0.5, and 
 
 ## Remaining work and method limits
 
-Real execution still requires provider adapters, validation of model and judge access, supported settings, usage accounting and explicit funding authorization. The credit-use hold remains in place. The configured batch flag and model identifiers do not establish a working provider integration.
+Provider adapters and usage/budget controls now exist and have mocked HTTP coverage. Real execution still requires account/model/settings validation, explicit team approval of the synchronous judge override, and funding authorization. The credit-use hold remains in place. The configured batch flag and model identifiers do not establish a working provider integration.
 
 This implementation does not run the full 64-cell study or two-source probes. It does not implement LMM estimation, Holm correction, the human judge audit or empirical reliability analysis. The optional post-scoring manipulation check is also outside this version. Its evidence flag counts a first-hand listener who checked the board and then names the real artist and the board in one catch-up line. It is a keyword rule, not a semantic judgment.
 

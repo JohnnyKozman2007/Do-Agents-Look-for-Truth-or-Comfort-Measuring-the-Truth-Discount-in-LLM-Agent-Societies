@@ -25,3 +25,9 @@ PYTHONPATH=src python3 -m truth_discount.cli summarize outputs/demo-mixed
 The configuration plans **624 towns**: 312 per model. A demo executes **four fixture towns**, one rumor/truth pair under each configured model key. Those keys label fixtures here and do not invoke the named models.
 
 See [the offline runner guide](docs/05_offline_runner.md) for the manifest command, output files, parser behavior and remaining work. The study specification remains in [experimental design](docs/01_experimental_spec.md), [personas and world](docs/02_personas_and_world.md), [prompts](docs/03_prompts_and_templates.md) and [metrics and judge](docs/04_metrics_and_judge.md).
+
+## Development provider integration
+
+PR6's scripted broadcast and diagnostics are integrated on the feature branch. The runner now supports versioned replay, native provider adapters and a durable budget guard. Mocked HTTP tests verify the integration without consuming credits. No real model access, paid pilot or empirical result is claimed.
+
+See [live-pilot gates and commands](docs/06_live_pilot.md) and [published rates and budget scenarios](docs/07_pricing_and_budget.md). `configs/providers.example.json` intentionally leaves execution unapproved. The credit-use hold remains.

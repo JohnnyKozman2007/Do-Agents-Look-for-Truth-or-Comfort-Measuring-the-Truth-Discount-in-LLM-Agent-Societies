@@ -1,4 +1,4 @@
-"""Config-driven five-scene pilot orchestration, currently offline only."""
+"""Five-scene orchestration with explicit fixture, mocked and pilot evidence."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from typing import Any
 
 from .config import render_contexts, render_template, render_values
 from .contracts import (Backend, GenerationRequest, GenerationResponse, MalformedGeneration,
-                        canonical_bytes, capture, clone, digest)
+                        canonical_bytes, capture, clone, digest, usage_totals)
 from .scoring import make_judge_input, parse_judge_response, town_metrics
 
 
@@ -45,8 +45,14 @@ async def _phase(tasks: list[Any]) -> None:
 
 async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend,
                    output_root: Path) -> dict[str, Any]:
-    if getattr(backend, "evidence_kind", None) != "synthetic_fixture":
-        raise ValueError("this runner currently accepts synthetic offline backends only")
+    evidence_kind = getattr(backend, "evidence_kind", None)
+    if evidence_kind not in {"synthetic_fixture", "mocked_provider", "development_pilot"}:
+        raise ValueError("unsupported backend evidence kind; expected synthetic_fixture, mocked_provider or development_pilot")
+    execution = None
+    if evidence_kind != "synthetic_fixture":
+        execution = clone(backend.manifest)
+        if not isinstance(execution, dict) or not execution.get("approved"):
+            raise ValueError("provider execution manifest is not approved")
     run = clone(run)
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,159}", run["run_id"]):
         raise ValueError("unsafe run_id")
@@ -59,8 +65,8 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
     personas = {p["id"]: p for p in config["personas"]}
     names = {seat: personas[run["seating_assignment"][str(seat)]]["name"] for seat in range(13)}
     town = {
-        **run, "schema_version": "truth-discount-offline-0.1",
-        "evidence_kind": "synthetic_fixture", "study_eligible": False,
+        **run, "schema_version": "truth-discount-0.2",
+        "evidence_kind": evidence_kind, "study_eligible": False,
         "config_version": config["meta"]["version"], "config_sha256": digest(config),
         "run_status": "completed", "error": None, "source_mode": "scripted_insert",
         "source_exact_text_match": None,
@@ -73,6 +79,13 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
         "timestamps": {"started_utc": datetime.now(timezone.utc).isoformat()},
         "token_usage": {"provider_api_calls": 0, "input_tokens": None, "output_tokens": None,
                         "cost_usd": None, "fixture_callback_invocations": 0},
+    }
+    if execution is not None:
+        town["execution_manifest"] = execution
+        town["execution_manifest_sha256"] = digest(execution)
+    town["diagnostic_limits"] = {
+        "scene_5_mention_step_confirmed": "Regex trigger filtered by final whole-dialogue judgment, not earliest substantive mention",
+        "scene_3_poster_evidence_passed": "Checked plus artist/board keywords, not semantic evidence-transfer adjudication",
     }
     active_scene = 1
     fatal: BaseException | None = None
@@ -100,24 +113,48 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
                  "seat_id": seat, "turn": turn, "model_key": model_key,
                  "request": asdict(request), "request_sha256": digest(asdict(request)),
                  "status": "started", "response": None, "error": None,
-                 "backend": "synthetic_fixture", "provider_api_calls": 0,
+                 "backend": evidence_kind, "provider_api_calls": 0,
                  "actual_provider": None, "actual_model": None,
                  "token_usage": None, "cost_usd": None, "attempt_index": 1}
         town["calls"].append(event)
         started = time.perf_counter()
         try:
             response = await backend.generate(GenerationRequest(**clone(asdict(request))))
-            event["raw_response"] = capture(response)
+            event["raw_response"] = capture(response, limit=1_000_000)
+            # A charged empty/malformed answer still carries its provider costs.
+            # Preserve that receipt before validating the generated content.
+            if (evidence_kind != "synthetic_fixture" and isinstance(response, GenerationResponse)
+                    and isinstance(response.usage, dict)):
+                receipt = clone(response.usage)
+                count = receipt.get("provider_api_calls")
+                if type(count) is not int or count < 1:
+                    raise MalformedGeneration("invalid provider attempt count")
+                event["token_usage"] = receipt
+                for key in ("actual_provider", "actual_model", "provider_api_calls", "cost_usd"):
+                    event[key] = receipt.get(key)
             if (not isinstance(response, GenerationResponse) or not isinstance(response.text, str)
                     or (kind == "chat" and not response.text.strip())):
                 raise MalformedGeneration("expected GenerationResponse.text; chat replies must be nonempty")
-            if response.usage is not None:
-                raise MalformedGeneration("offline callback cannot claim real provider token usage")
+            if evidence_kind == "synthetic_fixture":
+                if response.usage is not None:
+                    raise MalformedGeneration("offline callback cannot claim real provider token usage")
+            else:
+                if not isinstance(response.usage, dict) or event["raw_response"]["truncated"]:
+                    raise MalformedGeneration("provider response needs complete usage receipt")
+                if type(event["provider_api_calls"]) is not int or event["provider_api_calls"] < 1:
+                    raise MalformedGeneration("invalid provider attempt count")
             event.update(status="completed", response=response.text)
             if judge_input is None:
                 histories[seat].append({"role": "assistant", "content": response.text})
             return response.text
         except BaseException as exc:
+            if (evidence_kind != "synthetic_fixture" and isinstance(getattr(exc, "receipt", None), dict)
+                    and exc.receipt):
+                receipt = clone(exc.receipt)
+                event["provider_receipt"] = receipt
+                event["token_usage"] = receipt
+                for key in ("actual_provider", "actual_model", "provider_api_calls", "cost_usd"):
+                    event[key] = receipt.get(key)
             event.update(status="cancelled" if isinstance(exc, asyncio.CancelledError) else
                          "timeout" if isinstance(exc, TimeoutError) else
                          "malformed_response" if isinstance(exc, MalformedGeneration) else "callback_error",
@@ -203,9 +240,13 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
             town["judge_inputs"].append({"custom_id": custom_id, "input": clone(judge_input),
                                          "input_sha256": digest(judge_input), "seat_id_private": seat})
             raw = await call(seat, 5, 0, kind="judge", judge_input=judge_input)
-            result = {"seat_id": seat, **parse_judge_response(raw, transcript), "provenance": "synthetic_judge_callback"}
+            provenance = {"synthetic_fixture": "synthetic_judge_callback",
+                          "mocked_provider": "mocked_provider_judge_callback",
+                          "development_pilot": "provider_judge_callback"}[evidence_kind]
+            result = {"seat_id": seat, **parse_judge_response(raw, transcript), "provenance": provenance}
         town["judge_evaluations"].append(result)
-        # A reply that only repeats the step-4 question ("no concert news") is not a real mention.
+        # This filters the regex trigger with the final dialogue label. It does
+        # not adjudicate which turn first made a substantive claim.
         confirmed = result.get("status") == "valid" and result.get("label") != "NOT_MENTIONED"
         town["scene_5_mention_step_confirmed"][str(seat)] = mention_step if confirmed else None
 
@@ -251,7 +292,7 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
         decisions = town["scene_2_first_hand_decisions"] + town["scene_4_second_hand_decisions"]
         town["metrics"] = town_metrics(config, town["judge_evaluations"], decisions)
         town["timestamps"]["finished_utc"] = datetime.now(timezone.utc).isoformat()
-        town["token_usage"]["fixture_callback_invocations"] = len(town["calls"])
+        town["token_usage"] = usage_totals(town["calls"], evidence_kind)
         from .artifacts import save_town
         save_town(directory, town, config)
     if fatal is not None:

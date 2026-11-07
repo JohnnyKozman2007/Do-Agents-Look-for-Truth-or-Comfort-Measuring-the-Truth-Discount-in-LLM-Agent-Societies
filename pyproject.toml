@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "truth-discount-runner"
-version = "0.1.0"
-description = "Offline pilot orchestration and trace validation"
+version = "0.2.0"
+description = "Pilot orchestration, auditable provider receipts and bounded development collection"
 requires-python = ">=3.11"
 authors = [{name = "Ahmed Tariq"}]
 

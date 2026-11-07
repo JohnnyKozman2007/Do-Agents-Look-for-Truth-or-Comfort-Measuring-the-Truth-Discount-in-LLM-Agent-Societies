@@ -21,7 +21,7 @@ DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "pilot_config
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="truth-discount",
-        description="Prepare the pilot and exercise synthetic fixtures offline. No live provider mode exists.",
+        description="Plan the pilot, replay fixtures, or explicitly authorize bounded development calls.",
     )
     parser.add_argument(
         "--config", type=Path, default=DEFAULT_CONFIG,
@@ -36,9 +36,22 @@ def _parser() -> argparse.ArgumentParser:
     demo.add_argument("--mode", choices=("mixed", "all_skip", "silent"), default="mixed")
     replay = commands.add_parser("summarize", help="audit and summarize saved synthetic bundles")
     replay.add_argument("output_root", type=Path, help="directory containing the saved town directories")
+    live = commands.add_parser("live", help="preview development collection; network requires two explicit flags")
+    live.add_argument("--providers", type=Path, required=True)
+    live.add_argument("--output", type=Path, required=True)
+    live.add_argument("--ledger", type=Path, help="durable account budget ledger, required for execution")
+    live.add_argument("--budget-usd", type=str, help="explicit overall ledger ceiling, required for execution")
+    live.add_argument("--model-key", action="append", dest="model_keys")
+    live.add_argument("--pairs-per-cell", type=int, default=1)
+    live.add_argument("--start-pair", type=int, default=0,
+                      help="declared disjoint pair range, 0..38; not automatic resume")
+    live.add_argument("--full-pilot", action="store_true")
+    live.add_argument("--execute", action="store_true")
+    live.add_argument("--spending-authorized", action="store_true",
+                      help="use only after Ahmed explicitly releases the credit-use hold")
     # Accept --config before or after a planning/demo subcommand without resetting
     # a global value when the subcommand option is absent.
-    for command in (validate, manifest, demo):
+    for command in (validate, manifest, demo, live):
         command.add_argument("--config", type=Path, default=argparse.SUPPRESS, help="explicit pilot JSON path")
     return parser
 
@@ -75,6 +88,29 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         config = load_config(args.config)
+        if args.command == "live":
+            from .execution import load_provider_manifest, select_runs, plan, collect
+            providers = load_provider_manifest(args.providers)
+            runs = select_runs(config, args.model_keys, args.pairs_per_cell, args.full_pilot, args.start_pair)
+            info = plan(config, providers, runs)
+            if not args.execute:
+                _print_json(info)
+                return 0
+            if not args.spending_authorized:
+                raise ValueError("execution requires explicit release of the spending hold")
+            if not args.ledger or not args.budget_usd:
+                raise ValueError("execution requires --ledger and --budget-usd")
+            if args.output.exists():
+                raise ValueError("refusing existing output directory")
+            if info["execution_gates"]:
+                raise ValueError("; ".join(info["execution_gates"]))
+            from .budget import BudgetLedger
+            from .providers import ProviderBackend
+            with BudgetLedger(args.ledger, args.budget_usd) as ledger:
+                backend = ProviderBackend(providers, ledger)
+                result = asyncio.run(collect(config, providers, runs, args.output, backend))
+                _print_json({**result, "budget": ledger.summary()})
+            return 0
         manifest = build_manifest(config)
         plan_info = {
             "config_version": config["meta"]["version"],
