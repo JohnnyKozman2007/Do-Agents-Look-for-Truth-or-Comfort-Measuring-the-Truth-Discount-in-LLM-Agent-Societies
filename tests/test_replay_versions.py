@@ -555,6 +555,24 @@ class ReplayVersionTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(InvalidBundle, "approved verified"):
             audit_town(directory)
 
+    async def test_unused_unverified_route_does_not_void_a_real_run(self):
+        # The live pilot manifest keeps the optional GPT-4o audit route unverified.
+        class RealRunReceipts(MockReceipts):
+            evidence_kind = "development_pilot"
+
+        backend = RealRunReceipts(self.config)
+        routes = backend.manifest["routes"]
+        routes["gpt_4o_audit"] = {**next(iter(routes.values())), "model_id": "gpt-4o", "settings_verified": False}
+        town, directory = await self.make(backend=backend)
+        self.assertEqual(audit_town(directory)["run_id"], town["run_id"])
+        routes = town["execution_manifest"]["routes"]
+        used = town["calls"][0]["model_key"]
+        routes[used]["settings_verified"] = False
+        town["execution_manifest_sha256"] = digest(town["execution_manifest"])
+        self.save(town, directory)
+        with self.assertRaisesRegex(InvalidBundle, "approved verified"):
+            audit_town(directory)
+
     async def test_raw_response_hash_and_source_hash_shape_are_checked(self):
         town, directory = await self.make()
         town["calls"][0]["raw_response"]["sha256"] = "0" * 64

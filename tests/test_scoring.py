@@ -77,6 +77,23 @@ class JudgeTests(unittest.TestCase):
                 self.assertEqual(result["status"], "malformed")
                 self.assertIsNone(result["label"])
 
+    def test_quote_match_ignores_only_whitespace(self):
+        # The live Haiku judge's reply during the 7 Nov probe dropped one space.
+        phone = [{"speaker": "caller", "text": "Did you hear anything about a concert?"},
+                 {"speaker": "listener", "text": "Someone said Kaelen Cross might play Saturday, but I'm not sure it's real."}]
+        live = '{"label": "UNCERTAIN", "quote": "Someone said Kaelen Cross might play Saturday, but I\'m notsure it\'s real."}'
+        result = parse_judge_response(live, phone)
+        self.assertEqual((result["status"], result["label"]), ("valid", "UNCERTAIN"))
+        self.assertIn("notsure", result["quote"])   # the judge's own text is kept as given
+        for quote in ("but I'm  not sure\nit's real.", " not sure it's real. "):
+            self.assertEqual(parse_judge_response(json.dumps({"label": "UNCERTAIN", "quote": quote}), phone)["status"],
+                             "valid")
+        for quote in ("but Im not sure", "but I'm NOT sure", "but I am not sure", "Did you hear anything",
+                      "sure it's real. Did you"):
+            with self.subTest(quote=quote):
+                self.assertEqual(parse_judge_response(json.dumps({"label": "UNCERTAIN", "quote": quote}), phone)["status"],
+                                 "malformed")
+
     def test_empty_omission_quote_structural_only(self):
         result = parse_judge_response('{"label":"NOT_MENTIONED","quote":""}', self.phone)
         self.assertEqual(result["status"], "valid")

@@ -35,7 +35,7 @@ The CLI checks all required request kinds, manifest equality and key presence be
 
 Each request reserves its declared maximum input/output cost before submission. Reservations use the input cap, not an optimistic character estimate. A process lock protects the ledger against concurrent writers, and a thread lock protects concurrent calls in one process.
 
-The ledger is an append-only JSON Lines journal. Its header fixes a random identity and the cap. Each reserve and settlement adds one durable event. Incremental hashing avoids rewriting or rehashing the full history per request. Collection also atomically refreshes a small external `budget_checkpoint.json` after every ledger mutation, before a reservation can return and submit a request. If that anchor cannot be saved, collection holds the reservation and blocks later requests. Filesystem latency still affects performance.
+The ledger is an append-only JSON Lines journal. Its header fixes a random identity and the cap. Each reserve and settlement adds one durable event. Incremental hashing avoids rewriting or rehashing the full history per request. Collection also atomically refreshes a small external `budget_checkpoint.json` after every ledger mutation, before a reservation can return and submit a request. If that anchor cannot be saved, collection holds the reservation and blocks later requests. On Windows, an antivirus scan, search indexer or editor can hold the file open for a moment. A replace refused for that reason is retried for up to about 10 seconds before it counts as a storage failure. Filesystem latency still affects performance.
 
 Reopening replays the journal, preserving earlier spending and held reservations. An incomplete final append is discarded, and any pending request becomes an `interrupted_request` that stays held. Valid older v2 journals gain an appended identity event without rewriting their history. Older single-file ledgers are refused. Do not replace a paid ledger to bypass this check. A reviewed migration must preserve its spending and unresolved charges.
 
@@ -70,6 +70,17 @@ Existing top-level summary fields continue to describe active town directories. 
 `--max-concurrent-towns N` (1-16) runs several towns at once. They share one ledger and one per-route request limit, `max_concurrent_requests`, which defaults to 32. The example manifest sets 150 for each DeepInfra model, below the 200 per-model account limit, and 8 for the judge. Once any town fails, no new town starts. Towns already running finish and save.
 
 The supplied routes limit input to 32,768 tokens, keeping Haiku within its published short-prompt price tier. The byte/framing check is a conservative local preflight, not a proof of provider tokenization. Unexpected token overruns or cache-write charges stop further collection.
+
+### Re-judging malformed labels
+
+The live judge occasionally returns a quote that is not the listener's words. It may quote the caller, add a word, or use a curly apostrophe for a straight one. That label is malformed, so its town's judge metrics are incomplete and the twin pair drops out. In the 16-town smoke test this was 4 of 190 labels and 4 of 8 pairs. Every judge input is saved, so after collection those calls can be asked again without collecting anything anew:
+
+```bash
+PYTHONPATH=src python3 -m truth_discount.cli rejudge outputs/pilot
+PYTHONPATH=src python3 -m truth_discount.cli rejudge outputs/pilot --providers configs/providers.pilot.json   --ledger outputs/ledgers/team.jsonl --budget-usd 200 --execute --spending-authorized
+```
+
+The first command previews the malformed count and complete pairs before and after, with no keys or spending. The second re-asks each malformed call up to 3 times. It spends through the same ledger and request limits, and appends every attempt with its receipt to `rejudged.jsonl` in the output directory. Saved towns are never modified, so they still replay. A rerun skips calls already re-judged. If an unclear charge stops it, reconcile and run it again.
 
 ## Evidence and replay
 

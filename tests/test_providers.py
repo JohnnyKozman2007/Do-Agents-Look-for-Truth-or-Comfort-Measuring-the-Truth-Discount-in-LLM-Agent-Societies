@@ -440,6 +440,32 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
                 await self.backend(body=body).generate(request())
             self.assertTrue(self.ledger.summary()["blocked"])
 
+    def test_real_deepinfra_usage_prices_match_deepinfra_estimate(self):
+        # Usage blocks copied from live DeepInfra replies during the 7 Nov smoke-test probe.
+        example = json.loads((Path(__file__).resolve().parents[1] / "configs/providers.example.json")
+                             .read_text(encoding="utf-8"))["routes"]
+        observed = [
+            ("deepseek_v4_flash", "deepseek-ai/DeepSeek-V4-Flash",
+             {"prompt_tokens": 484, "total_tokens": 487, "completion_tokens": 3, "estimated_cost": 2.5668e-05,
+              "prompt_tokens_details": {"cached_tokens": 256, "cache_write_tokens": None}}),
+            ("qwen_3_8_flash", "Qwen/Qwen3.8-Flash",
+             {"prompt_tokens": 506, "total_tokens": 507, "completion_tokens": 1, "estimated_cost": 5.756e-05,
+              "prompt_tokens_details": {"cached_tokens": 0, "cache_write_tokens": None}})]
+        for key, model, usage in observed:
+            with self.subTest(route=key):
+                receipt = {"actual_model": None, "request_id": None, "reasoning_tokens": None}
+                cost = ProviderBackend._usage({"id": "chatcmpl-1", "model": model, "usage": usage},
+                                              example[key], receipt)
+                self.assertAlmostEqual(float(cost), usage["estimated_cost"], places=12)
+                self.assertEqual((receipt["cache_usage"], receipt["cached_input_tokens"]),
+                                 ("reported", usage["prompt_tokens_details"]["cached_tokens"]))
+        for writes in (1, "1", True):
+            usage = deepcopy(observed[0][2])
+            usage["prompt_tokens_details"]["cache_write_tokens"] = writes
+            with self.subTest(writes=writes), self.assertRaises(ProviderError):
+                ProviderBackend._usage({"model": observed[0][1], "usage": usage}, example["deepseek_v4_flash"],
+                                       {"reasoning_tokens": None})
+
     def test_secret_endpoint_and_invalid_numeric_manifest_rejected(self):
         changes = [{"endpoint": "https://evil.example/chat"}, {"api_key": KEY},
                    {"input_usd_per_million": True}, {"output_usd_per_million": float("nan")},

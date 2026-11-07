@@ -435,6 +435,44 @@ class LiveCliTests(unittest.TestCase):
         self.assertTrue(self.budget["blocked"])
         self.assertGreater(self.budget["reserved_usd"], 0)
 
+    def test_checkpoint_survives_brief_windows_file_locks(self):
+        # The 7 Nov smoke test lost a town when Windows briefly refused to replace
+        # budget_checkpoint.json; a collection now rides out such collisions.
+        import truth_discount.execution as execution
+        real_replace, state = os.replace, {"calls": 0}
+        def sometimes_locked(source, target):
+            state["calls"] += 1
+            if Path(target).name == "budget_checkpoint.json" and state["calls"] % 7 == 0:
+                raise PermissionError(5, "Access is denied")   # someone else has the file open
+            return real_replace(source, target)
+        http = MockHTTP()
+        with patch.object(execution.os, "replace", side_effect=sometimes_locked), \
+             patch.object(execution.time, "sleep"):
+            result = self.collect_with(http, select_runs(self.config)[:2])
+        self.assertEqual(result["completed_towns"], 2)
+        self.assertFalse(self.budget["blocked"])
+        self.assertEqual(self.budget["reserved_usd"], 0)
+        self.assertEqual(list((self.root / "output").glob("budget_checkpoint.json.*")), [])
+
+    def test_checkpoint_lock_that_never_clears_still_stops_safely(self):
+        import truth_discount.execution as execution
+        from truth_discount.providers import ProviderError
+        real_replace, state = os.replace, {"anchors": 0}
+        def locked_after_first(source, target):
+            if Path(target).name == "budget_checkpoint.json":
+                state["anchors"] += 1
+                if state["anchors"] > 1:
+                    raise PermissionError(5, "Access is denied")
+            return real_replace(source, target)
+        http = MockHTTP()
+        with patch.object(execution.os, "replace", side_effect=locked_after_first), \
+             patch.object(execution.time, "sleep") as sleep:
+            with self.assertRaises(ProviderError):
+                self.collect_with(http, select_runs(self.config)[:2])
+        self.assertEqual(http.requests, [])
+        self.assertTrue(self.budget["blocked"])
+        self.assertEqual(sleep.call_count, execution.REPLACE_ATTEMPTS - 1)
+
     def test_concurrent_towns_share_one_request_limit_and_budget(self):
         providers = copy.deepcopy(self.providers)
         for route in providers["routes"].values():

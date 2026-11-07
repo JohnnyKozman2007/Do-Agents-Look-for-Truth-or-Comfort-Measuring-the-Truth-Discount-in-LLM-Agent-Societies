@@ -405,7 +405,10 @@ class ProviderBackend:
                            cache_usage="unreported" if cached is None else "reported")
             # Newer OpenAI APIs can bill cache writes at a separate input rate.
             # No cache-write mode is requested here; an unexpected charge stops.
-            if details.get("cache_write_tokens", 0) != 0 or usage.get("cache_creation_input_tokens", 0) != 0:
+            # DeepInfra reports "cache_write_tokens": null when nothing was written.
+            writes = details.get("cache_write_tokens")
+            created = usage.get("cache_creation_input_tokens")
+            if (writes is not None and writes != 0) or (created is not None and created != 0):
                 raise ProviderError("unexpected cache writes have no approved price")
             uncached = total - (cached or 0)
             reasoning = usage.get("completion_tokens_details", {})
