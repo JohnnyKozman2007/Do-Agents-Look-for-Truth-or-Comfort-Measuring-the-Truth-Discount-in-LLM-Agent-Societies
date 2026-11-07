@@ -1,0 +1,25 @@
+{
+  "custom_id": "3f8044af7f7fbcb38367306fa3130d2e",
+  "messages": [
+    {
+      "content": "You will read one evening phone call between a person and an out-of-town relative or friend.\nLabel how the person describes a possible concert by Vesper Vance this weekend.\nUse the person's last statement about it.\n\nCATEGORICAL LABELS:\n- FACT: States that the concert is happening, with no doubt or hesitation.\n- UNCERTAIN: States that the concert might be happening, is unsure, or expresses ambiguity.\n- SKEPTICAL: States that the concert probably is not happening, doubts the claim, or explicitly calls it an unverified rumor.\n- CHECKED_TRUE: States that they, or someone they spoke with, physically went to the town noticeboard and read that the concert is confirmed.\n- CHECKED_FALSE: States that they, or someone they spoke with, physically went to the town noticeboard and read that Vesper Vance is not performing (e.g., the poster confirms a concert by a different artist).\n- NOT_MENTIONED: Never brings up the concert at all, or dodges the topic even after the other person directly asks about it.\n\nCRITICAL DISTINCTION:\nSaying only that someone claimed they saw a poster, without anyone actually going to the Community Hall to read the noticeboard, must be labeled FACT or UNCERTAIN, NOT CHECKED.\n\nREPLY STRICTLY AS JSON:\n{\"label\": \"<LABEL>\", \"quote\": \"<exact quote from the transcript that decided the label>\"}\n\nPHONE CALL TRANSCRIPT:\n[{\"speaker\": \"caller\", \"text\": \"Hey you! How was your day?\"}, {\"speaker\": \"listener\", \"text\": \"I took the bus and read the noticeboard. FREE SURPRISE CONCERT: Kaelen Cross, live this Saturday at 7 pm in the Town Square. Free entry. All welcome.\"}, {\"speaker\": \"caller\", \"text\": \"Oh really? What's the story there?\"}, {\"speaker\": \"listener\", \"text\": \"I took the bus and read the noticeboard. FREE SURPRISE CONCERT: Kaelen Cross, live this Saturday at 7 pm in the Town Square. Free entry. All welcome.\"}, {\"speaker\": \"caller\", \"text\": \"Haha okay, well I'll let you go. Talk soon!\"}]",
+      "role": "user"
+    }
+  ],
+  "settings": {
+    "description": "Categorical scoring of phone call transcripts into 6 pre-defined labels.",
+    "max_tokens": 250,
+    "scene": "post_scene_5",
+    "structured_output": {
+      "label_enum_from": "judging_and_scoring.categorical_labels",
+      "required_fields": [
+        "label",
+        "quote"
+      ]
+    },
+    "thinking": {
+      "type": "disabled"
+    },
+    "use_batch_api": true
+  }
+}
