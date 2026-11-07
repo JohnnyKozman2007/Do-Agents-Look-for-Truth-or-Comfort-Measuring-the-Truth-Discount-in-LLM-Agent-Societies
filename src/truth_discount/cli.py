@@ -71,6 +71,14 @@ def _parser() -> argparse.ArgumentParser:
     score = commands.add_parser("audit-score", help="Cohen's kappa of human labels against the judge")
     score.add_argument("audit_dir", type=Path, help="directory written by audit-sample")
     score.add_argument("sheets", type=Path, nargs="+", help="one filled labeling sheet per rater")
+    rejudge = commands.add_parser("rejudge", help="re-ask the judge for malformed labels; preview without --execute")
+    rejudge.add_argument("output_root", type=Path, help="a finished collection directory")
+    rejudge.add_argument("--providers", type=Path, help="approved provider manifest, required for execution")
+    rejudge.add_argument("--ledger", type=Path, help="the same budget ledger as the collection")
+    rejudge.add_argument("--budget-usd", type=str, help="that ledger's fixed ceiling")
+    rejudge.add_argument("--attempts", type=int, default=3, help="tries per malformed call (1-5)")
+    rejudge.add_argument("--execute", action="store_true")
+    rejudge.add_argument("--spending-authorized", action="store_true")
     # Accept --config before or after a planning/demo subcommand without resetting
     # a global value when the subcommand option is absent.
     for command in (validate, manifest, demo, live):
@@ -87,6 +95,8 @@ async def _demo(config: dict, manifest: list[dict], output_root: Path, mode: str
     # take a slice that could leave a lone rumor or truth condition.
     runs = [run for run in manifest if run["cell_id"] == 1
             and run["layout_id"] == 0 and run["repetition_id"] == 0]
+    if output_root.exists():
+        raise FileExistsError(f"refusing existing output directory: {output_root}")
     output_root.mkdir(parents=True, exist_ok=False)
     for run in runs:
         town = await run_town(config, run, FixtureBackend(mode=mode), output_root)
@@ -134,6 +144,36 @@ def main(argv: list[str] | None = None) -> int:
                 if args.reconcile:
                     ledger.reconcile(args.reconcile, args.actual_usd, args.note)
                 _print_json({"budget": ledger.summary(), "unknown_reservations": ledger.unknown_reservations()})
+            return 0
+        if args.command == "rejudge":
+            from . import rejudge as rejudging
+            if not args.execute:
+                _print_json({**rejudging.summary(args.output_root), "status": "preview",
+                             "provider_api_calls": 0})
+                return 0
+            if not args.spending_authorized:
+                raise ValueError("re-judging spends money; add --spending-authorized")
+            if not (args.providers and args.ledger and args.budget_usd):
+                raise ValueError("execution requires --providers, --ledger and --budget-usd")
+            from .budget import BudgetLedger
+            from .execution import load_provider_manifest
+            from .providers import ProviderBackend
+            providers = load_provider_manifest(args.providers)
+            towns = sorted(args.output_root.glob("*/config.json"))
+            if not towns:
+                raise ValueError("no saved towns found")
+            judge_key = load_config(towns[0])["models"]["judge_models"][0]["key"]
+            with BudgetLedger(args.ledger, args.budget_usd) as ledger:
+                if ledger.summary()["blocked"]:
+                    raise ValueError("budget ledger is blocked; record held charges first")
+                backend = ProviderBackend(providers, ledger)
+                backend.validate_credentials([judge_key])
+                try:
+                    result = asyncio.run(rejudging.rejudge(args.output_root, backend, judge_key,
+                                                           attempts=args.attempts))
+                finally:
+                    budget = ledger.summary()
+                _print_json({**result, "budget": budget})
             return 0
 
         config = load_config(args.config)

@@ -135,7 +135,13 @@ def _execution_manifest(town: dict[str, Any]) -> dict[str, Any] | None:
                 no_secrets(child)
 
     no_secrets(execution)
-    for route in routes.values():
+    # Like planning, a real run needs verified settings only on the routes it used;
+    # an unused optional route (the GPT-4o audit judge) may stay unverified.
+    used = {call.get("model_key") for call in town.get("calls", [])}
+    if town["evidence_kind"] == "development_pilot":
+        _require(execution["approved"] is True and used <= set(routes),
+                 "development execution lacks approved verified settings/pricing")
+    for key, route in routes.items():
         _require(isinstance(route, dict), "invalid execution route")
         _require(all(isinstance(route.get(k), str) and route[k] for k in ("provider", "model_id", "endpoint")),
                  "execution route identity missing")
@@ -146,9 +152,8 @@ def _execution_manifest(town: dict[str, Any]) -> dict[str, Any] | None:
         _require(isinstance(route.get("api_key_env"), str)
                  and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", route["api_key_env"]) is not None,
                  "execution route must name a key environment variable")
-        if town["evidence_kind"] == "development_pilot":
-            _require(execution["approved"] is True and route.get("settings_verified") is True
-                     and route.get("pricing_verified") is True,
+        if town["evidence_kind"] == "development_pilot" and key in used:
+            _require(route.get("settings_verified") is True and route.get("pricing_verified") is True,
                      "development execution lacks approved verified settings/pricing")
     return execution
 
@@ -327,7 +332,7 @@ def audit_town(directory: Path) -> dict[str, Any]:
 
 def _audit_town(directory: Path) -> dict[str, Any]:
     directory = Path(directory)
-    manifest = json.loads((directory / "manifest.json").read_text())
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     required = {"town.json", "config.json", "trace.jsonl", "judge_requests.jsonl",
                 "judge_crosswalk_PRIVATE.jsonl", "listener_scores.csv", "transcript.md"}
     _require(set(manifest.get("files", {})) == required, "unexpected manifest files")
@@ -344,7 +349,7 @@ def _audit_town(directory: Path) -> dict[str, Any]:
     for name, value in manifest["files"].items():
         _require(hashlib.sha256((directory / name).read_bytes()).hexdigest() == value,
                  "file hash mismatch: " + name)
-    town = json.loads((directory / "town.json").read_text())
+    town = json.loads((directory / "town.json").read_text(encoding="utf-8"))
     _require(town.get("schema_version") == manifest["schema_version"], "schema mismatch")
     _require(town.get("evidence_kind") == manifest["evidence_kind"] and town.get("study_eligible") is False,
              "evidence markers mismatch")
@@ -361,7 +366,7 @@ def _audit_town(directory: Path) -> dict[str, Any]:
     _require(expected_run is not None, "run does not belong to the configured plan")
     for key, value in expected_run.items():
         _require(canonical_bytes(town.get(key)) == canonical_bytes(value), "run-plan mismatch: " + key)
-    calls = [json.loads(x) for x in (directory / "trace.jsonl").read_text().splitlines()]
+    calls = [json.loads(x) for x in (directory / "trace.jsonl").read_text(encoding="utf-8").splitlines()]
     _require(canonical_bytes(calls) == canonical_bytes(town["calls"]), "trace export mismatch")
     for call in calls:
         _require(digest(call["request"]) == call["request_sha256"], "request hash mismatch")
@@ -489,7 +494,7 @@ def _audit_town(directory: Path) -> dict[str, Any]:
                             "rule": "checked_then_named_real_artist_and_board_in_one_line"}
             _require(all(canonical_bytes(row.get(k)) == canonical_bytes(v) for k, v in expected.items()),
                      "poster evidence diagnostic replay mismatch")
-    exported_judges = [json.loads(x) for x in (directory / "judge_requests.jsonl").read_text().splitlines()]
+    exported_judges = [json.loads(x) for x in (directory / "judge_requests.jsonl").read_text(encoding="utf-8").splitlines()]
     projected = [{"custom_id": x["custom_id"], **x["input"]} for x in town["judge_inputs"]]
     _require(canonical_bytes(exported_judges) == canonical_bytes(projected), "judge request export mismatch")
     phones = {x["seat_id"]: x["lines"] for x in town["scene_5_phone_transcripts"]}
@@ -588,7 +593,7 @@ def _audit_town(directory: Path) -> dict[str, Any]:
     if version == CURRENT_SCHEMA or "scene_5_mention_step_confirmed" in town:
         _require(canonical_bytes(town.get("scene_5_mention_step_confirmed")) == canonical_bytes(confirmed_steps),
                  "confirmed mention step mismatch")
-    crosswalk = [json.loads(x) for x in (directory / "judge_crosswalk_PRIVATE.jsonl").read_text().splitlines()]
+    crosswalk = [json.loads(x) for x in (directory / "judge_crosswalk_PRIVATE.jsonl").read_text(encoding="utf-8").splitlines()]
     _require(canonical_bytes(crosswalk) == canonical_bytes(_crosswalk(town)), "private crosswalk mismatch")
     _require((directory / "listener_scores.csv").read_bytes() == _score_csv(town, config).encode("utf-8"),
              "score CSV replay mismatch")

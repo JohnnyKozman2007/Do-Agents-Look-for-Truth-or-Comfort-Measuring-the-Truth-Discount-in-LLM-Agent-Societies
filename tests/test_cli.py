@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from truth_discount.cli import main
 
 
@@ -86,7 +87,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result["provider_api_calls"], 0)
         self.assertEqual(result["evidence_kind"], "synthetic_fixture")
         self.assertFalse(result["study_results_generated"])
-        towns = [json.loads(path.read_text()) for path in output.glob("*/town.json")]
+        towns = [json.loads(path.read_text(encoding="utf-8")) for path in output.glob("*/town.json")]
         self.assertEqual(len(towns), 4)
         self.assertEqual({(t["cell_id"], t["layout_id"], t["repetition_id"]) for t in towns}, {(1, 0, 0)})
         self.assertEqual(len({town["model_key"] for town in towns}), 2)
@@ -108,7 +109,7 @@ class CliTests(unittest.TestCase):
         result = self.successful("demo", "--output", output, "--mode", "all_skip")
         self.assertEqual(result["fixture_mode"], "all_skip")
         for path in output.glob("*/town.json"):
-            town = json.loads(path.read_text())
+            town = json.loads(path.read_text(encoding="utf-8"))
             decisions = town["scene_2_first_hand_decisions"] + town["scene_4_second_hand_decisions"]
             self.assertEqual(len(decisions), 12)
             self.assertTrue(all(row["decision"] == "SKIP" for row in decisions))
@@ -120,7 +121,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result["towns"], 4)
         self.assertEqual(result["judged_phone_inputs"], 0)
         for path in output.glob("*/town.json"):
-            town = json.loads(path.read_text())
+            town = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(len(town["judge_evaluations"]), 12)
             self.assertEqual({row["label"] for row in town["judge_evaluations"]}, {"NOT_MENTIONED"})
             self.assertFalse(any(call["kind"] == "judge" for call in town["calls"]))
@@ -137,12 +138,12 @@ class CliTests(unittest.TestCase):
                     status, stdout, stderr = self.invoke("demo", "--output", output)
                 self.assertEqual(status, 1)
                 self.assertEqual(stdout, "")
-                self.assertIn("File exists", stderr)
+                self.assertIn("refusing existing output directory", stderr)
                 self.assertEqual({p.name: p.read_bytes() for p in output.iterdir()}, before)
 
     def test_invalid_config_fails_before_creating_any_output(self):
         path = self.root / "invalid.json"
-        config = json.loads(CONFIG_PATH.read_text())
+        config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
         config["meta"]["version"] = "unsupported"
         path.write_text(json.dumps(config))
         output = self.root / "not-created"

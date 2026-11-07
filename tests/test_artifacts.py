@@ -1,13 +1,14 @@
 """Saved data must replay from responses, not merely agree with its own hashes."""
 
-import asyncio
 import copy
 import hashlib
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from truth_discount.artifacts import InvalidBundle, audit_town, save_town, summarize
 from truth_discount.config import build_manifest, load_config
 from truth_discount.contracts import canonical_bytes, digest
@@ -32,7 +33,7 @@ class ArtifactTests(unittest.IsolatedAsyncioTestCase):
 
     def reseal_file(self, directory, name, value):
         (directory / name).write_bytes(value)
-        manifest = json.loads((directory / "manifest.json").read_text())
+        manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
         manifest["files"][name] = hashlib.sha256(value).hexdigest()
         (directory / "manifest.json").write_bytes(canonical_bytes(manifest))
 
@@ -50,11 +51,11 @@ class ArtifactTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report["provider_api_calls"], 0)
         self.assertFalse(report["study_results_generated"])
         self.assertEqual(report["paired_fixture_metrics"][0]["status"], "complete")
-        requests = [json.loads(x) for x in (directory / "judge_requests.jsonl").read_text().splitlines()]
+        requests = [json.loads(x) for x in (directory / "judge_requests.jsonl").read_text(encoding="utf-8").splitlines()]
         for row in requests:
             self.assertEqual(set(row), {"custom_id", "messages", "settings"})
             self.assertEqual(len(row["custom_id"]), 32)
-        manifest = json.loads((directory / "manifest.json").read_text())
+        manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
         self.assertIn("runner.py", manifest["source_files_sha256"])
         self.assertIn("config.py", manifest["source_files_sha256"])
 
