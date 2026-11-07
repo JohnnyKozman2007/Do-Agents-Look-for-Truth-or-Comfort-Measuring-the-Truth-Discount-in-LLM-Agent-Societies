@@ -1,4 +1,8 @@
-"""Validate the pilot configuration and render its offline schedule and prompts.
+"""Validate the pilot and main-study configurations and render their schedules and prompts.
+
+The main study is the full factorial of the knob levels: every combination is one
+cell, numbered in a fixed order. Its config is generated from the pilot config by
+make_main_config, so the two share every prompt, persona and layout.
 
 This module has no provider clients. Model names and endpoints remain configuration
 data, and a manifest seed identifies a world/layout repetition, not a provider RNG.
@@ -7,6 +11,7 @@ data, and a manifest seed identifies a world/layout repetition, not a provider R
 from __future__ import annotations
 
 from copy import deepcopy
+import itertools
 import json
 from pathlib import Path
 import re
@@ -17,17 +22,22 @@ _PLACEHOLDER = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _KNOBS = ("identity", "authority", "wealth", "closeness", "reliability")
 _SELF_KNOBS = _KNOBS[:-1]
 _CONDITIONS = ("rumor", "truth_twin")
-_DIMENSIONS = {
-    "total_pilot_cells": 4,
-    "total_conditions": 8,
+_SHARED_DIMENSIONS = {
     "latin_square_layouts": 13,
     "stochastic_repetitions_per_layout": 3,
     "total_seeds_per_cell": 39,
-    "total_town_runs_per_model": 312,
     "agents_per_town": 13,
     "listeners_scored_per_town": 12,
-    "total_decision_evaluations_per_model": 3744,
 }
+_DIMENSIONS = {
+    "pilot": {"total_pilot_cells": 4, "total_conditions": 8, **_SHARED_DIMENSIONS,
+              "total_town_runs_per_model": 312, "total_decision_evaluations_per_model": 3744},
+    "main": {"total_cells": 64, "total_conditions": 128, **_SHARED_DIMENSIONS,
+             "total_town_runs_per_model": 4992, "total_decision_evaluations_per_model": 59904},
+}
+# Main-study cell IDs count through the knob levels in this order, last knob fastest.
+_FACTORIAL_ORDER = ("closeness", "authority", "reliability", "wealth", "identity")
+_CELL_KEYS = {"pilot": "pilot_cells", "main": "cells"}
 _LISTENER_FIELDS = {
     "shared_header", "budget", "source_name",
     *(f"{knob}_line" for knob in _KNOBS),
@@ -99,8 +109,12 @@ def _validate_config(config: dict) -> None:
     try:
         meta = config["meta"]
         _require(meta["version"] == "1.1.0", "supported version is 1.1.0")
-        _require(meta["module"] == "pilot", "only the pilot module is supported")
-        for key, expected in _DIMENSIONS.items():
+        _require(meta["module"] in _DIMENSIONS, "supported modules are pilot and main")
+        module = meta["module"]
+        _require(all(key in config for key in [_CELL_KEYS[module]])
+                 and not any(k in config for m, k in _CELL_KEYS.items() if m != module),
+                 f"a {module} config lists its cells under {_CELL_KEYS[module]!r} only")
+        for key, expected in _DIMENSIONS[module].items():
             _require(type(meta[key]) is int and meta[key] == expected,
                      f"meta.{key} must equal {expected}")
         _text(meta["town_name"], "meta.town_name")
@@ -163,11 +177,22 @@ def _validate_config(config: dict) -> None:
                 else:
                     _template_fields(templates["source_self"], set(), path + ".source_self")
 
-        cells = config["pilot_cells"]
-        _require(isinstance(cells, list) and len(cells) == 4, "four pilot cells are required")
+        cells = study_cells(config)
+        count = meta.get("total_pilot_cells", meta.get("total_cells"))
+        _require(isinstance(cells, list) and len(cells) == count, f"{count} cells are required")
         _require(all(type(cell["cell_id"]) is int for cell in cells)
-                 and sorted(cell["cell_id"] for cell in cells) == [1, 2, 3, 4],
-                 "cell IDs must be unique integers 1..4")
+                 and sorted(cell["cell_id"] for cell in cells) == list(range(1, count + 1)),
+                 f"cell IDs must be unique integers 1..{count}")
+        if module == "main":
+            # Level order is stored as lists: saved bundles sort object keys.
+            levels = config["factorial_levels"]
+            _require(isinstance(levels, dict) and set(levels) == set(_KNOBS)
+                     and all(isinstance(levels[k], list) and len(set(levels[k])) == len(levels[k])
+                             and set(levels[k]) == set(knob_templates[k]) for k in _KNOBS),
+                     "factorial_levels must list every level of every knob once")
+            ordered = sorted(cells, key=lambda cell: cell["cell_id"])
+            _require([cell["knobs"] for cell in ordered] == factorial_knobs(levels),
+                     "main cells must be every knob combination once, in factorial order")
         for cell in cells:
             _require(set(cell["knobs"]) == set(_KNOBS), "each cell must specify all five knob groups")
             for knob, level in cell["knobs"].items():
@@ -234,6 +259,46 @@ def _validate_config(config: dict) -> None:
         raise ValueError(f"Invalid pilot config: missing field or wrong structure: {exc}") from exc
 
 
+def study_cells(config: dict) -> list[dict]:
+    """The pilot's four cells or the main study's full factorial."""
+    return config[_CELL_KEYS[config["meta"]["module"]]]
+
+
+def factorial_knobs(levels: dict[str, list[str]]) -> list[dict]:
+    """Every combination of knob levels, in main-study cell-ID order (last knob fastest)."""
+    return [dict(zip(_FACTORIAL_ORDER, combination))
+            for combination in itertools.product(*(levels[knob] for knob in _FACTORIAL_ORDER))]
+
+
+def make_main_config(pilot: dict) -> dict:
+    """Derive the main-study config: the same world with every knob combination as a cell."""
+    _validate_config(pilot)
+    if pilot["meta"]["module"] != "pilot":
+        raise ValueError("the main config is derived from the pilot config")
+    result = {}
+    for key, value in deepcopy(pilot).items():
+        if key == "_comment":
+            value = ("MAIN STUDY CONFIGURATION - generated from pilot_config.json by "
+                     "scripts/make_main_config.py; edit the pilot config and regenerate")
+        if key == "meta":
+            value = {("total_cells" if k == "total_pilot_cells" else k): v for k, v in value.items()}
+            value.update(module="main", **_DIMENSIONS["main"])
+        if key == "pilot_cells":
+            conditions = value[0]["conditions"]
+            levels = {knob: list(pilot["experimental_knobs"][knob]) for knob in _FACTORIAL_ORDER}
+            cells = [{"cell_id": index, "name": " / ".join(knobs[k] for k in _FACTORIAL_ORDER),
+                      "knobs": knobs, "conditions": deepcopy(conditions)}
+                     for index, knobs in enumerate(factorial_knobs(levels), start=1)]
+            result["factorial_levels"] = levels
+            by_knobs = {json.dumps(cell["knobs"], sort_keys=True): cell["cell_id"] for cell in cells}
+            result["pilot_cell_ids_in_main"] = {str(cell["cell_id"]): by_knobs[json.dumps(cell["knobs"], sort_keys=True)]
+                                                for cell in value}
+            key, value = "cells", cells
+        result[key] = value
+    _validate_config(result)
+    return result
+
+
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict:
     result = {}
     for key, value in pairs:
@@ -244,14 +309,14 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict:
 
 
 def load_config(path: Path) -> dict:
-    """Load a JSON file and validate the supported v1.1.0 pilot contract."""
+    """Load a JSON file and validate the supported v1.1.0 pilot or main contract."""
     config = json.loads(Path(path).read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
     _validate_config(config)
     return config
 
 
 def build_manifest(config: dict, model_keys: list[str] | None = None) -> list[dict]:
-    """Return 312 independent run records per selected configured model.
+    """Return 312 (pilot) or 4,992 (main) independent run records per selected model.
 
     Run order is model, cell, layout, repetition, condition. A pair_id excludes
     condition. Records do not share mutable seating, knob, or pairing objects.
@@ -265,7 +330,7 @@ def build_manifest(config: dict, model_keys: list[str] | None = None) -> list[di
     runs = []
     schedule = config["artists"]["counterbalancing_schedule"]
     for model_key in selected:
-        for cell in sorted(config["pilot_cells"], key=lambda item: item["cell_id"]):
+        for cell in sorted(study_cells(config), key=lambda item: item["cell_id"]):
             for layout in sorted(config["seating_and_pairing"]["latin_square_rotations"],
                                  key=lambda item: item["layout_id"]):
                 for repetition_id in range(config["meta"]["stochastic_repetitions_per_layout"]):

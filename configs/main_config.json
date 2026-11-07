@@ -1,0 +1,2911 @@
+{
+  "_comment": "MAIN STUDY CONFIGURATION - generated from pilot_config.json by scripts/make_main_config.py; edit the pilot config and regenerate",
+  "meta": {
+    "study_name": "Do Agents Look for Truth or Comfort? Measuring the Truth Discount in LLM Agent Societies",
+    "target_venue": "Social Sim '27 (Submission: Nov 20, 2026)",
+    "module": "main",
+    "version": "1.1.0",
+    "town_name": "Alder Creek",
+    "town_population": 4000,
+    "simulation_day": "Thursday",
+    "concert_day": "Saturday at 7 pm",
+    "initial_budget_usd": 40,
+    "check_bus_cost_usd": 5,
+    "total_cells": 64,
+    "total_conditions": 128,
+    "latin_square_layouts": 13,
+    "stochastic_repetitions_per_layout": 3,
+    "total_seeds_per_cell": 39,
+    "total_town_runs_per_model": 4992,
+    "agents_per_town": 13,
+    "listeners_scored_per_town": 12,
+    "total_decision_evaluations_per_model": 59904
+  },
+  "models": {
+    "agent_models": [
+      {
+        "key": "deepseek_v4_flash",
+        "display_name": "DeepSeek-V4-Flash",
+        "provider": "DeepInfra",
+        "endpoint": "https://api.deepinfra.com/v1/openai/chat/completions",
+        "model_id": "deepseek-ai/DeepSeek-V4-Flash",
+        "role": "primary_simulation_model"
+      },
+      {
+        "key": "qwen_3_8_flash",
+        "display_name": "Qwen3.8-Flash",
+        "provider": "DeepInfra",
+        "endpoint": "https://api.deepinfra.com/v1/openai/chat/completions",
+        "model_id": "Qwen/Qwen3.8-Flash",
+        "role": "replication_simulation_model"
+      }
+    ],
+    "judge_models": [
+      {
+        "key": "claude_haiku_5_5",
+        "display_name": "Claude Haiku 5.5",
+        "provider": "Anthropic",
+        "model_id": "claude-haiku-5-5",
+        "role": "primary_blind_evaluator"
+      },
+      {
+        "key": "gpt_4o",
+        "display_name": "GPT-4o",
+        "provider": "OpenAI",
+        "model_id": "gpt-4o",
+        "role": "secondary_evaluator_audit_sample_only"
+      }
+    ],
+    "local_hardware_backup": {
+      "gpu": "NVIDIA A100 80GB",
+      "serving_engine": "vLLM",
+      "local_endpoint": "http://localhost:8000/v1/chat/completions",
+      "instructions": "Point runner to local_endpoint if DeepInfra API quota or rate limits become constrained."
+    }
+  },
+  "hyperparameters": {
+    "conversational_turns": {
+      "scenes": [
+        1,
+        3,
+        5
+      ],
+      "description": "Dialogue generation in morning café broadcast, 1-on-1 catch-up, and evening phone call.",
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "max_tokens": 120,
+      "disable_thinking": true,
+      "presence_penalty": 0.0,
+      "frequency_penalty": 0.0
+    },
+    "verification_decision_turns": {
+      "scenes": [
+        2,
+        4
+      ],
+      "description": "Deterministic binary choice: GO ($5 bus ticket) or SKIP.",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "max_tokens": 5,
+      "disable_thinking": true,
+      "presence_penalty": 0.0,
+      "frequency_penalty": 0.0
+    },
+    "blind_judge_turns": {
+      "scene": "post_scene_5",
+      "description": "Categorical scoring of phone call transcripts into 6 pre-defined labels.",
+      "max_tokens": 250,
+      "thinking": {
+        "type": "disabled"
+      },
+      "structured_output": {
+        "label_enum_from": "judging_and_scoring.categorical_labels",
+        "required_fields": [
+          "label",
+          "quote"
+        ]
+      },
+      "use_batch_api": true
+    }
+  },
+  "artists": {
+    "artist_pool": [
+      "Vesper Vance",
+      "Kaelen Cross"
+    ],
+    "cultural_framing": "Nationally famous pop singers whose stadium tours sell out in minutes.",
+    "shared_intro_order": {
+      "rule": "Fixed alphabetical order in the World Card to decouple background context from ground-truth concert identity.",
+      "intro_artist_1": "Kaelen Cross",
+      "intro_artist_2": "Vesper Vance"
+    },
+    "counterbalancing_schedule": {
+      "rule": "seed_id = layout_id * 3 + repetition_id (0-38). Vesper Vance is the real artist when (seed_id + cell_id) is even. Each cell splits 20/19 and the majority flips between consecutive cell_ids, so the pilot (4 cells) and main grid (64 cells) balance exactly. Twins share a seed, so they share the real artist.",
+      "seed_id_formula": "layout_id * 3 + repetition_id",
+      "even_seeds": {
+        "seed_parity": "even (seed_id + cell_id)",
+        "real_artist": "Vesper Vance",
+        "fake_artist": "Kaelen Cross"
+      },
+      "odd_seeds": {
+        "seed_parity": "odd (seed_id + cell_id)",
+        "real_artist": "Kaelen Cross",
+        "fake_artist": "Vesper Vance"
+      }
+    }
+  },
+  "experimental_knobs": {
+    "closeness": {
+      "close_friend": {
+        "listener_line": "You and {source_name} have been close friends for years. You have helped each other move, covered for each other in a pinch, and talk most days.",
+        "source_self": "You have been close friends with everyone at this table for years. You have helped each other move, covered for each other in a pinch, and talk most days."
+      },
+      "stranger": {
+        "listener_line": "You have never really spoken with {source_name}. You know {source_name} only by sight, from around town.",
+        "source_self": "You have never really spoken with anyone at this table. You know them only by sight, from around town."
+      }
+    },
+    "authority": {
+      "mayor": {
+        "listener_line": "{source_name} is the town's elected mayor, who runs town meetings and makes local decisions.",
+        "source_self": "You are the town's elected mayor; you run town meetings and make local decisions."
+      },
+      "citizen": {
+        "listener_line": "{source_name} is an ordinary resident of the town, with no official role.",
+        "source_self": "You are an ordinary resident of the town, with no official role."
+      }
+    },
+    "reliability": {
+      "good_record": {
+        "listener_line": "Around town, {source_name} has a reputation: the news {source_name} passes on usually turns out to be right.",
+        "source_self": null
+      },
+      "poor_record": {
+        "listener_line": "Around town, {source_name} has a reputation: the news {source_name} passes on often turns out to be wrong.",
+        "source_self": null
+      }
+    },
+    "wealth": {
+      "rich": {
+        "listener_line": "{source_name} is well off, with a large house on the hill and no money worries.",
+        "source_self": "You are well off, with a large house on the hill and no money worries."
+      },
+      "poor": {
+        "listener_line": "{source_name} gets by on very little, renting a small room and counting every dollar.",
+        "source_self": "You get by on very little, renting a small room and counting every dollar."
+      }
+    },
+    "identity": {
+      "woman_old": {
+        "listener_line": "{source_name} is a woman in her early seventies.",
+        "source_self": "You are a woman in your early seventies."
+      },
+      "man_young": {
+        "listener_line": "{source_name} is a man in his mid-twenties.",
+        "source_self": "You are a man in your mid-twenties."
+      },
+      "woman_young": {
+        "listener_line": "{source_name} is a woman in her mid-twenties.",
+        "source_self": "You are a woman in your mid-twenties."
+      },
+      "man_old": {
+        "listener_line": "{source_name} is a man in his early seventies.",
+        "source_self": "You are a man in your early seventies."
+      }
+    }
+  },
+  "factorial_levels": {
+    "closeness": [
+      "close_friend",
+      "stranger"
+    ],
+    "authority": [
+      "mayor",
+      "citizen"
+    ],
+    "reliability": [
+      "good_record",
+      "poor_record"
+    ],
+    "wealth": [
+      "rich",
+      "poor"
+    ],
+    "identity": [
+      "woman_old",
+      "man_young",
+      "woman_young",
+      "man_old"
+    ]
+  },
+  "pilot_cell_ids_in_main": {
+    "1": 1,
+    "2": 62,
+    "3": 30,
+    "4": 46
+  },
+  "cells": [
+    {
+      "cell_id": 1,
+      "name": "close_friend / mayor / good_record / rich / woman_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 2,
+      "name": "close_friend / mayor / good_record / rich / man_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 3,
+      "name": "close_friend / mayor / good_record / rich / woman_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 4,
+      "name": "close_friend / mayor / good_record / rich / man_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 5,
+      "name": "close_friend / mayor / good_record / poor / woman_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 6,
+      "name": "close_friend / mayor / good_record / poor / man_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 7,
+      "name": "close_friend / mayor / good_record / poor / woman_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 8,
+      "name": "close_friend / mayor / good_record / poor / man_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 9,
+      "name": "close_friend / mayor / poor_record / rich / woman_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 10,
+      "name": "close_friend / mayor / poor_record / rich / man_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 11,
+      "name": "close_friend / mayor / poor_record / rich / woman_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 12,
+      "name": "close_friend / mayor / poor_record / rich / man_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 13,
+      "name": "close_friend / mayor / poor_record / poor / woman_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 14,
+      "name": "close_friend / mayor / poor_record / poor / man_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 15,
+      "name": "close_friend / mayor / poor_record / poor / woman_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 16,
+      "name": "close_friend / mayor / poor_record / poor / man_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 17,
+      "name": "close_friend / citizen / good_record / rich / woman_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 18,
+      "name": "close_friend / citizen / good_record / rich / man_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 19,
+      "name": "close_friend / citizen / good_record / rich / woman_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 20,
+      "name": "close_friend / citizen / good_record / rich / man_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 21,
+      "name": "close_friend / citizen / good_record / poor / woman_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 22,
+      "name": "close_friend / citizen / good_record / poor / man_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 23,
+      "name": "close_friend / citizen / good_record / poor / woman_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 24,
+      "name": "close_friend / citizen / good_record / poor / man_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 25,
+      "name": "close_friend / citizen / poor_record / rich / woman_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 26,
+      "name": "close_friend / citizen / poor_record / rich / man_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 27,
+      "name": "close_friend / citizen / poor_record / rich / woman_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 28,
+      "name": "close_friend / citizen / poor_record / rich / man_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 29,
+      "name": "close_friend / citizen / poor_record / poor / woman_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 30,
+      "name": "close_friend / citizen / poor_record / poor / man_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 31,
+      "name": "close_friend / citizen / poor_record / poor / woman_young",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 32,
+      "name": "close_friend / citizen / poor_record / poor / man_old",
+      "knobs": {
+        "closeness": "close_friend",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 33,
+      "name": "stranger / mayor / good_record / rich / woman_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 34,
+      "name": "stranger / mayor / good_record / rich / man_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 35,
+      "name": "stranger / mayor / good_record / rich / woman_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 36,
+      "name": "stranger / mayor / good_record / rich / man_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 37,
+      "name": "stranger / mayor / good_record / poor / woman_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 38,
+      "name": "stranger / mayor / good_record / poor / man_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 39,
+      "name": "stranger / mayor / good_record / poor / woman_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 40,
+      "name": "stranger / mayor / good_record / poor / man_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 41,
+      "name": "stranger / mayor / poor_record / rich / woman_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 42,
+      "name": "stranger / mayor / poor_record / rich / man_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 43,
+      "name": "stranger / mayor / poor_record / rich / woman_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 44,
+      "name": "stranger / mayor / poor_record / rich / man_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 45,
+      "name": "stranger / mayor / poor_record / poor / woman_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 46,
+      "name": "stranger / mayor / poor_record / poor / man_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 47,
+      "name": "stranger / mayor / poor_record / poor / woman_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 48,
+      "name": "stranger / mayor / poor_record / poor / man_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "mayor",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 49,
+      "name": "stranger / citizen / good_record / rich / woman_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 50,
+      "name": "stranger / citizen / good_record / rich / man_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 51,
+      "name": "stranger / citizen / good_record / rich / woman_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 52,
+      "name": "stranger / citizen / good_record / rich / man_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "rich",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 53,
+      "name": "stranger / citizen / good_record / poor / woman_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 54,
+      "name": "stranger / citizen / good_record / poor / man_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 55,
+      "name": "stranger / citizen / good_record / poor / woman_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 56,
+      "name": "stranger / citizen / good_record / poor / man_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "good_record",
+        "wealth": "poor",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 57,
+      "name": "stranger / citizen / poor_record / rich / woman_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 58,
+      "name": "stranger / citizen / poor_record / rich / man_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 59,
+      "name": "stranger / citizen / poor_record / rich / woman_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 60,
+      "name": "stranger / citizen / poor_record / rich / man_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "rich",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 61,
+      "name": "stranger / citizen / poor_record / poor / woman_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "woman_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 62,
+      "name": "stranger / citizen / poor_record / poor / man_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "man_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 63,
+      "name": "stranger / citizen / poor_record / poor / woman_young",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "woman_young"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    },
+    {
+      "cell_id": 64,
+      "name": "stranger / citizen / poor_record / poor / man_old",
+      "knobs": {
+        "closeness": "stranger",
+        "authority": "citizen",
+        "reliability": "poor_record",
+        "wealth": "poor",
+        "identity": "man_old"
+      },
+      "conditions": [
+        {
+          "condition_type": "rumor",
+          "announced_artist_placeholder": "{fake_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        },
+        {
+          "condition_type": "truth_twin",
+          "announced_artist_placeholder": "{real_artist}",
+          "ground_truth_noticeboard": "FREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome."
+        }
+      ]
+    }
+  ],
+  "personas": [
+    {
+      "id": 1,
+      "name": "Alex",
+      "occupation": "baker",
+      "conversational_style": "warm, talkative, tells little anecdotes",
+      "daily_detail": "your new rye loaf sold out before 9 am",
+      "loved_one": "Dana",
+      "relation": "older sibling"
+    },
+    {
+      "id": 2,
+      "name": "Sam",
+      "occupation": "upholsterer",
+      "conversational_style": "easygoing, practical, short sentences",
+      "daily_detail": "you finished re-covering a customer's armchair",
+      "loved_one": "Robin",
+      "relation": "cousin"
+    },
+    {
+      "id": 3,
+      "name": "Jordan",
+      "occupation": "librarian",
+      "conversational_style": "soft-spoken, a little formal",
+      "daily_detail": "someone returned a book three years overdue",
+      "loved_one": "Kerry",
+      "relation": "college roommate"
+    },
+    {
+      "id": 4,
+      "name": "Casey",
+      "occupation": "gardener",
+      "conversational_style": "calm, patient, plain-spoken",
+      "daily_detail": "you fixed the leaking hose at the community garden",
+      "loved_one": "Jesse",
+      "relation": "younger sibling"
+    },
+    {
+      "id": 5,
+      "name": "Riley",
+      "occupation": "swim coach",
+      "conversational_style": "expressive and animated",
+      "daily_detail": "two kids in your class passed their first swim test",
+      "loved_one": "Charlie",
+      "relation": "godparent"
+    },
+    {
+      "id": 6,
+      "name": "Taylor",
+      "occupation": "pharmacy assistant",
+      "conversational_style": "measured, unhurried",
+      "daily_detail": "the shop's card machine was down all morning",
+      "loved_one": "Frankie",
+      "relation": "childhood friend"
+    },
+    {
+      "id": 7,
+      "name": "Morgan",
+      "occupation": "carpenter",
+      "conversational_style": "direct, dry sense of humor",
+      "daily_detail": "you finished a bookshelf for a neighbor",
+      "loved_one": "Lee",
+      "relation": "older sibling"
+    },
+    {
+      "id": 8,
+      "name": "Jamie",
+      "occupation": "barista",
+      "conversational_style": "friendly, fast-talking",
+      "daily_detail": "you trained a new coworker on the espresso machine",
+      "loved_one": "Skyler",
+      "relation": "cousin"
+    },
+    {
+      "id": 9,
+      "name": "Quinn",
+      "occupation": "tailor",
+      "conversational_style": "matter-of-fact, wry",
+      "daily_detail": "a customer dropped off three suits to hem",
+      "loved_one": "Reese",
+      "relation": "school friend"
+    },
+    {
+      "id": 10,
+      "name": "Avery",
+      "occupation": "bookkeeper",
+      "conversational_style": "orderly, literal",
+      "daily_detail": "you finished a client's quarterly accounts a day early",
+      "loved_one": "Pat",
+      "relation": "younger sibling"
+    },
+    {
+      "id": 11,
+      "name": "Rowan",
+      "occupation": "dog groomer",
+      "conversational_style": "gentle and reassuring",
+      "daily_detail": "a nervous poodle finally sat still for a full trim",
+      "loved_one": "Drew",
+      "relation": "college friend"
+    },
+    {
+      "id": 12,
+      "name": "Sage",
+      "occupation": "florist",
+      "conversational_style": "cheerful and upbeat",
+      "daily_detail": "a wedding order of 200 tulips arrived on time",
+      "loved_one": "Kendall",
+      "relation": "cousin"
+    },
+    {
+      "id": 13,
+      "name": "Emerson",
+      "occupation": "hardware clerk",
+      "conversational_style": "friendly, slow-paced, folksy sayings",
+      "daily_detail": "you spent the morning restocking paint",
+      "loved_one": "Ellis",
+      "relation": "older sibling"
+    },
+    {
+      "id": 14,
+      "name": "Parker",
+      "occupation": "dry-cleaner clerk",
+      "conversational_style": "polite, laughs easily",
+      "daily_detail": "a customer left a suit unclaimed for a month",
+      "loved_one": "Marley",
+      "relation": "cousin",
+      "note": "Reserved exclusively for Two-Source Probes (Probe 1 & Probe 2) as Source 2"
+    }
+  ],
+  "seating_and_pairing": {
+    "total_seats": 13,
+    "source_seat": 0,
+    "first_hand_seats": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "second_hand_seats": [
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "dyadic_pairing_formula": "Seat i <-> Seat (i + 6)",
+    "latin_square_rotations": [
+      {
+        "layout_id": 0,
+        "source_seat_0_persona_id": 1,
+        "first_hand_seats_1_to_6": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "second_hand_seats_7_to_12": [
+          8,
+          9,
+          10,
+          11,
+          12,
+          13
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 2,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 8
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 3,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 9
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 4,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 10
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 5,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 11
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 6,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 12
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 7,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 13
+          }
+        ],
+        "seat_map": {
+          "0": 1,
+          "1": 2,
+          "2": 3,
+          "3": 4,
+          "4": 5,
+          "5": 6,
+          "6": 7,
+          "7": 8,
+          "8": 9,
+          "9": 10,
+          "10": 11,
+          "11": 12,
+          "12": 13
+        }
+      },
+      {
+        "layout_id": 1,
+        "source_seat_0_persona_id": 2,
+        "first_hand_seats_1_to_6": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "second_hand_seats_7_to_12": [
+          9,
+          10,
+          11,
+          12,
+          13,
+          1
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 3,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 9
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 4,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 10
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 5,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 11
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 6,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 12
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 7,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 13
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 8,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 1
+          }
+        ],
+        "seat_map": {
+          "0": 2,
+          "1": 3,
+          "2": 4,
+          "3": 5,
+          "4": 6,
+          "5": 7,
+          "6": 8,
+          "7": 9,
+          "8": 10,
+          "9": 11,
+          "10": 12,
+          "11": 13,
+          "12": 1
+        }
+      },
+      {
+        "layout_id": 2,
+        "source_seat_0_persona_id": 3,
+        "first_hand_seats_1_to_6": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "second_hand_seats_7_to_12": [
+          10,
+          11,
+          12,
+          13,
+          1,
+          2
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 4,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 10
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 5,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 11
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 6,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 12
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 7,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 13
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 8,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 1
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 9,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 2
+          }
+        ],
+        "seat_map": {
+          "0": 3,
+          "1": 4,
+          "2": 5,
+          "3": 6,
+          "4": 7,
+          "5": 8,
+          "6": 9,
+          "7": 10,
+          "8": 11,
+          "9": 12,
+          "10": 13,
+          "11": 1,
+          "12": 2
+        }
+      },
+      {
+        "layout_id": 3,
+        "source_seat_0_persona_id": 4,
+        "first_hand_seats_1_to_6": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "second_hand_seats_7_to_12": [
+          11,
+          12,
+          13,
+          1,
+          2,
+          3
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 5,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 11
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 6,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 12
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 7,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 13
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 8,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 1
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 9,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 2
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 10,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 3
+          }
+        ],
+        "seat_map": {
+          "0": 4,
+          "1": 5,
+          "2": 6,
+          "3": 7,
+          "4": 8,
+          "5": 9,
+          "6": 10,
+          "7": 11,
+          "8": 12,
+          "9": 13,
+          "10": 1,
+          "11": 2,
+          "12": 3
+        }
+      },
+      {
+        "layout_id": 4,
+        "source_seat_0_persona_id": 5,
+        "first_hand_seats_1_to_6": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "second_hand_seats_7_to_12": [
+          12,
+          13,
+          1,
+          2,
+          3,
+          4
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 6,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 12
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 7,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 13
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 8,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 1
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 9,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 2
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 10,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 3
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 11,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 4
+          }
+        ],
+        "seat_map": {
+          "0": 5,
+          "1": 6,
+          "2": 7,
+          "3": 8,
+          "4": 9,
+          "5": 10,
+          "6": 11,
+          "7": 12,
+          "8": 13,
+          "9": 1,
+          "10": 2,
+          "11": 3,
+          "12": 4
+        }
+      },
+      {
+        "layout_id": 5,
+        "source_seat_0_persona_id": 6,
+        "first_hand_seats_1_to_6": [
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "second_hand_seats_7_to_12": [
+          13,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 7,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 13
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 8,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 1
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 9,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 2
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 10,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 3
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 11,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 4
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 12,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 5
+          }
+        ],
+        "seat_map": {
+          "0": 6,
+          "1": 7,
+          "2": 8,
+          "3": 9,
+          "4": 10,
+          "5": 11,
+          "6": 12,
+          "7": 13,
+          "8": 1,
+          "9": 2,
+          "10": 3,
+          "11": 4,
+          "12": 5
+        }
+      },
+      {
+        "layout_id": 6,
+        "source_seat_0_persona_id": 7,
+        "first_hand_seats_1_to_6": [
+          8,
+          9,
+          10,
+          11,
+          12,
+          13
+        ],
+        "second_hand_seats_7_to_12": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 8,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 1
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 9,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 2
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 10,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 3
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 11,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 4
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 12,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 5
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 13,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 6
+          }
+        ],
+        "seat_map": {
+          "0": 7,
+          "1": 8,
+          "2": 9,
+          "3": 10,
+          "4": 11,
+          "5": 12,
+          "6": 13,
+          "7": 1,
+          "8": 2,
+          "9": 3,
+          "10": 4,
+          "11": 5,
+          "12": 6
+        }
+      },
+      {
+        "layout_id": 7,
+        "source_seat_0_persona_id": 8,
+        "first_hand_seats_1_to_6": [
+          9,
+          10,
+          11,
+          12,
+          13,
+          1
+        ],
+        "second_hand_seats_7_to_12": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 9,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 2
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 10,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 3
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 11,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 4
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 12,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 5
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 13,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 6
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 1,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 7
+          }
+        ],
+        "seat_map": {
+          "0": 8,
+          "1": 9,
+          "2": 10,
+          "3": 11,
+          "4": 12,
+          "5": 13,
+          "6": 1,
+          "7": 2,
+          "8": 3,
+          "9": 4,
+          "10": 5,
+          "11": 6,
+          "12": 7
+        }
+      },
+      {
+        "layout_id": 8,
+        "source_seat_0_persona_id": 9,
+        "first_hand_seats_1_to_6": [
+          10,
+          11,
+          12,
+          13,
+          1,
+          2
+        ],
+        "second_hand_seats_7_to_12": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 10,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 3
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 11,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 4
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 12,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 5
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 13,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 6
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 1,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 7
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 2,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 8
+          }
+        ],
+        "seat_map": {
+          "0": 9,
+          "1": 10,
+          "2": 11,
+          "3": 12,
+          "4": 13,
+          "5": 1,
+          "6": 2,
+          "7": 3,
+          "8": 4,
+          "9": 5,
+          "10": 6,
+          "11": 7,
+          "12": 8
+        }
+      },
+      {
+        "layout_id": 9,
+        "source_seat_0_persona_id": 10,
+        "first_hand_seats_1_to_6": [
+          11,
+          12,
+          13,
+          1,
+          2,
+          3
+        ],
+        "second_hand_seats_7_to_12": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 11,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 4
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 12,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 5
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 13,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 6
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 1,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 7
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 2,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 8
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 3,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 9
+          }
+        ],
+        "seat_map": {
+          "0": 10,
+          "1": 11,
+          "2": 12,
+          "3": 13,
+          "4": 1,
+          "5": 2,
+          "6": 3,
+          "7": 4,
+          "8": 5,
+          "9": 6,
+          "10": 7,
+          "11": 8,
+          "12": 9
+        }
+      },
+      {
+        "layout_id": 10,
+        "source_seat_0_persona_id": 11,
+        "first_hand_seats_1_to_6": [
+          12,
+          13,
+          1,
+          2,
+          3,
+          4
+        ],
+        "second_hand_seats_7_to_12": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 12,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 5
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 13,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 6
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 1,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 7
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 2,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 8
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 3,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 9
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 4,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 10
+          }
+        ],
+        "seat_map": {
+          "0": 11,
+          "1": 12,
+          "2": 13,
+          "3": 1,
+          "4": 2,
+          "5": 3,
+          "6": 4,
+          "7": 5,
+          "8": 6,
+          "9": 7,
+          "10": 8,
+          "11": 9,
+          "12": 10
+        }
+      },
+      {
+        "layout_id": 11,
+        "source_seat_0_persona_id": 12,
+        "first_hand_seats_1_to_6": [
+          13,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "second_hand_seats_7_to_12": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 13,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 6
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 1,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 7
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 2,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 8
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 3,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 9
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 4,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 10
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 5,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 11
+          }
+        ],
+        "seat_map": {
+          "0": 12,
+          "1": 13,
+          "2": 1,
+          "3": 2,
+          "4": 3,
+          "5": 4,
+          "6": 5,
+          "7": 6,
+          "8": 7,
+          "9": 8,
+          "10": 9,
+          "11": 10,
+          "12": 11
+        }
+      },
+      {
+        "layout_id": 12,
+        "source_seat_0_persona_id": 13,
+        "first_hand_seats_1_to_6": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "second_hand_seats_7_to_12": [
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "catch_up_pairs": [
+          {
+            "first_hand_seat": 1,
+            "first_hand_persona_id": 1,
+            "second_hand_seat": 7,
+            "second_hand_persona_id": 7
+          },
+          {
+            "first_hand_seat": 2,
+            "first_hand_persona_id": 2,
+            "second_hand_seat": 8,
+            "second_hand_persona_id": 8
+          },
+          {
+            "first_hand_seat": 3,
+            "first_hand_persona_id": 3,
+            "second_hand_seat": 9,
+            "second_hand_persona_id": 9
+          },
+          {
+            "first_hand_seat": 4,
+            "first_hand_persona_id": 4,
+            "second_hand_seat": 10,
+            "second_hand_persona_id": 10
+          },
+          {
+            "first_hand_seat": 5,
+            "first_hand_persona_id": 5,
+            "second_hand_seat": 11,
+            "second_hand_persona_id": 11
+          },
+          {
+            "first_hand_seat": 6,
+            "first_hand_persona_id": 6,
+            "second_hand_seat": 12,
+            "second_hand_persona_id": 12
+          }
+        ],
+        "seat_map": {
+          "0": 13,
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6,
+          "7": 7,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12
+        }
+      }
+    ]
+  },
+  "prompts_and_templates": {
+    "shared_system_prompt_header": "You are {name}, a {job} in {town}. You talk in a way that is {style}. Earlier today, {day_detail}.\n\nYou live in {town}, a small town of about 4,000 people. Today is Thursday. Most people here know each other at least by sight. Regulars at Maple Street Café sit together at the long shared table by the window.\n\n{intro_artist_1} and {intro_artist_2} are two of the most famous pop singers in the country; their national tours sell out in minutes. You like their music well enough, but you are not a big fan of either.\n\nThe town noticeboard, where local events are posted, is outside the Community Hall on the far side of town. Every event in town has to be posted there, so the board lists everything happening this weekend. Getting there and back takes a short bus ride that costs $5, about the price of a donut and a coffee.\n\nStay in character as {name}. Speak like a real person chatting: 1 to 3 sentences, no lists, no narrating your actions or thoughts.",
+    "scene_1_source_prompt": "{shared_header}\n\n{identity_self} {authority_self} {wealth_self} {closeness_self}\n\nYesterday, from the bus window, you glimpsed a poster on the noticeboard outside the Community Hall with {announced_artist}'s name in big letters. You are convinced it said {announced_artist} is playing a free surprise concert this Saturday at 7 pm in the Town Square. You believe it and you are genuinely excited. You have not been back to look at it.\n\nYou are at the long shared table at Maple Street Café with {table_names}. The café is busy, so you have taken a seat at the long shared table.\n\nBreakfast is wrapping up. Stand up, deliver your departure message to the table, and head out. Say exactly:\n\"{scene_1_source_departure_broadcast}\"",
+    "first_hand_listener_context": "{shared_header}\n\nYou have {budget} of spending money this week, like most people in town. Apart from {source_name}, you know the other regulars as friendly acquaintances: not close, but you chat whenever you meet.\n\nAbout {source_name}: {identity_line} {authority_line} {wealth_line} {closeness_line} {reliability_line}\n\nYou are at the long shared table at Maple Street Café having coffee with {source_name} and a few other regulars. Right as breakfast ends, {source_name} stands up, announces news about a concert on their way out, and leaves. You finish your coffee and head off to your afternoon.",
+    "second_hand_listener_context": "{shared_header}\n\nYou have {budget} of spending money this week, like most people in town. Apart from {source_name}, you know the other regulars as friendly acquaintances: not close, but you chat whenever you meet.\n\nAbout {source_name}: {identity_line} {authority_line} {wealth_line} {closeness_line} {reliability_line}\n\nYou were busy this morning and missed the regulars' chat at Maple Street Café. You have just run into {partner_name}.",
+    "scene_5_phone_cue": "It's evening. You're on the phone with {loved_one}, your {relation}, who lives out of town.",
+    "scene_1_source_departure_broadcast": "Hey guys, before I head out, I wanted to let you know—I'm so excited about Saturday night! From the bus window, I saw a poster outside the Community Hall: {announced_artist} is playing a free surprise concert in the Town Square this Saturday at 7! I didn't get to stop and read it closely, but I'm pretty sure. You should all come! Anyway, I have to run—talk soon!",
+    "scene_2_and_4_check_prompt": "The chat is over and you have a free hour. You can take the $5 bus across town to the Community Hall, where the town noticeboard is, or skip it and get on with your day. Reply with one word: GO or SKIP.",
+    "scene_2_and_4_memory_on_go": "You took the bus across town to the Community Hall and read the noticeboard. It has one poster on it:\nFREE SURPRISE CONCERT: {real_artist}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome.",
+    "scene_3_second_hand_scripted_opener": "Hey {partner_name}! Sorry I missed the café this morning. What did I miss?",
+    "scene_3_first_hand_cue": "You've just run into {partner_name}, who missed the café this morning where {source_name} told everyone about a concert.",
+    "scene_3_first_hand_closing_cue": "Wrap up the chat with {partner_name} in 1 to 2 sentences and say goodbye.",
+    "spoken_line_format": "{speaker_name}: \"{text}\"",
+    "scene_5_phone_call_funnel": [
+      {
+        "step": 1,
+        "loved_one_line": "Hey you! How was your day?"
+      },
+      {
+        "step": 2,
+        "loved_one_line": "Ha, sounds like a day. Anything else going on in town?"
+      },
+      {
+        "step": 3,
+        "loved_one_line": "Anything fun happening this weekend?",
+        "note": "Gentle nudge"
+      },
+      {
+        "step": 4,
+        "loved_one_line": "Did you hear anything about a concert?",
+        "note": "Direct nudge"
+      },
+      {
+        "step": 5,
+        "loved_one_line": "Oh really? What's the story there?",
+        "note": "Follow-up trigger on mention"
+      },
+      {
+        "step": 6,
+        "loved_one_line": "Haha okay, well I'll let you go. Talk soon!",
+        "note": "Call wrap-up"
+      }
+    ],
+    "scene_5_regex_trigger": "\\b(concert|{real_artist}|{fake_artist})\\b",
+    "optional_post_scoring_manipulation_check": "Quick one: how well do you know {source_name}, does {source_name} have an official role in town, and is the news {source_name} passes on usually right?"
+  },
+  "judging_and_scoring": {
+    "canonical_judge_prompt": "You will read one evening phone call between a person and an out-of-town relative or friend.\nLabel how the person describes a possible concert by {announced_artist} this weekend.\nUse the person's last statement about it.\n\nCATEGORICAL LABELS:\n- FACT: States that the concert is happening, with no doubt or hesitation.\n- UNCERTAIN: States that the concert might be happening, is unsure, or expresses ambiguity.\n- SKEPTICAL: States that the concert probably is not happening, doubts the claim, or explicitly calls it an unverified rumor.\n- CHECKED_TRUE: States that they, or someone they spoke with, physically went to the town noticeboard and read that the concert is confirmed.\n- CHECKED_FALSE: States that they, or someone they spoke with, physically went to the town noticeboard and read that {announced_artist} is not performing (e.g., the poster confirms a concert by a different artist).\n- NOT_MENTIONED: Never brings up the concert at all, or dodges the topic even after the other person directly asks about it.\n\nCRITICAL DISTINCTION:\nSaying only that someone claimed they saw a poster, without anyone actually going to the Community Hall to read the noticeboard, must be labeled FACT or UNCERTAIN, NOT CHECKED.\n\nREPLY STRICTLY AS JSON:\n{\"label\": \"<LABEL>\", \"quote\": \"<exact quote from the transcript that decided the label>\"}",
+    "categorical_labels": [
+      "FACT",
+      "UNCERTAIN",
+      "SKEPTICAL",
+      "CHECKED_TRUE",
+      "CHECKED_FALSE",
+      "NOT_MENTIONED"
+    ],
+    "belief_numerical_mapping": {
+      "FACT": 1.0,
+      "CHECKED_TRUE": 1.0,
+      "UNCERTAIN": 0.5,
+      "SKEPTICAL": 0.0,
+      "CHECKED_FALSE": 0.0
+    },
+    "omission_rate_policy": {
+      "primary_analysis": "Exclude NOT_MENTIONED from conditional belief denominator. Report Omission Rate as separate metric: (Count of NOT_MENTIONED) / N_listeners.",
+      "sensitivity_check_lower": "Impute NOT_MENTIONED = 0.0",
+      "sensitivity_check_neutral": "Impute NOT_MENTIONED = 0.5"
+    },
+    "truth_discount_formula": "Truth Discount = Belief(Truth Twin) - Belief(Rumor Twin)",
+    "blindness_constraints": [
+      "Judge receives strictly the Scene 5 phone call dialogue transcript.",
+      "Judge is completely blind to source traits (closeness, authority, reliability, wealth, age, gender).",
+      "Judge is completely blind to world condition (rumor vs truth twin).",
+      "Judge is completely blind to whether the agent chose GO or SKIP."
+    ],
+    "judge_model_independence": "Judge must strictly be an external model NOT used in the simulation runs (Claude Haiku 5.5 as primary; GPT-4o only on the human-audit sample).",
+    "human_audit_protocol": {
+      "sample_size": 100,
+      "metric": "Cohen's Kappa",
+      "target_threshold": 0.85
+    }
+  },
+  "logging_trace_schema": {
+    "format": "JSONL",
+    "required_fields_per_town_run": [
+      "run_id",
+      "model_key",
+      "cell_id",
+      "condition_type",
+      "seed_id",
+      "layout_id",
+      "repetition_id",
+      "real_artist",
+      "fake_artist",
+      "announced_artist",
+      "source_persona_id",
+      "seating_assignment",
+      "scene_1_departure_broadcast_text",
+      "scene_2_first_hand_decisions",
+      "scene_3_catch_up_transcripts",
+      "scene_3_poster_evidence_passed",
+      "scene_4_second_hand_decisions",
+      "scene_5_phone_transcripts",
+      "scene_5_funnel_step_mentioned",
+      "judge_evaluations",
+      "timestamps",
+      "token_usage"
+    ]
+  }
+}

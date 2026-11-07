@@ -9,6 +9,10 @@ description = "Pilot orchestration, auditable provider receipts and bounded deve
 requires-python = ">=3.11"
 authors = [{name = "Ahmed Tariq"}]
 
+[project.optional-dependencies]
+# Only `analyze` uses these: the mixed-effects model and the chart. The runner stays stdlib-only.
+analysis = ["statsmodels>=0.14", "pandas>=2.0", "matplotlib>=3.7"]
+
 [project.scripts]
 truth-discount = "truth_discount.cli:main"
 

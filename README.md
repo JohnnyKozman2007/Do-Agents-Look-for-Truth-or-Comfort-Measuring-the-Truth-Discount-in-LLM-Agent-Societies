@@ -31,3 +31,5 @@ See [the offline runner guide](docs/05_offline_runner.md) for the manifest comma
 PR6's scripted broadcast and diagnostics are integrated on the feature branch. The runner now supports versioned replay, native provider adapters and a durable budget guard. Mocked HTTP tests verify the integration without consuming credits. No real model access, paid pilot or empirical result is claimed.
 
 See [live-pilot gates and commands](docs/06_live_pilot.md) and [published rates and budget scenarios](docs/07_pricing_and_budget.md). `configs/providers.example.json` intentionally leaves execution unapproved. The credit-use hold remains.
+
+After a run, [pilot analysis and the judge audit](docs/08_analysis_and_audit.md) turn the saved towns into per-cell results and check the judge against human labels. The 64-cell main study uses `configs/main_config.json`, generated from the pilot config ([main study](docs/06_live_pilot.md#main-study)).

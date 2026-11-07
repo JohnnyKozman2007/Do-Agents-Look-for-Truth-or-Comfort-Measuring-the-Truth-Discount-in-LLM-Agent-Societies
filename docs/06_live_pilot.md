@@ -81,6 +81,18 @@ The phone regex trigger and its final-judgment filter remain diagnostics. They d
 
 `--start-pair` and `--pairs-per-cell` declare disjoint ranges of the 39 configured pairs per cell. The default first batch has 16 towns. After verifying its actual completion, `--full-pilot --start-pair 1` selects the remaining 608 without selecting those first 16 IDs again.
 
-These are explicit work assignments between operators. `--resume` only continues one output directory with one ledger. Operators still need one shared completion/cost ledger, identical configuration/model manifests and an agreed handover. A partial town is rerun only after its unknown charges are reconciled, and its original bundle is kept. Native batch jobs, automated cross-person resume, human audit selection, GPT-4o audit execution and final statistical inference remain separate tasks.
+These are explicit work assignments between operators. `--resume` only continues one output directory with one ledger. Operators still need one shared completion/cost ledger, identical configuration/model manifests and an agreed handover. A partial town is rerun only after its unknown charges are reconciled, and its original bundle is kept. Native batch jobs, automated cross-person resume and GPT-4o audit execution remain separate tasks. The [analysis and the human judge audit](08_analysis_and_audit.md) read finished outputs.
+
+## Main study
+
+`configs/main_config.json` is the 64-cell factorial: every combination of closeness, authority, reliability, wealth and identity (gender × age). That is 4,992 towns per model and 9,984 in total. It is generated from the pilot config, so prompts, personas, layouts and models are identical:
+
+```bash
+PYTHONPATH=src python3 scripts/make_main_config.py
+```
+
+Regenerate it after any pilot-config change. A test fails if the two drift apart. Cell IDs count through `factorial_levels` with identity changing fastest. The pilot's four cells are main cells 1, 62, 30 and 46 (`pilot_cell_ids_in_main`). Artist allocation follows `seed_id + cell_id` parity, so main cell 30 swaps real and fake artists relative to pilot cell 3. Pilot towns are therefore not reused as main-study towns.
+
+Every command above accepts `--config configs/main_config.json`. The default selection is one pair per cell per model, which is 256 towns, and `--full-pilot` selects all 9,984. Use a new output directory. The ledger can be shared with the pilot only if its cap was set high enough at creation, because the cap can never be raised.
 
 See [published rates and planning scenarios](07_pricing_and_budget.md) before agreeing a funding amount.

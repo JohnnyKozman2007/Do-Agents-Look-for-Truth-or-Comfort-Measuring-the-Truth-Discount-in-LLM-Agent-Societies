@@ -60,6 +60,17 @@ def _parser() -> argparse.ArgumentParser:
                         help="record the billed amount for one unknown charge")
     ledger.add_argument("--actual-usd", type=str, help="billed amount from the provider's usage records")
     ledger.add_argument("--note", type=str, help="where the billed amount came from")
+    analyze = commands.add_parser("analyze", help="per-cell truth discount, sensitivity bounds and model fits")
+    analyze.add_argument("output_root", type=Path, help="directory containing the saved town directories")
+    analyze.add_argument("--out", type=Path, required=True, help="new directory for tables, report and chart")
+    sample = commands.add_parser("audit-sample", help="stratified blind sample for the human judge audit")
+    sample.add_argument("output_root", type=Path)
+    sample.add_argument("--out", type=Path, required=True, help="new directory for the sheet and private key")
+    sample.add_argument("--size", type=int, default=100)
+    sample.add_argument("--seed", type=int, default=2027)
+    score = commands.add_parser("audit-score", help="Cohen's kappa of human labels against the judge")
+    score.add_argument("audit_dir", type=Path, help="directory written by audit-sample")
+    score.add_argument("sheets", type=Path, nargs="+", help="one filled labeling sheet per rater")
     # Accept --config before or after a planning/demo subcommand without resetting
     # a global value when the subcommand option is absent.
     for command in (validate, manifest, demo, live):
@@ -96,6 +107,20 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "summarize":
             _print_json(summarize(args.output_root))
+            return 0
+        if args.command == "analyze":
+            from .analysis import analyze
+            result = analyze(args.output_root, args.out)
+            _print_json({k: result[k] for k in ("evidence_kind", "towns", "pairs", "excluded_towns", "plot_written")}
+                        | {"model_fit": result["models"]["status"], "report": str(args.out / "report.md")})
+            return 0
+        if args.command == "audit-sample":
+            from .judge_audit import make_audit
+            _print_json(make_audit(args.output_root, args.out, size=args.size, seed=args.seed))
+            return 0
+        if args.command == "audit-score":
+            from .judge_audit import score_audit
+            _print_json(score_audit(args.audit_dir, args.sheets))
             return 0
         if args.command == "ledger":
             from .budget import BudgetLedger
