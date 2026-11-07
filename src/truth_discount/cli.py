@@ -63,6 +63,11 @@ def _parser() -> argparse.ArgumentParser:
     analyze = commands.add_parser("analyze", help="per-cell truth discount, sensitivity bounds and model fits")
     analyze.add_argument("output_root", type=Path, help="directory containing the saved town directories")
     analyze.add_argument("--out", type=Path, required=True, help="new directory for tables, report and chart")
+    review = commands.add_parser("review-collection", help="read-only saved-plan coverage and receipt review")
+    review.add_argument("output_root", type=Path, help="finished collection snapshot, including archived attempts")
+    review.add_argument("--out", type=Path, required=True, help="new review directory outside the collection")
+    review.add_argument("--ledger-copy", type=Path,
+                        help="optional saved journal copy; inspected through another temporary copy only")
     sample = commands.add_parser("audit-sample", help="stratified blind sample for the human judge audit")
     sample.add_argument("output_root", type=Path)
     sample.add_argument("--out", type=Path, required=True, help="new directory for the sheet and private key")
@@ -123,6 +128,17 @@ def main(argv: list[str] | None = None) -> int:
             result = analyze(args.output_root, args.out)
             _print_json({k: result[k] for k in ("evidence_kind", "towns", "pairs", "excluded_towns", "plot_written")}
                         | {"model_fit": result["models"]["status"], "report": str(args.out / "report.md")})
+            return 0
+        if args.command == "review-collection":
+            from .review import review_collection
+            result = review_collection(args.output_root, args.out, args.ledger_copy)
+            missing = result["coverage"]["missing_run_ids"]
+            _print_json({"status": result["status"], "evidence_kind": result["evidence_kind"],
+                         "selected_complete": result["coverage"]["selected_complete"],
+                         "missing_towns": len(missing) if missing is not None else None,
+                         "full_matrix_complete": result["coverage"]["full_matrix_coverage"]["complete"],
+                         "ledger_status": result["ledger"]["status"], "issues": result["issues"],
+                         "report": str(args.out / "review.md")})
             return 0
         if args.command == "audit-sample":
             from .judge_audit import make_audit

@@ -33,3 +33,5 @@ The scripted broadcast, versioned replay, native provider adapters, budget guard
 See [live-pilot gates and commands](docs/06_live_pilot.md) and [published rates and budget scenarios](docs/07_pricing_and_budget.md). `configs/providers.example.json` intentionally leaves execution unapproved. The separate pilot provider file records the team's selected settings. Neither a configuration file nor a code review authorizes spending by another operator.
 
 After a run, [pilot analysis and the judge audit](docs/08_analysis_and_audit.md) produce descriptive tables and measure human/automated-label agreement. The generated 64-cell main study remains a separate future plan, not a completed pilot result or execution instruction. See the [writing handoff](docs/09_writing_and_analysis_handoff.md), [related work](docs/10_related_work.md) and [bibliography](paper/references.bib) before framing the paper's contribution.
+
+Use the [finished-pilot workflow](docs/11_finished_pilot_review.md) to check the exported plan, missing towns and saved costs before analysis. It also explains the separate smoke/main-batch coverage and human-label handoff.

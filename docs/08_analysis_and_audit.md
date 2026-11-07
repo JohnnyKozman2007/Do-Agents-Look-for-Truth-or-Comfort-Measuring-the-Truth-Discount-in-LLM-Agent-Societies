@@ -2,6 +2,8 @@
 
 These commands read saved bundles and make no model calls. They do not alter the source runs. The output is descriptive and exploratory. A generated report does not establish a confirmatory result, a frozen analysis specification or publication readiness.
 
+Start with the [finished-pilot review](11_finished_pilot_review.md). Its `review-collection` command checks declared run coverage and saved receipt evidence, including whole missing pairs that an observed-only analysis cannot count. A successful command means the review ran. Read its coverage and ledger statuses before claiming the pilot is complete.
+
 ## Analysis
 
 ```bash
