@@ -7,6 +7,12 @@ from decimal import Decimal
 from typing import Any, Protocol
 
 
+# Provider error codes documented as rejected before any inference, so unbilled.
+# DeepInfra: "A rejected request never reaches the model, so no inference happens
+# and nothing is billed." https://docs.deepinfra.com/chat/overview#fail-fast
+REJECTED_BEFORE_INFERENCE = {"DeepInfra": "engine_overloaded"}
+
+
 def canonical_bytes(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
                       allow_nan=False).encode("utf-8")

@@ -15,7 +15,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from .config import build_manifest, load_config, render_template, render_values
-from .contracts import canonical_bytes, digest
+from .contracts import REJECTED_BEFORE_INFERENCE, canonical_bytes, digest
 from .scoring import make_judge_input, paired_metrics, parse_judge_response, town_metrics
 
 
@@ -203,8 +203,10 @@ def _provider_receipt(call: dict[str, Any], execution: dict[str, Any]) -> None:
     _require(all(_optional_number(receipt[k], integer=True) for k in _USAGE_COUNTERS),
              "invalid provider token usage")
     _require(_optional_number(receipt["cost_usd"]), "invalid provider cost")
-    _require(receipt["cost_status"] in {"calculated_from_usage", "unknown", "not_submitted"},
+    _require(receipt["cost_status"] in {"calculated_from_usage", "unknown", "not_submitted",
+                                        "rejected_before_inference"},
              "invalid provider cost status")
+    _require(receipt.get("cache_usage") in {None, "reported", "unreported"}, "invalid cache usage marker")
     _require(receipt["request_id"] is None or isinstance(receipt["request_id"], str),
              "invalid provider request identity")
     _require(isinstance(receipt["attempts"], list)
@@ -212,9 +214,18 @@ def _provider_receipt(call: dict[str, Any], execution: dict[str, Any]) -> None:
     attempts = receipt["attempts"]
     _require(len(attempts) == receipt["provider_api_calls"], "provider attempt count mismatch")
     _require(all(type(a.get("attempt_index")) is int and a["attempt_index"] >= 0
-                 and a.get("status") in {"completed", "failed", "cancelled"} for a in attempts)
+                 and a.get("status") in {"completed", "failed", "cancelled", "rejected"} for a in attempts)
              and len({a["attempt_index"] for a in attempts}) == len(attempts),
              "invalid terminal provider attempt")
+    # A free attempt must be the provider's documented pre-inference rejection,
+    # and only a route that asked for fail-fast handling can produce one.
+    rejected = [a for a in attempts if a["status"] == "rejected"]
+    if rejected:
+        expected_code = REJECTED_BEFORE_INFERENCE.get(receipt["actual_provider"])
+        _require(isinstance(route, dict) and route.get("fail_fast") is True and expected_code is not None
+                 and all(a.get("http_status") == 429 and a.get("error_code") == expected_code for a in rejected)
+                 and all(a["status"] == "rejected" for a in attempts[:-1]),
+                 "free provider attempt is not a documented pre-inference rejection")
     for key in ("actual_provider", "actual_model", "provider_api_calls", "cost_usd"):
         _require(canonical_bytes(call.get(key)) == canonical_bytes(receipt[key]),
                  "provider receipt projection mismatch: " + key)
@@ -250,15 +261,23 @@ def _provider_receipt(call: dict[str, Any], execution: dict[str, Any]) -> None:
     if receipt["reasoning_tokens"] is not None and receipt["output_tokens"] is not None:
         _require(receipt["reasoning_tokens"] <= receipt["output_tokens"], "reasoning usage exceeds output")
     if receipt["cost_status"] == "calculated_from_usage":
-        _require(all(receipt[k] is not None for k in ("input_tokens", "output_tokens", "cached_input_tokens"))
+        _require(all(receipt[k] is not None for k in ("input_tokens", "output_tokens"))
                  and receipt.get("cache_creation_input_tokens", 0) == 0,
                  "calculated cost lacks priced usage")
-        uncached = receipt["input_tokens"] - receipt["cached_input_tokens"]
+        # Older bundles have no marker; they always reported the cached count.
+        cached = receipt["cached_input_tokens"]
+        _require((cached is None) == (receipt.get("cache_usage") == "unreported"),
+                 "cache usage marker does not match the reported cached count")
+        uncached = receipt["input_tokens"] - (cached or 0)
         expected_cost = float((Decimal(uncached) * Decimal(str(pricing["input_usd_per_million"]))
-                               + Decimal(receipt["cached_input_tokens"]) * Decimal(str(pricing["cached_input_usd_per_million"]))
+                               + Decimal(cached or 0) * Decimal(str(pricing["cached_input_usd_per_million"]))
                                + Decimal(receipt["output_tokens"]) * Decimal(str(pricing["output_usd_per_million"])))
                               / Decimal(1_000_000))
         _require(receipt["cost_usd"] == expected_cost, "provider usage-derived cost mismatch")
+    elif receipt["cost_status"] == "rejected_before_inference":
+        _require(call["status"] != "completed" and receipt["cost_usd"] == 0
+                 and len(rejected) == len(attempts) and all(receipt[k] is None for k in _USAGE_COUNTERS),
+                 "free rejection receipt claims a completed or billed attempt")
     else:
         _require(receipt["cost_status"] == "unknown" and receipt["cost_usd"] is None,
                  "unobserved provider cost must remain unknown")
@@ -612,6 +631,10 @@ def summarize(output_root: Path) -> dict[str, Any]:
         for key in ("input_tokens", "output_tokens", "cost_usd"):
             result[key] = _known_sum([t["token_usage"] for t in towns], key)
         result["cost_status"] = "calculated_from_usage" if result["cost_usd"] is not None else "unknown"
+        # These calls were priced as fully uncached input: an upper-bound estimate.
+        result["cache_usage_unreported_calls"] = sum(
+            isinstance(c.get("token_usage"), dict) and c["token_usage"].get("cache_usage") == "unreported"
+            for t in towns for c in t["calls"])
         result["billing_verified"] = False
         if evidence_kind == "mocked_provider":
             # Adapter estimates are useful fixture evidence, never billed charges.
