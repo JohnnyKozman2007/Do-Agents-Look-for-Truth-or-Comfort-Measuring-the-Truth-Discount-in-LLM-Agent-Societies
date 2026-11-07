@@ -2,7 +2,7 @@
 
 This project studies how source traits and verification affect belief in LLM agent societies. The experimental specification and pilot configuration live in `docs/` and `configs/`.
 
-The current runner implements the five-scene pilot with **synthetic fixtures only**. It records prompts, responses, isolated agent histories, checking decisions and descriptive scores. It has no live provider adapter and makes no model API calls or credit purchases. Fixture scores are software checks, not empirical findings.
+The runner implements the five-scene pilot with synthetic fixtures and explicitly authorized provider execution. It records prompts, responses, isolated agent histories, checking decisions and usage receipts. The offline checks below make no model calls. Fixture and mocked scores are software checks, not empirical findings.
 
 ## Local check
 
@@ -28,8 +28,8 @@ See [the offline runner guide](docs/05_offline_runner.md) for the manifest comma
 
 ## Development provider integration
 
-PR6's scripted broadcast and diagnostics are integrated on the feature branch. The runner now supports versioned replay, native provider adapters and a durable budget guard. Mocked HTTP tests verify the integration without consuming credits. No real model access, paid pilot or empirical result is claimed.
+The scripted broadcast, versioned replay, native provider adapters, budget guard and resume checks are integrated. Later smoke-test fixes preserve the analysis and rejudge commands together. Mocked HTTP tests verify software behavior without consuming credits. Validate actual pilot claims against the saved run manifests and receipts.
 
-See [live-pilot gates and commands](docs/06_live_pilot.md) and [published rates and budget scenarios](docs/07_pricing_and_budget.md). `configs/providers.example.json` intentionally leaves execution unapproved. The credit-use hold remains.
+See [live-pilot gates and commands](docs/06_live_pilot.md) and [published rates and budget scenarios](docs/07_pricing_and_budget.md). `configs/providers.example.json` intentionally leaves execution unapproved. The separate pilot provider file records the team's selected settings. Neither a configuration file nor a code review authorizes spending by another operator.
 
-After a run, [pilot analysis and the judge audit](docs/08_analysis_and_audit.md) turn the saved towns into per-cell results and check the judge against human labels. The 64-cell main study uses `configs/main_config.json`, generated from the pilot config ([main study](docs/06_live_pilot.md#main-study)).
+After a run, [pilot analysis and the judge audit](docs/08_analysis_and_audit.md) produce descriptive tables and measure human/automated-label agreement. The generated 64-cell main study remains a separate future plan, not a completed pilot result or execution instruction. See the [writing handoff](docs/09_writing_and_analysis_handoff.md), [related work](docs/10_related_work.md) and [bibliography](paper/references.bib) before framing the paper's contribution.
