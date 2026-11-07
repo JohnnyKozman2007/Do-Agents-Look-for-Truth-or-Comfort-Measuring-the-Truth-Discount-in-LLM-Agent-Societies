@@ -605,11 +605,93 @@ def _audit_town(directory: Path) -> dict[str, Any]:
     return town
 
 
+def _receipt_accounting(towns: list[dict[str, Any]], evidence_kind: str) -> dict[str, Any]:
+    """Count recorded attempts without turning unknown charges into zero.
+
+    These are saved-receipt calculations only. A ledger reconciliation is
+    separate evidence and cannot be inferred by replaying a town bundle.
+    """
+    calls = [call for town in towns for call in town["calls"]]
+    receipts = [call.get("token_usage") for call in calls]
+    submitted = [call for call in calls if call["provider_api_calls"] > 0]
+    unknown_charges = sum(not isinstance(call.get("token_usage"), dict)
+                          or call["token_usage"].get("cost_usd") is None for call in submitted)
+    known_cost = float(sum((Decimal(str(receipt["cost_usd"])) for receipt in receipts
+                            if isinstance(receipt, dict) and receipt.get("cost_usd") is not None),
+                           Decimal(0)))
+    total_cost = (_known_sum([town["token_usage"] for town in towns], "cost_usd")
+                  if evidence_kind != "synthetic_fixture" else None)
+    return {
+        "town_count": len(towns),
+        "completed_town_count": sum(town["run_status"] == "completed" for town in towns),
+        "call_count": len(calls),
+        "provider_api_calls": sum(town["token_usage"]["provider_api_calls"] for town in towns),
+        "simulated_provider_requests": sum(town["token_usage"].get("simulated_provider_requests", 0)
+                                            for town in towns),
+        "provider_request_attempts": sum(call["provider_api_calls"] for call in calls),
+        "fixture_callback_invocations": sum(town["token_usage"]["fixture_callback_invocations"]
+                                             for town in towns),
+        "input_tokens": (_known_sum([town["token_usage"] for town in towns], "input_tokens")
+                         if evidence_kind != "synthetic_fixture" else None),
+        "output_tokens": (_known_sum([town["token_usage"] for town in towns], "output_tokens")
+                          if evidence_kind != "synthetic_fixture" else None),
+        "recorded_known_input_tokens_subtotal": (sum(receipt["input_tokens"] for receipt in receipts
+                                                     if isinstance(receipt, dict) and receipt.get("input_tokens") is not None)
+                                                 if evidence_kind != "synthetic_fixture" else None),
+        "recorded_known_output_tokens_subtotal": (sum(receipt["output_tokens"] for receipt in receipts
+                                                      if isinstance(receipt, dict) and receipt.get("output_tokens") is not None)
+                                                  if evidence_kind != "synthetic_fixture" else None),
+        "cost_usd": total_cost if evidence_kind == "development_pilot" else None,
+        "simulated_cost_usd": total_cost if evidence_kind == "mocked_provider" else None,
+        "recorded_known_cost_subtotal_usd": known_cost if evidence_kind == "development_pilot" else None,
+        "recorded_known_simulated_cost_subtotal_usd": known_cost if evidence_kind == "mocked_provider" else None,
+        "unknown_charge_calls": unknown_charges,
+        "unknown_usage_calls": sum(not isinstance(call.get("token_usage"), dict)
+                                   or any(call["token_usage"].get(key) is None
+                                          for key in ("input_tokens", "output_tokens"))
+                                   for call in submitted),
+        "cache_usage_unreported_calls": sum(isinstance(receipt, dict)
+                                             and receipt.get("cache_usage") == "unreported"
+                                             for receipt in receipts),
+        "reconciliation_required": unknown_charges > 0,
+        "ledger_reconciled": False,
+        "billing_verified": False,
+    }
+
+
+def archived_attempt_paths(output_root: Path) -> list[Path]:
+    """Enumerate every preserved town attempt, rejecting unaccountable layouts."""
+    # Resume preserves previous attempts outside the active town directories.
+    # Discover directories, not manifests: an incomplete/corrupt archive must
+    # never vanish from accounting merely because its manifest is missing.
+    archived_paths: list[Path] = []
+    archive_root = Path(output_root) / "_incomplete"
+    if archive_root.exists():
+        _require(archive_root.is_dir(), "archived attempt root is not a directory")
+        for attempt in sorted(archive_root.iterdir()):
+            _require(attempt.is_dir() and re.fullmatch(r"attempt-[1-9][0-9]*", attempt.name) is not None,
+                     "unexpected entry in archived attempt root")
+            children = sorted(attempt.iterdir())
+            _require(bool(children) and all(child.is_dir() for child in children),
+                     "archived attempt has missing or unexpected town entries")
+            archived_paths.extend(children)
+    return archived_paths
+
+
 def summarize(output_root: Path) -> dict[str, Any]:
-    paths = sorted(p.parent for p in Path(output_root).glob("*/manifest.json"))
+    output_root = Path(output_root)
+    paths = sorted(p.parent for p in output_root.glob("*/manifest.json"))
     _require(bool(paths), "no saved towns found")
     towns = [audit_town(p) for p in paths]
-    evidence_kinds = {t["evidence_kind"] for t in towns}
+    archived_paths = archived_attempt_paths(output_root)
+    archived_towns = []
+    for path in archived_paths:
+        try:
+            archived_towns.append(audit_town(path))
+        except (InvalidBundle, OSError) as error:
+            raise InvalidBundle("cannot account for archived attempt "
+                                + path.relative_to(output_root).as_posix() + ": " + str(error)) from error
+    evidence_kinds = {t["evidence_kind"] for t in towns + archived_towns}
     _require(len(evidence_kinds) == 1, "cannot pool fixture, mocked-provider and development-pilot evidence")
     evidence_kind = next(iter(evidence_kinds))
     pairs = paired_metrics(towns)
@@ -641,4 +723,18 @@ def summarize(output_root: Path) -> dict[str, Any]:
             result["simulated_cost_usd"] = result.pop("cost_usd")
             result["cost_usd"] = None
             result["cost_status"] = "simulated_calculation" if result["simulated_cost_usd"] is not None else "unknown"
+    result["receipt_accounting"] = {
+        "source": "audited_saved_town_receipts",
+        "existing_summary_scope": "active_town_directories_only",
+        "archived_attempts_in_paired_metrics": False,
+        "ledger_reconciled": False,
+        "billing_verified": False,
+        "limitation": "Receipt totals do not resolve unknown charges or prove ledger/provider reconciliation.",
+        "archived_attempt_paths": [path.relative_to(output_root).as_posix() for path in archived_paths],
+        "active_towns": _receipt_accounting(towns, evidence_kind),
+        "completed_active_towns": _receipt_accounting(
+            [town for town in towns if town["run_status"] == "completed"], evidence_kind),
+        "archived_attempts": _receipt_accounting(archived_towns, evidence_kind),
+        "all_attempts": _receipt_accounting(towns + archived_towns, evidence_kind),
+    }
     return result

@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -224,6 +225,159 @@ class BudgetTests(unittest.TestCase):
         with self.assertRaisesRegex(BudgetError, "old single-file"):
             BudgetLedger(self.path, 1)
         self.assertEqual(self.path.read_text(), legacy)
+
+    def test_checkpoint_binds_identity_and_survives_reopening(self):
+        ledger = self.ledger()
+        checkpoint = ledger.checkpoint()
+        ledger.verify_checkpoint(checkpoint)
+        self.assertEqual(checkpoint["history_sha256"], hashlib.sha256(self.path.read_bytes()).hexdigest())
+        ledger.close()
+        restarted = self.ledger()
+        self.assertEqual(restarted.checkpoint(), checkpoint)
+        restarted.verify_checkpoint(checkpoint)
+        with BudgetLedger(self.path.with_name("replacement.jsonl"), 1) as replacement:
+            self.assertNotEqual(replacement.checkpoint()["ledger_id"], checkpoint["ledger_id"])
+            with self.assertRaisesRegex(BudgetError, "original ledger identity"):
+                replacement.verify_checkpoint(checkpoint)
+
+    def test_checkpoint_cap_is_stable_for_equivalent_decimal_spellings(self):
+        ledger = self.ledger("1000.00")
+        checkpoint = ledger.checkpoint()
+        self.assertEqual(checkpoint["limit_usd"], "1000")
+        ledger.close()
+        restarted = self.ledger("1e3")
+        self.assertEqual(restarted.checkpoint(), checkpoint)
+        restarted.verify_checkpoint(checkpoint)
+
+    def test_checkpoint_allows_new_charges_and_reconciliation(self):
+        ledger = self.ledger()
+        initial = ledger.checkpoint()
+        pending = ledger.reserve(.4)
+        ledger.settle(pending, None, {"cost_status": "unknown"})
+        before_reconcile = ledger.checkpoint()
+        ledger.reconcile(pending, .02, "synthetic billed-amount confirmation")
+        ledger.verify_checkpoint(initial)
+        ledger.verify_checkpoint(before_reconcile)
+        final = ledger.checkpoint()
+        self.assertGreater(final["event_count"], before_reconcile["event_count"])
+        self.assertEqual(final["history_sha256"], hashlib.sha256(self.path.read_bytes()).hexdigest())
+        ledger.close()
+        restarted = self.ledger()
+        restarted.verify_checkpoint(final)
+        self.assertEqual(restarted.summary()["settled_usd"], .02)
+
+    def test_checkpoint_rejects_rewound_and_rewritten_paid_history(self):
+        ledger = self.ledger()
+        original_header = self.path.read_bytes()
+        ledger.settle(ledger.reserve(.4), .1)
+        checkpoint = ledger.checkpoint()
+        paid_history = self.path.read_bytes()
+        ledger.close()
+        self.path.write_bytes(original_header)
+        rewound = self.ledger()
+        with self.assertRaisesRegex(BudgetError, "ledger history"):
+            rewound.verify_checkpoint(checkpoint)
+        rewound.close()
+        lines = paid_history.splitlines(keepends=True)
+        settlement = json.loads(lines[2])
+        settlement["actual_usd"] = "0.09"
+        lines[2] = json.dumps(settlement, separators=(",", ":")).encode() + b"\n"
+        self.path.write_bytes(b"".join(lines))
+        rewritten = self.ledger()
+        self.assertEqual(rewritten.summary()["settled_usd"], .09)
+        with self.assertRaisesRegex(BudgetError, "history differs"):
+            rewritten.verify_checkpoint(checkpoint)
+
+    def test_checkpoint_rejects_changed_cap_and_invalid_binding(self):
+        ledger = self.ledger()
+        checkpoint = ledger.checkpoint()
+        with self.assertRaisesRegex(BudgetError, "original ledger cap"):
+            ledger.verify_checkpoint({**checkpoint, "limit_usd": "2"})
+        for invalid in (None, {}, {**checkpoint, "extra": 1},
+                        {**checkpoint, "event_count": True},
+                        {**checkpoint, "event_count": 0},
+                        {**checkpoint, "event_count": checkpoint["event_count"] + 1},
+                        {**checkpoint, "history_sha256": "x" * 64}):
+            with self.subTest(binding=invalid), self.assertRaises(BudgetError):
+                ledger.verify_checkpoint(invalid)
+
+    def test_old_v2_journal_gets_append_only_identity_without_resetting_spend(self):
+        ledger = self.ledger()
+        ledger.settle(ledger.reserve(.4), .1)
+        unknown = ledger.reserve(.2)
+        ledger.settle(unknown, None, {"cost_status": "unknown"})
+        ledger.close()
+        lines = self.path.read_bytes().splitlines(keepends=True)
+        header = json.loads(lines[0])
+        header.pop("ledger_id")
+        lines[0] = json.dumps(header, separators=(",", ":")).encode() + b"\n"
+        legacy_bytes = b"".join(lines)
+        self.path.write_bytes(legacy_bytes)
+        migrated = self.ledger()
+        self.assertTrue(self.path.read_bytes().startswith(legacy_bytes))
+        self.assertEqual(migrated.summary()["settled_usd"], .1)
+        self.assertEqual(migrated.summary()["reserved_usd"], .2)
+        self.assertTrue(migrated.summary()["blocked"])
+        checkpoint = migrated.checkpoint()
+        self.assertEqual(len(self.path.read_bytes().splitlines()), len(lines) + 1)
+        migrated.close()
+        restarted = self.ledger()
+        self.assertEqual(restarted.checkpoint(), checkpoint)
+        restarted.verify_checkpoint(checkpoint)
+
+    def test_second_identity_event_is_rejected(self):
+        ledger = self.ledger()
+        identifier = ledger.checkpoint()["ledger_id"]
+        ledger.close()
+        with self.path.open("ab") as stream:
+            stream.write(json.dumps({"type": "identity", "ledger_id": identifier}).encode() + b"\n")
+        with self.assertRaisesRegex(BudgetError, "identity is already fixed"):
+            self.ledger()
+
+    def test_checkpoint_callback_observes_each_durable_updated_state(self):
+        ledger = self.ledger()
+        observed = []
+        def record(checkpoint):
+            ledger.verify_checkpoint(checkpoint)
+            observed.append((checkpoint, ledger.summary()))
+        ledger.set_checkpoint_callback(record)
+        pending = ledger.reserve(.4)
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(observed[-1][1]["reserved_usd"], .4)
+        ledger.settle(pending, None)
+        self.assertEqual(observed[-1][1]["unknown_count"], 1)
+        ledger.reconcile(pending, .02, "synthetic confirmed billing")
+        self.assertEqual(len(observed), 3)
+        self.assertEqual(observed[-1][1]["settled_usd"], .02)
+        self.assertEqual([x[0]["event_count"] for x in observed], [2, 3, 4])
+        ledger.set_checkpoint_callback(None)
+        ledger.reserve(.1)
+        self.assertEqual(len(observed), 3)
+
+    def test_checkpoint_callback_failure_prevents_unanchored_request_and_later_calls(self):
+        ledger = self.ledger()
+        initial = ledger.checkpoint()
+        def failure(_):
+            raise OSError("synthetic anchor storage failure")
+        ledger.set_checkpoint_callback(failure)
+        with self.assertRaises(OSError):
+            ledger.reserve(.4)
+        self.assertEqual(ledger.summary()["reserved_usd"], .4)
+        self.assertTrue(ledger.summary()["blocked"])
+        with self.assertRaises(BudgetBlocked):
+            ledger.reserve(.1)
+        with self.assertRaises(BudgetBlocked):
+            ledger.checkpoint()
+        ledger.set_checkpoint_callback(None)
+        ledger.close()
+        restarted = self.ledger()
+        restarted.verify_checkpoint(initial)
+        self.assertEqual(restarted.summary()["reserved_usd"], .4)
+        self.assertIn("interrupted_request", restarted.summary()["block_reasons"])
+
+    def test_checkpoint_callback_must_be_callable(self):
+        with self.assertRaises(BudgetError):
+            self.ledger().set_checkpoint_callback(False)
 
 
 if __name__ == "__main__":

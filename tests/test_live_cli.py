@@ -8,6 +8,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -231,12 +232,13 @@ class LiveCliTests(unittest.TestCase):
         self.assertEqual(http.requests, [])
         self.assertFalse((self.root / "output").exists())
 
-    def collect_with(self, http, runs, *, cap="1", resume=False, towns=1, providers=None):
+    def collect_with(self, http, runs, *, cap="1", resume=False, towns=1, providers=None,
+                     ledger_path=None):
         from truth_discount.budget import BudgetLedger
         from truth_discount.providers import ProviderBackend
         providers = providers or self.providers
         with patch.dict(os.environ, {"TEST_PROVIDER_KEY": "FAKE_NOT_A_REAL_KEY"}), \
-             BudgetLedger(self.root / "ledger.jsonl", cap) as ledger:
+             BudgetLedger(ledger_path or self.root / "ledger.jsonl", cap) as ledger:
             backend = ProviderBackend(providers, ledger, transport=http, evidence_kind="mocked_provider")
             try:
                 return asyncio.run(collect(self.config, providers, runs, self.root / "output", backend,
@@ -291,6 +293,13 @@ class LiveCliTests(unittest.TestCase):
         skipped_cost = audit_town(self.root / "output" / runs[0]["run_id"])["token_usage"]["cost_usd"]
         self.assertAlmostEqual(self.budget["settled_usd"],
                                spent_before + result["simulated_cost_usd"] - skipped_cost, places=9)
+        self.assertEqual(result["budget_accounting"]["budget"]["settled_usd"], self.budget["settled_usd"])
+        accounting = result["receipt_accounting"]
+        self.assertEqual(accounting["archived_attempts"]["town_count"], 1)
+        self.assertEqual(accounting["completed_active_towns"]["town_count"], 4)
+        self.assertIsNone(accounting["all_attempts"]["simulated_cost_usd"])
+        self.assertTrue(accounting["all_attempts"]["reconciliation_required"])
+        self.assertGreater(self.budget["settled_usd"], result["simulated_cost_usd"])
         log = (self.root / "output" / "resume_log.jsonl").read_text(encoding="utf-8").splitlines()
         self.assertEqual(json.loads(log[-1])["skipped_verified_towns"], 1)
 
@@ -303,6 +312,128 @@ class LiveCliTests(unittest.TestCase):
             self.collect_with(MockHTTP(), select_runs(self.config)[2:4], resume=True)
         result = self.collect_with(MockHTTP(), runs, resume=True)
         self.assertEqual((result["skipped_verified_towns"], result["set_aside_towns"]), (2, []))
+
+    def test_resume_rejects_fresh_ledger_before_keys_or_calls(self):
+        from truth_discount.providers import ProviderBackend, ProviderError
+
+        class DropsOneRequest(MockHTTP):
+            def __call__(self, *args):
+                if len(self.requests) == 69:
+                    self.requests.append({"synthetic": "disconnect"})
+                    raise ConnectionResetError("synthetic interrupted call")
+                return super().__call__(*args)
+
+        runs = select_runs(self.config)[:4]
+        with self.assertRaises(ProviderError):
+            self.collect_with(DropsOneRequest(), runs)
+        self.assertTrue(self.budget["blocked"])
+        original = (self.root / "ledger.jsonl").read_bytes()
+        http = MockHTTP()
+        with patch.object(ProviderBackend, "validate_credentials", side_effect=AssertionError("key read")):
+            with self.assertRaisesRegex(ValueError, "original ledger identity"):
+                self.collect_with(http, runs, resume=True, ledger_path=self.root / "replacement.jsonl")
+        self.assertEqual(http.requests, [])
+        self.assertEqual(original, (self.root / "ledger.jsonl").read_bytes())
+
+    def test_resume_rejects_same_identity_with_rewound_spending_history(self):
+        from truth_discount.providers import ProviderBackend
+        runs = select_runs(self.config)[:2]
+        self.collect_with(MockHTTP(), runs)
+        path = self.root / "ledger.jsonl"
+        path.write_bytes(path.read_bytes().splitlines(keepends=True)[0])
+        http = MockHTTP()
+        with patch.object(ProviderBackend, "validate_credentials", side_effect=AssertionError("key read")):
+            with self.assertRaisesRegex(ValueError, "checkpoint|history|prefix"):
+                self.collect_with(http, runs, resume=True)
+        self.assertEqual(http.requests, [])
+
+    def test_resume_rejects_valid_bundle_from_different_config_or_provider(self):
+        from truth_discount.artifacts import audit_town
+        from truth_discount.budget import BudgetLedger
+        from truth_discount.providers import ProviderBackend
+        from truth_discount.runner import run_town
+        for mismatch in ("config", "provider"):
+            with self.subTest(mismatch=mismatch):
+                self.root = Path(self.temp.name) / mismatch
+                self.root.mkdir()
+                runs = select_runs(self.config)[:2]
+                self.collect_with(MockHTTP(), runs)
+                other_config, other_providers = copy.deepcopy(self.config), copy.deepcopy(self.providers)
+                if mismatch == "config":
+                    other_config["meta"]["town_name"] = "Synthetic Alternative Town"
+                else:
+                    other_providers["routes"][runs[0]["model_key"]]["max_concurrent_requests"] = 2
+                with patch.dict(os.environ, {"TEST_PROVIDER_KEY": "FAKE_NOT_A_REAL_KEY"}), \
+                     BudgetLedger(self.root / "foreign.jsonl", "1") as ledger:
+                    backend = ProviderBackend(other_providers, ledger, transport=MockHTTP(),
+                                              evidence_kind="mocked_provider")
+                    asyncio.run(run_town(other_config, runs[0], backend, self.root / "foreign"))
+                foreign = self.root / "foreign" / runs[0]["run_id"]
+                self.assertEqual(audit_town(foreign)["run_status"], "completed")
+                victim = self.root / "output" / runs[0]["run_id"]
+                victim.rename(self.root / "preserved-original")
+                shutil.copytree(foreign, victim)
+                http = MockHTTP()
+                with patch.object(ProviderBackend, "validate_credentials", side_effect=AssertionError("key read")):
+                    with self.assertRaisesRegex(ValueError, mismatch + ".*differs from execution plan"):
+                        self.collect_with(http, runs, resume=True)
+                self.assertEqual(http.requests, [])
+                self.assertTrue(victim.exists())
+
+    def test_resume_rejects_evidence_kind_change_before_keys(self):
+        from truth_discount.budget import BudgetLedger
+        from truth_discount.providers import ProviderBackend
+        runs = select_runs(self.config)[:2]
+        self.collect_with(MockHTTP(), runs)
+        with BudgetLedger(self.root / "ledger.jsonl", "1") as ledger:
+            backend = ProviderBackend(self.providers, ledger, transport=MockHTTP(),
+                                      evidence_kind="development_pilot")
+            with patch.object(backend, "validate_credentials", side_effect=AssertionError("key read")):
+                with self.assertRaisesRegex(ValueError, "evidence kind"):
+                    asyncio.run(collect(self.config, self.providers, runs, self.root / "output", backend, resume=True))
+
+    def test_resume_rejects_missing_anchor_unverifiable_town_and_bad_archives(self):
+        from truth_discount.providers import ProviderBackend
+        for issue in ("anchor", "town", "archive_file", "empty_archive"):
+            with self.subTest(issue=issue):
+                self.root = Path(self.temp.name) / issue
+                self.root.mkdir()
+                runs = select_runs(self.config)[:2]
+                self.collect_with(MockHTTP(), runs)
+                out = self.root / "output"
+                if issue == "anchor":
+                    (out / "budget_checkpoint.json").unlink()
+                elif issue == "town":
+                    (out / runs[0]["run_id"] / "manifest.json").unlink()
+                elif issue == "archive_file":
+                    (out / "_incomplete").mkdir()
+                    (out / "_incomplete" / "unexpected").write_text("preserve")
+                else:
+                    (out / "_incomplete" / "attempt-1").mkdir(parents=True)
+                http = MockHTTP()
+                with patch.object(ProviderBackend, "validate_credentials", side_effect=AssertionError("key read")):
+                    with self.assertRaises((ValueError, OSError)):
+                        self.collect_with(http, runs, resume=True)
+                self.assertEqual(http.requests, [])
+
+    def test_anchor_write_failure_prevents_submission_and_holds_reservation(self):
+        import truth_discount.execution as execution
+        from truth_discount.providers import ProviderError
+        original = execution._atomic_json
+        anchor_writes = []
+        def fails_after_initial_anchor(path, value):
+            if path.name == "budget_checkpoint.json":
+                anchor_writes.append(value)
+                if len(anchor_writes) > 1:
+                    raise OSError("synthetic anchor storage failure")
+            return original(path, value)
+        http = MockHTTP()
+        with patch.object(execution, "_atomic_json", side_effect=fails_after_initial_anchor):
+            with self.assertRaises(ProviderError):
+                self.collect_with(http, select_runs(self.config)[:2])
+        self.assertEqual(http.requests, [])
+        self.assertTrue(self.budget["blocked"])
+        self.assertGreater(self.budget["reserved_usd"], 0)
 
     def test_concurrent_towns_share_one_request_limit_and_budget(self):
         providers = copy.deepcopy(self.providers)
