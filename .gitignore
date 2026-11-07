@@ -205,6 +205,9 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Local fixture bundles and validation receipts
+/artifacts/
+
 # Ruff stuff:
 .ruff_cache/
 
@@ -218,3 +221,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated offline plans and synthetic fixture bundles
+/outputs/
+/pilot-manifest.jsonl
