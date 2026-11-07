@@ -9,7 +9,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from truth_discount.artifacts import InvalidBundle, audit_town, save_town, summarize
+from truth_discount.artifacts import (InvalidBundle, archived_attempt_paths, audit_town,
+                                     save_town, summarize)
 from truth_discount.config import build_manifest, load_config, render_contexts
 from truth_discount.contracts import (GenerationRequest, GenerationResponse, capture,
                                      digest, usage_totals)
@@ -226,6 +227,156 @@ class ReplayVersionTests(unittest.IsolatedAsyncioTestCase):
         self.save(town, directory)
         with self.assertRaisesRegex(InvalidBundle, "aggregate mismatch"):
             audit_town(directory)
+
+    async def archived_partial(self, *, unknown=False, fixture=False):
+        class ReceiptFailure(ValueError):
+            def __init__(self, receipt):
+                super().__init__("synthetic uncertain charge")
+                self.receipt = receipt
+
+        class Partial(MockReceipts):
+            async def generate(inner, request):
+                response = await super().generate(request)
+                if request.scene == 3 and request.seat == 1:
+                    if unknown:
+                        receipt = inner.receipt(request)
+                        receipt.update(actual_model=None, request_id=None, input_tokens=None,
+                                       output_tokens=None, cached_input_tokens=None, cost_usd=None,
+                                       cost_status="unknown", attempts=[{"attempt_index": 0, "status": "failed"}])
+                        raise ReceiptFailure(receipt)
+                    return GenerationResponse("", response.usage)
+                return response
+
+        class PartialFixture(FixtureBackend):
+            async def generate(inner, request):
+                response = await super().generate(request)
+                return GenerationResponse("") if request.scene == 3 and request.seat == 1 else response
+
+        if unknown:
+            with self.assertRaises(ReceiptFailure):
+                await self.make(backend=Partial(self.config))
+        else:
+            await self.make(backend=PartialFixture() if fixture else Partial(self.config))
+        directory = self.root / self.runs[0]["run_id"]
+        town = audit_town(directory)
+        self.assertNotEqual(town["run_status"], "completed")
+        archived = self.root / "_incomplete" / "attempt-1" / directory.name
+        archived.parent.mkdir(parents=True)
+        directory.rename(archived)
+        return town, archived
+
+    async def test_archived_paid_partial_attempt_is_counted_without_reentering_pairs(self):
+        partial, archived = await self.archived_partial()
+        first, _ = await self.make(0, MockReceipts(self.config))
+        second, _ = await self.make(1, MockReceipts(self.config))
+        report = summarize(self.root)
+        accounting = report["receipt_accounting"]
+        active, archive, combined = (accounting[key] for key in
+                                     ("active_towns", "archived_attempts", "all_attempts"))
+        self.assertEqual((report["towns"], report["completed_towns"], report["pairs"]), (2, 2, 1))
+        self.assertEqual(len(report["town_summaries"]), 2)
+        self.assertFalse(accounting["archived_attempts_in_paired_metrics"])
+        self.assertEqual(accounting["archived_attempt_paths"], [archived.relative_to(self.root).as_posix()])
+        self.assertEqual((active["town_count"], archive["town_count"], combined["town_count"]), (2, 1, 3))
+        active_cost = first["token_usage"]["cost_usd"] + second["token_usage"]["cost_usd"]
+        self.assertAlmostEqual(report["simulated_cost_usd"], active_cost)
+        self.assertAlmostEqual(archive["simulated_cost_usd"], partial["token_usage"]["cost_usd"])
+        self.assertAlmostEqual(combined["simulated_cost_usd"], active_cost + partial["token_usage"]["cost_usd"])
+        self.assertEqual(combined["input_tokens"], sum(t["token_usage"]["input_tokens"]
+                                                     for t in (first, second, partial)))
+        self.assertEqual(combined["simulated_provider_requests"], sum(len(t["calls"])
+                                                                    for t in (first, second, partial)))
+        self.assertEqual(combined["provider_api_calls"], 0)
+        self.assertIsNone(combined["cost_usd"])
+        self.assertFalse(combined["billing_verified"])
+
+    async def test_archived_unknown_charge_keeps_all_attempt_cost_unknown(self):
+        partial, _ = await self.archived_partial(unknown=True)
+        active, _ = await self.make(0, MockReceipts(self.config))
+        report = summarize(self.root)
+        accounting = report["receipt_accounting"]
+        self.assertAlmostEqual(report["simulated_cost_usd"], active["token_usage"]["cost_usd"])
+        for key in ("archived_attempts", "all_attempts"):
+            group = accounting[key]
+            self.assertIsNone(group["simulated_cost_usd"])
+            self.assertIsNone(group["input_tokens"])
+            self.assertEqual(group["unknown_charge_calls"], 1)
+            self.assertTrue(group["reconciliation_required"])
+            self.assertFalse(group["ledger_reconciled"])
+            self.assertGreater(group["recorded_known_simulated_cost_subtotal_usd"], 0)
+        self.assertEqual(accounting["all_attempts"]["call_count"], len(partial["calls"]) + len(active["calls"]))
+        self.assertEqual(accounting["active_towns"]["unknown_charge_calls"], 0)
+
+    async def test_active_incomplete_receipts_are_separate_from_completed_active_towns(self):
+        partial, archived = await self.archived_partial()
+        archived.rename(self.root / archived.name)
+        archived.parent.rmdir()
+        archived.parent.parent.rmdir()
+        completed, _ = await self.make(1, MockReceipts(self.config))
+        report = summarize(self.root)
+        accounting = report["receipt_accounting"]
+        self.assertEqual(report["completed_towns"], 1)
+        self.assertEqual(accounting["active_towns"]["town_count"], 2)
+        self.assertEqual(accounting["completed_active_towns"]["town_count"], 1)
+        self.assertAlmostEqual(accounting["completed_active_towns"]["simulated_cost_usd"],
+                               completed["token_usage"]["cost_usd"])
+        self.assertAlmostEqual(report["simulated_cost_usd"],
+                               partial["token_usage"]["cost_usd"] + completed["token_usage"]["cost_usd"])
+
+    async def test_broken_archived_attempt_cannot_disappear_from_cost_totals(self):
+        for defect in ("missing_manifest", "tampered_receipt"):
+            with self.subTest(defect=defect):
+                self.root = Path(self.temp.name) / defect
+                _, archived = await self.archived_partial()
+                await self.make(0, MockReceipts(self.config))
+                if defect == "missing_manifest":
+                    (archived / "manifest.json").unlink()
+                else:
+                    with (archived / "trace.jsonl").open("a") as stream:
+                        stream.write("{}\n")
+                with self.assertRaisesRegex(InvalidBundle, "cannot account for archived attempt"):
+                    summarize(self.root)
+
+    async def test_archive_evidence_kind_cannot_be_hidden_by_active_mocked_towns(self):
+        await self.archived_partial(fixture=True)
+        await self.make(0, MockReceipts(self.config))
+        with self.assertRaisesRegex(InvalidBundle, "cannot pool"):
+            summarize(self.root)
+
+    def test_archive_enumeration_rejects_shapes_that_could_hide_attempt_costs(self):
+        for defect in ("root_file", "stray_file", "empty_attempt", "unknown_name", "zero_attempt",
+                       "leading_zero_attempt", "town_file"):
+            with self.subTest(defect=defect):
+                root = Path(self.temp.name) / defect
+                archive = root / "_incomplete"
+                root.mkdir()
+                if defect == "root_file":
+                    archive.write_text("unaccounted receipts")
+                else:
+                    archive.mkdir()
+                    if defect == "stray_file":
+                        (archive / "trace.jsonl").write_text("{}\n")
+                    elif defect == "empty_attempt":
+                        (archive / "attempt-1").mkdir()
+                    elif defect == "town_file":
+                        (archive / "attempt-1").mkdir()
+                        (archive / "attempt-1" / "town.json").write_text("{}")
+                    else:
+                        name = {"unknown_name": "old-attempt", "zero_attempt": "attempt-0",
+                                "leading_zero_attempt": "attempt-01"}[defect]
+                        (archive / name / "town-id").mkdir(parents=True)
+                with self.assertRaises(InvalidBundle):
+                    archived_attempt_paths(root)
+
+    async def test_archived_fixture_attempts_claim_no_paid_or_simulated_requests(self):
+        partial, _ = await self.archived_partial(fixture=True)
+        completed, _ = await self.make(0)
+        report = summarize(self.root)
+        combined = report["receipt_accounting"]["all_attempts"]
+        self.assertEqual((combined["provider_api_calls"], combined["simulated_provider_requests"]), (0, 0))
+        self.assertIsNone(combined["cost_usd"])
+        self.assertIsNone(combined["simulated_cost_usd"])
+        self.assertEqual(combined["fixture_callback_invocations"], len(partial["calls"]) + len(completed["calls"]))
 
     async def test_unreported_cache_and_free_rejections_replay(self):
         town, directory = await self.make(backend=FailFastReceipts(self.config, unreported_cache=True))

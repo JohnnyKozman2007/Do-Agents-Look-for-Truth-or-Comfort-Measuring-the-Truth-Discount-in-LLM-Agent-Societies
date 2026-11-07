@@ -13,6 +13,7 @@ ledger never clears an unresolved charge or changes its cap.
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -119,6 +120,10 @@ class BudgetLedger:
         self._io_failed = False
         self._lock = None
         self._stream = None
+        self._ledger_id: str | None = None
+        self._history = hashlib.sha256()
+        self._event_count = 0
+        self._checkpoint_callback = None
         self._rows: dict[str, dict] = {}
         self._unknown: dict[str, str] = {}   # reservation id -> block reason
         self._settled = Decimal(0)
@@ -167,7 +172,9 @@ class BudgetLedger:
                     raise BudgetError("old single-file ledger format; keep it and start a new ledger path")
             self._stream.seek(0)
             self._stream.truncate()
-            self._append({"type": "header", "version": LEDGER_VERSION, "limit_usd": str(self.limit)})
+            self._ledger_id = uuid.uuid4().hex
+            self._append({"type": "header", "version": LEDGER_VERSION,
+                          "limit_usd": str(self.limit), "ledger_id": self._ledger_id})
             if created and os.name != "nt":
                 directory = os.open(self.path.parent, os.O_RDONLY)
                 try:
@@ -176,22 +183,33 @@ class BudgetLedger:
                     os.close(directory)
             return
         header = _parse(complete[0])
-        if (not isinstance(header, dict) or set(header) != {"type", "version", "limit_usd"}
+        legacy_header = {"type", "version", "limit_usd"}
+        if (not isinstance(header, dict) or set(header) not in (legacy_header, legacy_header | {"ledger_id"})
                 or header["type"] != "header" or header["version"] != LEDGER_VERSION):
             raise BudgetError("invalid ledger header")
         if money(header["limit_usd"], "limit_usd") != self.limit:
             raise BudgetError("existing ledger cap cannot be changed")
+        if "ledger_id" in header:
+            self._ledger_id = _identifier(header["ledger_id"])
+        self._history.update(complete[0] + b"\n")
+        self._event_count += 1
         for number, line in enumerate(complete[1:], start=2):
             try:
                 self._apply(_parse(line))
             except BudgetError as error:
                 raise BudgetError(f"invalid ledger event at line {number}: {error}") from None
+            self._history.update(line + b"\n")
+            self._event_count += 1
         if tail:
             # Only the final append can be torn. It was never acknowledged, so no
             # request was sent on its strength; dropping it errs toward holding money.
             self._stream.seek(len(raw) - len(tail))
             self._stream.truncate()
         self._stream.seek(0, os.SEEK_END)
+        if self._ledger_id is None:
+            # Upgrade old v2 journals by appending identity, preserving every
+            # acknowledged reservation, charge and original header byte.
+            self._apply({"type": "identity", "ledger_id": uuid.uuid4().hex}, write=True)
         pending = sorted(i for i, row in self._rows.items() if row["status"] == "pending")
         if pending:
             self._apply({"type": "interrupt", "ids": pending}, write=True)
@@ -207,18 +225,31 @@ class BudgetLedger:
         except BaseException:
             self._io_failed = True
             raise
+        self._history.update(line)
+        self._event_count += 1
 
     def _apply(self, event: Any, *, write: bool = False) -> dict | None:
         """Validate one event, optionally append it durably, then update state."""
         if not isinstance(event, dict) or not isinstance(event.get("type"), str):
             raise BudgetError("invalid ledger event")
         kind = event["type"]
-        fields = {"reserve": {"type", "id", "reserved_usd", "metadata"},
+        fields = {"identity": {"type", "ledger_id"},
+                  "reserve": {"type", "id", "reserved_usd", "metadata"},
                   "settle": {"type", "id", "actual_usd", "receipt"},
                   "interrupt": {"type", "ids"},
                   "reconcile": {"type", "id", "actual_usd", "note"}}.get(kind)
         if fields is None or set(event) != fields:
             raise BudgetError("invalid ledger event schema")
+        if kind == "identity":
+            identifier = _identifier(event["ledger_id"])
+            if self._ledger_id is not None:
+                raise BudgetError("ledger identity is already fixed")
+            if write:
+                self._append(event)
+            self._ledger_id = identifier
+            if write:
+                self._notify_checkpoint()
+            return None
         if kind == "interrupt":
             ids = event["ids"]
             if not isinstance(ids, list) or not ids or len(set(ids)) != len(ids):
@@ -232,6 +263,8 @@ class BudgetLedger:
             for identifier in ids:
                 self._rows[identifier].update(status="unknown", receipt=dict(_INTERRUPTED))
                 self._unknown[identifier] = "interrupted_request"
+            if write:
+                self._notify_checkpoint()
             return None
         identifier = _identifier(event["id"])
         row = self._rows.get(identifier)
@@ -246,6 +279,8 @@ class BudgetLedger:
                    "status": "pending", "metadata": metadata, "receipt": {}}
             self._rows[identifier] = row
             self._held += amount
+            if write:
+                self._notify_checkpoint()
             return row
         actual = None if event["actual_usd"] is None else money(event["actual_usd"], "actual_cost")
         if kind == "settle":
@@ -268,12 +303,16 @@ class BudgetLedger:
         if actual is None:
             row["status"] = "unknown"
             self._unknown[identifier] = "unknown_charge"
+            if write:
+                self._notify_checkpoint()
             return row
         row.update(status="settled", actual_usd=actual)
         self._held -= row["reserved_usd"]
         self._settled += actual
         if actual > row["reserved_usd"]:
             self._exceeded = True
+        if write:
+            self._notify_checkpoint()
         return row
 
     def _open(self):
@@ -329,6 +368,83 @@ class BudgetLedger:
                      "metadata": dict(self._rows[i]["metadata"]),
                      "receipt": dict(self._rows[i]["receipt"])}
                     for i, reason in sorted(self._unknown.items())]
+
+    def checkpoint(self) -> dict:
+        """Return an immutable prefix binding for an execution plan.
+
+        A caller must durably refresh its trusted checkpoint as execution
+        advances. A checkpoint cannot detect history removed after its prefix.
+        It contains neither provider credentials nor generated text.
+        """
+        with self._mutex:
+            self._open()
+            if self._io_failed:
+                raise BudgetBlocked("cannot checkpoint a ledger after storage failure")
+            cap = format(self.limit, "f")
+            if "." in cap:
+                cap = cap.rstrip("0").rstrip(".")
+            if self.limit == 0:
+                cap = "0"
+            return {"ledger_id": self._ledger_id, "limit_usd": cap,
+                    "event_count": self._event_count,
+                    "history_sha256": self._history.hexdigest()}
+
+    def set_checkpoint_callback(self, callback) -> None:
+        """Install an execution-owned durable checkpoint writer, or detach it.
+
+        The callback runs under the ledger lock after each durable mutation and
+        before reserve returns. An anchor write failure blocks later calls.
+        """
+        if callback is not None and not callable(callback):
+            raise BudgetError("checkpoint callback must be callable or None")
+        with self._mutex:
+            self._open()
+            self._checkpoint_callback = callback
+
+    def _notify_checkpoint(self) -> None:
+        if self._checkpoint_callback is not None:
+            try:
+                self._checkpoint_callback(self.checkpoint())
+            except BaseException:
+                self._io_failed = True
+                raise
+
+    def verify_checkpoint(self, checkpoint: dict) -> None:
+        """Reject another ledger, changed cap or missing/rewritten history.
+
+        Appended reservation, settlement and reconciliation events are allowed.
+        Verification reads the journal's actual bytes rather than trusting a
+        caller-supplied digest or the loaded in-memory totals.
+        """
+        with self._mutex:
+            self._open()
+            fields = {"ledger_id", "limit_usd", "event_count", "history_sha256"}
+            if not isinstance(checkpoint, dict) or set(checkpoint) != fields:
+                raise BudgetError("invalid ledger checkpoint")
+            identifier = _identifier(checkpoint["ledger_id"])
+            count = checkpoint["event_count"]
+            expected_hash = checkpoint["history_sha256"]
+            if (type(count) is not int or count < 1 or not isinstance(expected_hash, str)
+                    or len(expected_hash) != 64
+                    or any(c not in "0123456789abcdef" for c in expected_hash)):
+                raise BudgetError("invalid ledger checkpoint")
+            if identifier != self._ledger_id:
+                raise BudgetError("resume requires the original ledger identity")
+            if money(checkpoint["limit_usd"], "checkpoint limit") != self.limit:
+                raise BudgetError("resume requires the original ledger cap")
+            if count > self._event_count:
+                raise BudgetError("ledger history is shorter than the saved checkpoint")
+            if self._io_failed:
+                raise BudgetBlocked("cannot verify a ledger after storage failure")
+            actual = hashlib.sha256()
+            with self.path.open("rb") as stream:
+                for _ in range(count):
+                    line = stream.readline()
+                    if not line.endswith(b"\n"):
+                        raise BudgetError("ledger history is shorter than the saved checkpoint")
+                    actual.update(line)
+            if actual.hexdigest() != expected_hash:
+                raise BudgetError("ledger history differs from the saved checkpoint")
 
     def summary(self) -> dict:
         with self._mutex:

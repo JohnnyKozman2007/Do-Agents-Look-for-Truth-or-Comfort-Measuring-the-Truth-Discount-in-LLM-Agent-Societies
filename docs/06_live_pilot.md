@@ -35,7 +35,9 @@ The CLI checks all required request kinds, manifest equality and key presence be
 
 Each request reserves its declared maximum input/output cost before submission. Reservations use the input cap, not an optimistic character estimate. A process lock protects the ledger against concurrent writers, and a thread lock protects concurrent calls in one process.
 
-The ledger is an append-only JSON Lines journal. Its first line fixes the cap, and each reserve and settlement adds one line, flushed to disk before the request is sent. Earlier lines are never rewritten, so recording a request takes the same time at request 50,000 as at request 1. Reopening replays the journal: the cap, earlier spending and held reservations all survive a crash. A crash can tear only the last line. That line was never acknowledged, so it is dropped, and any request still pending becomes an `interrupted_request` that stays held. Older single-file ledgers are refused rather than overwritten. Start a new ledger path for them.
+The ledger is an append-only JSON Lines journal. Its header fixes a random identity and the cap. Each reserve and settlement adds one durable event. Incremental hashing avoids rewriting or rehashing the full history per request. Collection also atomically refreshes a small external `budget_checkpoint.json` after every ledger mutation, before a reservation can return and submit a request. If that anchor cannot be saved, collection holds the reservation and blocks later requests. Filesystem latency still affects performance.
+
+Reopening replays the journal, preserving earlier spending and held reservations. An incomplete final append is discarded, and any pending request becomes an `interrupted_request` that stays held. Valid older v2 journals gain an appended identity event without rewriting their history. Older single-file ledgers are refused. Do not replace a paid ledger to bypass this check. A reviewed migration must preserve its spending and unresolved charges.
 
 Successful receipts record provider/model/request IDs, token categories, calculated token cost, request attempts and the pricing hash. Cache and reasoning counts are not double-counted. Calculated charges from usage are not verified invoices. The local guard does not impose an account-wide or provider-enforced limit on other clients.
 
@@ -47,7 +49,7 @@ PYTHONPATH=src python3 -m truth_discount.cli ledger --ledger ledgers/pilot.jsonl
   --reconcile <reservation id> --actual-usd 0.0004 --note "DeepInfra usage page, 19 Nov"
 ```
 
-The first command lists unknown charges. The second records one. If the billed amount cannot be found, record the reserved amount, which is an upper bound. Paid empty or malformed model responses still retain their usage and cost records.
+The first command lists unknown charges. The second records one. If the billed amount cannot be found and the operator uses the reserved amount conservatively, the note must identify that estimate. It is not invoice verification. Paid empty or malformed model responses still retain their usage and cost records.
 
 ### Rejections and retries
 
@@ -55,11 +57,15 @@ DeepInfra routes send `fail_fast: true`. When a model has no spare capacity, Dee
 
 ### Missing cache counts
 
-DeepInfra's usage may omit `prompt_tokens_details.cached_tokens`. A response without a cache count is still a known bill. It is priced as if every input token were uncached, which is the full input rate and a conservative estimate, and the receipt is marked `cache_usage: "unreported"`. Replay recomputes that price, and `summarize` reports `cache_usage_unreported_calls`. Missing input or output token counts still leave the charge unknown.
+DeepInfra's usage may omit `prompt_tokens_details.cached_tokens`. When valid total prompt/output counts are present, a response without a cache count is priced as if every input token were uncached. The receipt records the conservative estimate with `cache_usage: "unreported"`. Replay recomputes that price, and `summarize` reports `cache_usage_unreported_calls`. Missing input or output token counts still leave the charge unknown. Native Anthropic cache counters follow a different format, and the current native route does not request cache writes.
 
 ### Resume and several towns at once
 
-`--resume` continues an existing output directory. The config, provider manifest and run selection must hash the same as its saved `execution_plan.json`, and the ledger must not be blocked. Towns that pass the full replay audit as completed are skipped. A partial or unverifiable town is moved, unchanged, to `_incomplete/attempt-N/<run id>/` for reconciliation, then rerun. Each resume appends a line to `resume_log.jsonl`.
+`--resume` continues an existing output directory only with its original ledger identity and fixed cap. It verifies the exact journal prefix recorded in `budget_checkpoint.json`, allowing new reconciliations and later events but rejecting a replacement ledger or rewound/rewritten spending history. The execution plan must retain identical configuration, provider manifest, run selection and evidence kind. Legacy output plans without this binding require review and do not automatically resume.
+
+Before reading credentials or making requests, collection audits every active and archived attempt against that plan. Completed towns are skipped only when their configuration/provider hashes, evidence kind and full run mapping match. A valid incomplete town can be preserved under `_incomplete/attempt-N/<run id>/` and rerun after any unknown charge is reconciled. A mismatched, corrupt or unverifiable town stops collection for review without moving or deleting its evidence. Each resume appends a line to `resume_log.jsonl`.
+
+Existing top-level summary fields continue to describe active town directories. `receipt_accounting` separately reports active towns, completed active towns, archived attempts and all saved attempts. Archived attempts never enter paired outcome metrics. Unknown archived charges keep all-attempt cost unknown, with known subtotals reported separately. The collector's `budget_accounting` gives the entire bound ledger, including prior batches, partial attempts and operator reconciliation. Bundle receipt totals do not establish reconciled billing, and mocked costs remain simulated.
 
 `--max-concurrent-towns N` (1-16) runs several towns at once. They share one ledger and one per-route request limit, `max_concurrent_requests`, which defaults to 32. The example manifest sets 150 for each DeepInfra model, below the 200 per-model account limit, and 8 for the judge. Once any town fails, no new town starts. Towns already running finish and save.
 
@@ -81,6 +87,6 @@ The phone regex trigger and its final-judgment filter remain diagnostics. They d
 
 `--start-pair` and `--pairs-per-cell` declare disjoint ranges of the 39 configured pairs per cell. The default first batch has 16 towns. After verifying its actual completion, `--full-pilot --start-pair 1` selects the remaining 608 without selecting those first 16 IDs again.
 
-These are explicit work assignments between operators. `--resume` only continues one output directory with one ledger. Operators still need one shared completion/cost ledger, identical configuration/model manifests and an agreed handover. A partial town is rerun only after its unknown charges are reconciled, and its original bundle is kept. Native batch jobs, automated cross-person resume, human audit selection, GPT-4o audit execution and final statistical inference remain separate tasks.
+These are explicit work assignments between operators. `--resume` only continues one bound output directory with its original ledger. Operators still need one shared completion/cost ledger, identical configuration/model manifests and an agreed handover. A partial town is rerun only after its unknown charges are reconciled, and its original bundle is kept. Native batch jobs, automated cross-person resume, human audit selection, GPT-4o audit execution and final statistical inference remain separate tasks.
 
 See [published rates and planning scenarios](07_pricing_and_budget.md) before agreeing a funding amount.
