@@ -4,12 +4,15 @@ DeepInfra sometimes turns requests away for a minute or more ("engine_overloaded
 rejections are free and leave the ledger unblocked, but once a call has used all its retries
 the run stops. This wrapper waits, then resumes, and repeats. It stops for good on success or
 on any other error (for example an unclear charge, which needs reconciling first).
+Restarting a partial town can repeat earlier paid calls. Those costs remain in the same
+ledger and archived attempts even though the rejected request itself cost $0.
 
-Usage, from the repo folder, with the API keys in the environment; the arguments are those of
-`truth_discount.cli live`, without --resume:
+Usage, from the repo folder, only after the operator authorizes execution and sets the
+approved ceiling. The arguments are those of `truth_discount.cli live`, without --resume.
+The example's $20 ceiling is illustrative and does not grant spending authority:
 
     python scripts/run_until_done.py --providers configs/providers.pilot.json --output outputs/pilot \
-        --ledger outputs/ledgers/team.jsonl --budget-usd 200 --execute --spending-authorized \
+        --ledger outputs/ledgers/team.jsonl --budget-usd 20 --execute --spending-authorized \
         --full-pilot --start-pair 1 --max-concurrent-towns 8
 """
 from datetime import datetime
