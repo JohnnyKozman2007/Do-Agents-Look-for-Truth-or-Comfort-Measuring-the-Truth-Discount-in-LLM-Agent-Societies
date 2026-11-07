@@ -231,6 +231,137 @@ class LiveCliTests(unittest.TestCase):
         self.assertEqual(http.requests, [])
         self.assertFalse((self.root / "output").exists())
 
+    def collect_with(self, http, runs, *, cap="1", resume=False, towns=1, providers=None):
+        from truth_discount.budget import BudgetLedger
+        from truth_discount.providers import ProviderBackend
+        providers = providers or self.providers
+        with patch.dict(os.environ, {"TEST_PROVIDER_KEY": "FAKE_NOT_A_REAL_KEY"}), \
+             BudgetLedger(self.root / "ledger.jsonl", cap) as ledger:
+            backend = ProviderBackend(providers, ledger, transport=http, evidence_kind="mocked_provider")
+            try:
+                return asyncio.run(collect(self.config, providers, runs, self.root / "output", backend,
+                                           resume=resume, max_concurrent_towns=towns))
+            finally:
+                self.budget = ledger.summary()
+
+    def test_crash_reconcile_and_resume_skip_verified_towns(self):
+        from truth_discount.artifacts import audit_town
+        from truth_discount.providers import ProviderError
+
+        class DropsOneRequest(MockHTTP):
+            def __call__(self, method, url, headers, body, timeout_seconds):
+                if len(self.requests) == 69:   # inside the second town
+                    self.requests.append({"url": url, "body": clone(body)})
+                    raise ConnectionResetError("connection dropped after sending")
+                return super().__call__(method, url, headers, body, timeout_seconds)
+
+        runs = select_runs(self.config)[:4]
+        with self.assertRaises(ProviderError):
+            self.collect_with(DropsOneRequest(), runs)
+        self.assertEqual(self.budget["block_reasons"], ["unknown_charge"])
+        self.assertTrue(audit_town(self.root / "output" / runs[0]["run_id"])["run_status"] == "completed")
+        self.assertFalse((self.root / "output" / runs[2]["run_id"]).exists())
+
+        # The unclear charge holds the run until someone records what was billed.
+        with self.assertRaisesRegex(ValueError, "blocked"):
+            self.collect_with(MockHTTP(), runs, resume=True)
+        code, out, err = self.invoke("ledger", "--ledger", self.root / "ledger.jsonl", "--budget-usd", "1")
+        self.assertEqual(code, 0, err)
+        unknown = json.loads(out)["unknown_reservations"]
+        self.assertEqual(len(unknown), 1)
+        code, out, err = self.invoke("ledger", "--ledger", self.root / "ledger.jsonl", "--budget-usd", "1",
+                                     "--reconcile", unknown[0]["id"], "--actual-usd", "0.00002")
+        self.assertEqual(code, 1)
+        self.assertIn("--note", err)
+        code, out, err = self.invoke("ledger", "--ledger", self.root / "ledger.jsonl", "--budget-usd", "1",
+                                     "--reconcile", unknown[0]["id"], "--actual-usd", "0.00002",
+                                     "--note", "DeepInfra usage page")
+        self.assertEqual(code, 0, err)
+        self.assertFalse(json.loads(out)["budget"]["blocked"])
+        spent_before = json.loads(out)["budget"]["settled_usd"]
+
+        http = MockHTTP()
+        result = self.collect_with(http, runs, resume=True)
+        self.assertEqual(result["skipped_verified_towns"], 1)
+        self.assertEqual(result["set_aside_towns"], ["_incomplete/attempt-1/" + runs[1]["run_id"]])
+        self.assertEqual(result["completed_towns"], 4)
+        self.assertEqual(len(http.requests), 3 * 66)
+        kept = audit_town(self.root / "output" / result["set_aside_towns"][0])
+        self.assertNotEqual(kept["run_status"], "completed")
+        skipped_cost = audit_town(self.root / "output" / runs[0]["run_id"])["token_usage"]["cost_usd"]
+        self.assertAlmostEqual(self.budget["settled_usd"],
+                               spent_before + result["simulated_cost_usd"] - skipped_cost, places=9)
+        log = (self.root / "output" / "resume_log.jsonl").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(json.loads(log[-1])["skipped_verified_towns"], 1)
+
+    def test_resume_needs_the_same_plan_and_existing_output(self):
+        runs = select_runs(self.config)[:2]
+        with self.assertRaisesRegex(ValueError, "nothing to resume"):
+            self.collect_with(MockHTTP(), runs, resume=True)
+        self.collect_with(MockHTTP(), runs)
+        with self.assertRaisesRegex(ValueError, "run_manifest_sha256"):
+            self.collect_with(MockHTTP(), select_runs(self.config)[2:4], resume=True)
+        result = self.collect_with(MockHTTP(), runs, resume=True)
+        self.assertEqual((result["skipped_verified_towns"], result["set_aside_towns"]), (2, []))
+
+    def test_concurrent_towns_share_one_request_limit_and_budget(self):
+        providers = copy.deepcopy(self.providers)
+        for route in providers["routes"].values():
+            route["max_concurrent_requests"] = 3
+        from truth_discount.artifacts import audit_town
+        mock, now, peak = MockHTTP(), {}, {}
+
+        async def http(method, url, headers, body, timeout_seconds):
+            model = body["model"]
+            now[model] = now.get(model, 0) + 1
+            peak[model] = max(peak.get(model, 0), now[model])
+            await asyncio.sleep(.001)
+            now[model] -= 1
+            return mock(method, url, headers, body, timeout_seconds)
+
+        runs = select_runs(self.config)[:4]
+        result = self.collect_with(http, runs, towns=4, providers=providers)
+        self.assertEqual(result["completed_towns"], 4)
+        self.assertEqual(max(peak.values()), 3)
+        times = [audit_town(self.root / "output" / r["run_id"])["timestamps"] for r in runs]
+        self.assertLess(max(t["started_utc"] for t in times), min(t["finished_utc"] for t in times))
+        self.assertAlmostEqual(self.budget["settled_usd"], result["simulated_cost_usd"], places=9)
+        self.assertEqual(self.budget["reserved_usd"], 0)
+
+    def test_budget_limit_stops_new_towns_and_is_never_exceeded(self):
+        from truth_discount.providers import ProviderError
+        for towns in (1, 2):
+            with self.subTest(concurrent_towns=towns):
+                self.root = Path(self.temp.name) / f"limit-{towns}"
+                self.root.mkdir()
+                runs = select_runs(self.config)[:4]
+                with self.assertRaises(ProviderError):
+                    self.collect_with(MockHTTP(), runs, cap="0.043", towns=towns)
+                saved = [r for r in runs if (self.root / "output" / r["run_id"]).exists()]
+                self.assertLess(len(saved), 4)
+                if towns == 1:   # the first town fits under the cap; the run stops at a later one
+                    from truth_discount.artifacts import audit_town
+                    first = audit_town(self.root / "output" / saved[0]["run_id"])
+                    self.assertEqual(first["run_status"], "completed")
+                else:            # both running towns drew on one cap; no third town started
+                    self.assertEqual(len(saved), 2)
+                self.assertLessEqual(self.budget["settled_usd"] + self.budget["reserved_usd"], 0.043)
+                self.assertFalse(self.budget["blocked"])
+
+    def test_ledger_command_refuses_missing_file_and_stray_flags(self):
+        code, _, err = self.invoke("ledger", "--ledger", self.root / "none.jsonl", "--budget-usd", "1")
+        self.assertEqual(code, 1)
+        self.assertIn("does not exist", err)
+        self.assertFalse((self.root / "none.jsonl").exists())
+        from truth_discount.budget import BudgetLedger
+        BudgetLedger(self.root / "ledger.jsonl", "1").close()
+        code, _, err = self.invoke("ledger", "--ledger", self.root / "ledger.jsonl", "--budget-usd", "1",
+                                   "--actual-usd", "0.1")
+        self.assertEqual(code, 1)
+        code, _, err = self.invoke("ledger", "--ledger", self.root / "ledger.jsonl", "--budget-usd", "2")
+        self.assertEqual(code, 1)
+        self.assertIn("cap cannot be changed", err)
+
     def test_backend_manifest_cannot_differ_from_preflight_plan(self):
         from truth_discount.budget import BudgetLedger
         from truth_discount.providers import ProviderBackend

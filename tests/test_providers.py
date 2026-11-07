@@ -173,20 +173,147 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(error.exception.receipt["provider_api_calls"], 0)
         self.assertEqual(self.calls, [])
 
-    async def test_unknown_usage_is_not_zero_and_blocks_next_request(self):
-        body = response(usage={"prompt_tokens": 100, "completion_tokens": 3})
-        backend = self.backend(body=body)
+    async def test_missing_cache_count_is_priced_at_full_input_and_marked(self):
+        for usage in ({"prompt_tokens": 100, "completion_tokens": 3},
+                      {"prompt_tokens": 100, "completion_tokens": 3, "prompt_tokens_details": None},
+                      {"prompt_tokens": 100, "completion_tokens": 3, "prompt_tokens_details": {}}):
+            with self.subTest(usage=usage):
+                result = await self.backend(body=response(usage=usage)).generate(request())
+                self.assertIsNone(result.usage["cached_input_tokens"])
+                self.assertEqual(result.usage["cache_usage"], "unreported")
+                self.assertEqual(result.usage["cost_status"], "calculated_from_usage")
+                self.assertAlmostEqual(result.usage["cost_usd"], (100 * 1.0 + 3 * 4.0) / 1e6)
+        self.assertFalse(self.ledger.summary()["blocked"])
+        reported = await self.backend().generate(request())
+        self.assertEqual(reported.usage["cache_usage"], "reported")
+
+    async def test_anthropic_missing_cache_read_is_priced_at_full_input(self):
+        body = {"id": "msg_1", "model": "model-v1", "content": [{"type": "text", "text": "GO"}],
+                "usage": {"input_tokens": 100, "output_tokens": 3}}
+        result = await self.backend(manifest("Anthropic"), body=body).generate(request(
+            settings={"max_tokens": 5, "thinking": {"type": "disabled"}}))
+        self.assertEqual(result.usage["cache_usage"], "unreported")
+        self.assertEqual(result.usage["input_tokens"], 100)
+        self.assertAlmostEqual(result.usage["cost_usd"], (100 * 1.0 + 3 * 4.0) / 1e6)
+
+    async def test_missing_token_counts_stay_unknown_and_block_next_request(self):
+        backend = self.backend(body=response(usage={"completion_tokens": 3}))
         with self.assertRaises(ProviderError) as error:
             await backend.generate(request())
         receipt = error.exception.receipt
-        self.assertIsNone(receipt["cached_input_tokens"])
         self.assertIsNone(receipt["cost_usd"])
-        self.assertEqual(receipt["input_tokens"], 100)
         self.assertEqual(receipt["cost_status"], "unknown")
         self.assertTrue(self.ledger.summary()["blocked"])
         with self.assertRaises(ProviderError):
             await backend.generate(request())
         self.assertEqual(len(self.calls), 1)
+
+    def fail_fast_manifest(self, retries=2):
+        config = manifest()
+        config["routes"]["agent"].update(fail_fast=True, max_retries=retries, retry_backoff_seconds=.5)
+        return config
+
+    def scripted(self, *responses):
+        queue = list(responses)
+        def transport(*args):
+            self.calls.append(args)
+            return deepcopy(queue.pop(0))
+        return transport
+
+    async def test_fail_fast_rejection_is_free_and_retried(self):
+        busy = HTTPResponse(429, {"error": {"code": "engine_overloaded"}})
+        backend = self.backend(self.fail_fast_manifest(), transport=self.scripted(busy, busy, response()))
+        sleeps = []
+        async def sleep(seconds):
+            sleeps.append(seconds)
+        backend._sleep = sleep
+        result = await backend.generate(request())
+        self.assertEqual(result.text, "GO")
+        self.assertTrue(all(call[3]["fail_fast"] is True for call in self.calls))
+        self.assertEqual(sleeps, [.5, 1.0])
+        self.assertEqual(result.usage["provider_api_calls"], 3)
+        self.assertEqual([a["status"] for a in result.usage["attempts"]], ["rejected", "rejected", "completed"])
+        self.assertEqual(result.usage["cost_status"], "calculated_from_usage")
+        self.assertNotIn("error_code", result.usage)
+        summary = self.ledger.summary()
+        self.assertEqual(summary["reservation_count"], 3)
+        self.assertAlmostEqual(summary["settled_usd"], result.usage["cost_usd"])
+        self.assertFalse(summary["blocked"])
+
+    async def test_exhausted_fail_fast_retries_cost_nothing_and_do_not_block(self):
+        busy = HTTPResponse(429, {"error": {"code": "engine_overloaded"}})
+        backend = self.backend(self.fail_fast_manifest(retries=1), transport=self.scripted(busy, busy))
+        backend._sleep = lambda seconds: asyncio.sleep(0)
+        with self.assertRaises(ProviderError) as error:
+            await backend.generate(request())
+        receipt = error.exception.receipt
+        self.assertEqual((receipt["cost_usd"], receipt["cost_status"]), (0.0, "rejected_before_inference"))
+        self.assertEqual(receipt["provider_api_calls"], 2)
+        self.assertEqual(self.ledger.summary()["settled_usd"], 0)
+        self.assertFalse(self.ledger.summary()["blocked"])
+
+    async def test_other_429s_and_rejections_without_fail_fast_hold_the_reservation(self):
+        cases = [(self.fail_fast_manifest(), HTTPResponse(429, {})),                    # "Rate limited"
+                 (self.fail_fast_manifest(), HTTPResponse(503, {"error": {"code": "engine_overloaded"}})),
+                 (manifest(), HTTPResponse(429, {"error": {"code": "engine_overloaded"}}))]
+        for number, (config, reply) in enumerate(cases):
+            with self.subTest(case=number):
+                self.ledger.close()
+                self.path = Path(self.temp.name) / f"hold-{number}.json"
+                self.ledger = BudgetLedger(self.path, 1)
+                self.addCleanup(self.ledger.close)
+                self.calls = []
+                with self.assertRaises(ProviderError) as error:
+                    await self.backend(config, transport=self.scripted(reply, response())).generate(request())
+                self.assertEqual(error.exception.receipt["cost_status"], "unknown")
+                self.assertEqual(len(self.calls), 1)
+                self.assertTrue(self.ledger.summary()["blocked"])
+
+    def test_retry_and_concurrency_settings_are_bounded(self):
+        bad = [{"max_retries": 2}, {"fail_fast": "yes"}, {"fail_fast": True, "max_retries": 11},
+               {"max_concurrent_requests": 0}, {"max_concurrent_requests": 201},
+               {"retry_backoff_seconds": 61}]
+        for change in bad:
+            with self.subTest(change=change), self.assertRaises(ProviderError):
+                config = manifest()
+                config["routes"]["agent"].update(change)
+                self.backend(config)
+        anthropic = manifest("Anthropic")
+        anthropic["routes"]["agent"]["fail_fast"] = True
+        with self.assertRaises(ProviderError):
+            self.backend(anthropic)
+
+    async def test_in_flight_requests_share_one_route_limit(self):
+        config = manifest()
+        config["routes"]["agent"]["max_concurrent_requests"] = 2
+        state = {"now": 0, "peak": 0}
+        async def slow(*args):
+            state["now"] += 1
+            state["peak"] = max(state["peak"], state["now"])
+            await asyncio.sleep(.01)
+            state["now"] -= 1
+            return deepcopy(response())
+        backend = self.backend(config, transport=slow)
+        await asyncio.gather(*(backend.generate(request()) for _ in range(7)))
+        self.assertEqual(state["peak"], 2)
+        self.assertEqual(self.ledger.summary()["reservation_count"], 7)
+
+    def test_example_manifest_sends_explicit_thinking_off_and_fail_fast_for_qwen(self):
+        example = json.loads((Path(__file__).resolve().parents[1] / "configs/providers.example.json")
+                             .read_text(encoding="utf-8"))
+        example["approved"] = True
+        example["routes"]["qwen_3_8_flash"]["settings_verified"] = True
+        backend = ProviderBackend(example, self.ledger, lambda *args: None, evidence_kind="mocked_provider")
+        _, body, *_ = backend._prepare(request(model_key="qwen_3_8_flash"))
+        self.assertEqual((body["reasoning_effort"], body["fail_fast"], body["max_tokens"]), ("none", True, 5))
+
+    def test_only_a_short_error_code_is_kept_from_a_429_body(self):
+        from truth_discount.providers import _error_code
+        self.assertEqual(_error_code(b'{"error":{"code":"engine_overloaded","message":"Model busy"}}'),
+                         "engine_overloaded")
+        for raw in (b"Rate limited", b'{"error":"' + KEY.encode() + b'"}', b'{"error":{"code":"' + KEY.encode() + b'"}}',
+                    b"\xff\xfe", b"[]"):
+            self.assertIsNone(_error_code(raw))
 
     async def test_transport_error_never_records_secret_or_retries(self):
         async def bad(*args):

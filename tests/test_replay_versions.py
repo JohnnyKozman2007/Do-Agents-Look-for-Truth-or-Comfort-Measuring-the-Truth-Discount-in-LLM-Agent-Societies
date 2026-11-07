@@ -61,6 +61,28 @@ class MockReceipts(FixtureBackend):
         return GenerationResponse(response.text, self.receipt(request))
 
 
+class FailFastReceipts(MockReceipts):
+    """DeepInfra-style receipts: GO/SKIP checks were turned away once before being served."""
+
+    def __init__(self, config, *, unreported_cache=False):
+        super().__init__(config)
+        self.unreported_cache = unreported_cache
+        for route in self.manifest["routes"].values():
+            route.update(provider="DeepInfra", fail_fast=True, max_retries=2)
+
+    def receipt(self, request):
+        receipt = super().receipt(request)
+        receipt["cache_usage"] = "reported"
+        if self.unreported_cache:
+            receipt.update(cached_input_tokens=None, cache_usage="unreported")
+        if request.scene == 2:
+            receipt["provider_api_calls"] = 2
+            receipt["attempts"] = [{"attempt_index": 0, "status": "rejected", "http_status": 429,
+                                    "error_code": "engine_overloaded"},
+                                   {"attempt_index": 1, "status": "completed"}]
+        return receipt
+
+
 class ReplayVersionTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -204,6 +226,43 @@ class ReplayVersionTests(unittest.IsolatedAsyncioTestCase):
         self.save(town, directory)
         with self.assertRaisesRegex(InvalidBundle, "aggregate mismatch"):
             audit_town(directory)
+
+    async def test_unreported_cache_and_free_rejections_replay(self):
+        town, directory = await self.make(backend=FailFastReceipts(self.config, unreported_cache=True))
+        self.assertEqual(audit_town(directory), town)
+        report = summarize(self.root)
+        self.assertEqual(report["cache_usage_unreported_calls"], len(town["calls"]))
+        self.assertEqual(report["simulated_provider_requests"], len(town["calls"]) + 6)
+        self.assertAlmostEqual(report["simulated_cost_usd"], len(town["calls"]) * 0.0000014)
+
+    async def test_cache_marker_must_match_the_priced_count(self):
+        town, directory = await self.make(backend=FailFastReceipts(self.config, unreported_cache=True))
+        call = town["calls"][0]
+        call["token_usage"]["cache_usage"] = "reported"
+        call["raw_response"] = capture(GenerationResponse(call["response"], call["token_usage"]))
+        self.save(town, directory)
+        with self.assertRaisesRegex(InvalidBundle, "cache usage marker"):
+            audit_town(directory)
+
+    async def test_free_attempt_needs_a_documented_fail_fast_rejection(self):
+        for change in ("route", "code", "order"):
+            with self.subTest(change=change):
+                self.root = Path(self.temp.name) / change
+                town, directory = await self.make(backend=FailFastReceipts(self.config))
+                call = next(c for c in town["calls"] if c["scene"] == 2)
+                if change == "route":
+                    town["execution_manifest"]["routes"][call["model_key"]]["fail_fast"] = False
+                    town["execution_manifest_sha256"] = digest(town["execution_manifest"])
+                else:
+                    attempts = call["token_usage"]["attempts"]
+                    if change == "code":
+                        attempts[0]["error_code"] = "rate_limited"
+                    else:
+                        attempts.reverse()
+                    call["raw_response"] = capture(GenerationResponse(call["response"], call["token_usage"]))
+                self.save(town, directory)
+                with self.assertRaisesRegex(InvalidBundle, "pre-inference rejection"):
+                    audit_town(directory)
 
     async def test_mixed_fixture_and_mocked_outputs_are_not_pooled(self):
         await self.make(0)

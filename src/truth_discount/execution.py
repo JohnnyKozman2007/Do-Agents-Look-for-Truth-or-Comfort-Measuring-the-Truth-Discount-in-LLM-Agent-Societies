@@ -1,6 +1,9 @@
 """Plan and gate bounded development collection without changing the study."""
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime, timezone
+import itertools
 import json
 from pathlib import Path
 from typing import Any
@@ -96,25 +99,91 @@ def validate_backend(config: dict, runs: list[dict], backend) -> None:
         clone(config["hyperparameters"]["blind_judge_turns"]), judge, "judge", 5, 1, 0))
 
 
+def _set_aside(output: Path, directory: Path) -> str:
+    """Keep a partial or unverifiable town for reconciliation; paid evidence is never deleted."""
+    for attempt in itertools.count(1):
+        target = output / "_incomplete" / f"attempt-{attempt}" / directory.name
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            directory.rename(target)
+            return target.relative_to(output).as_posix()
+
+
+def _verified_complete(directory: Path) -> bool:
+    from .artifacts import InvalidBundle, audit_town
+    try:
+        return audit_town(directory)["run_status"] == "completed"
+    except (InvalidBundle, OSError, ValueError):
+        return False
+
+
 async def collect(config: dict, providers: dict, runs: list[dict], output: Path,
-                  backend) -> dict:
+                  backend, *, resume: bool = False, max_concurrent_towns: int = 1) -> dict:
     from .artifacts import summarize
     from .runner import run_town
-    if output.exists():
-        raise FileExistsError("refusing existing output directory")
+    if type(max_concurrent_towns) is not int or not 1 <= max_concurrent_towns <= 16:
+        raise ValueError("max-concurrent-towns must be an integer from 1 to 16")
+    if output.exists() and not resume:
+        raise FileExistsError("refusing existing output directory; resume continues it")
+    if resume and not (output / "execution_plan.json").is_file():
+        raise ValueError("nothing to resume: the output has no execution plan")
     if digest(providers) != digest(backend.manifest):
         raise ValueError("backend manifest differs from the approved execution plan")
     info = plan(config, providers, runs)
     if info["execution_gates"]:
         raise ValueError("; ".join(info["execution_gates"]))
+    if resume:
+        saved = json.loads((output / "execution_plan.json").read_text(encoding="utf-8"))
+        for key in ("config_sha256", "provider_manifest_sha256", "run_manifest_sha256"):
+            if saved.get(key) != info[key]:
+                raise ValueError("resume needs the same plan; changed: " + key)
     validate_backend(config, runs, backend)
     needed = sorted({r["model_key"] for r in runs} | {info["primary_judge_key"]})
     backend.validate_credentials(needed)
-    output.mkdir(parents=True, exist_ok=False)
-    (output / "execution_plan.json").write_text(json.dumps(info, indent=2), encoding="utf-8")
+    ledger = getattr(backend, "ledger", None)
+    if ledger is not None and ledger.summary()["blocked"]:
+        raise ValueError("budget ledger is blocked (" + ", ".join(ledger.summary()["block_reasons"])
+                         + "); record billed amounts with `truth-discount ledger --reconcile` first")
+    if not resume:
+        output.mkdir(parents=True, exist_ok=False)
+        (output / "execution_plan.json").write_text(json.dumps(info, indent=2), encoding="utf-8")
+    pending, skipped, set_aside = [], [], []
     for run in runs:
-        town = await run_town(config, run, backend, output)
-        if town["run_status"] != "completed":
-            raise ValueError("collection stopped after incomplete town: " + run["run_id"])
+        directory = output / run["run_id"]
+        if not directory.exists():
+            pending.append(run)
+        elif _verified_complete(directory):
+            skipped.append(run["run_id"])
+        else:
+            set_aside.append(_set_aside(output, directory))
+            pending.append(run)
+    if resume:
+        with (output / "resume_log.jsonl").open("a", encoding="utf-8") as log:
+            log.write(json.dumps({"resumed_utc": datetime.now(timezone.utc).isoformat(),
+                                  "skipped_verified_towns": len(skipped), "set_aside": set_aside,
+                                  "pending_towns": len(pending)}) + "\n")
+    # Towns share one backend, so one ledger and one per-route request limit.
+    # After any failure no new town starts; towns already running finish and save.
+    queue, failures = list(pending), []
+
+    async def worker():
+        while queue and not failures:
+            run = queue.pop(0)
+            try:
+                town = await run_town(config, run, backend, output)
+            except Exception as error:
+                failures.append((run["run_id"], error))
+                return
+            if town["run_status"] != "completed":
+                failures.append((run["run_id"], None))
+                return
+
+    await asyncio.gather(*(worker() for _ in range(max(1, min(max_concurrent_towns, len(pending))))))
+    if failures:
+        run_id, error = failures[0]
+        if error is not None:
+            raise error
+        raise ValueError("collection stopped after incomplete town: " + run_id)
     return {**summarize(output), "output_root": str(output),
-            "execution_plan_sha256": digest(info), "study_eligible": False}
+            "execution_plan_sha256": digest(info), "study_eligible": False,
+            "resumed": resume, "skipped_verified_towns": len(skipped), "set_aside_towns": set_aside}

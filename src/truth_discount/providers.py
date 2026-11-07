@@ -22,7 +22,8 @@ import urllib.error
 import urllib.request
 
 from .budget import BudgetError, BudgetLedger, money
-from .contracts import GenerationRequest, GenerationResponse, canonical_bytes, clone, digest
+from .contracts import (REJECTED_BEFORE_INFERENCE as _REJECTED_BEFORE_INFERENCE, GenerationRequest,
+                        GenerationResponse, canonical_bytes, clone, digest)
 
 
 class ProviderError(ValueError):
@@ -47,13 +48,15 @@ _ROUTE_FIELDS = {"provider", "model_id", "endpoint", "api_key_env", "input_usd_p
     "output_usd_per_million", "cached_input_usd_per_million", "max_input_tokens", "timeout_seconds",
     "settings_verified", "pricing_verified", "thinking_disabled_parameters", "verified_nonreasoning",
     "allow_synchronous_judge", "accepted_model_ids", "input_overhead_tokens", "anthropic_version",
-    "max_output_parameter", "max_retries", "pricing_source", "settings_source", "verified_at"}
+    "max_output_parameter", "max_retries", "pricing_source", "settings_source", "verified_at",
+    "fail_fast", "retry_backoff_seconds", "max_concurrent_requests"}
 _SETTING_FIELDS = {"temperature", "top_p", "max_tokens", "presence_penalty", "frequency_penalty",
     "disable_thinking", "thinking", "structured_output", "use_batch_api", "scene", "scenes", "description"}
 _LABELS = ["FACT", "UNCERTAIN", "SKEPTICAL", "CHECKED_TRUE", "CHECKED_FALSE", "NOT_MENTIONED"]
 _ID = re.compile(r"[A-Za-z0-9_./:\-]{1,256}\Z")
 _ENV = re.compile(r"[A-Z_][A-Z0-9_]{0,127}\Z")
 _RATES = ("input_usd_per_million", "output_usd_per_million", "cached_input_usd_per_million")
+DEFAULT_MAX_CONCURRENT_REQUESTS = 32
 
 
 def _integer(value, name, *, minimum=0):
@@ -97,8 +100,25 @@ def _http_transport(method, url, headers, json_body, timeout_seconds):
             body = json.loads(raw)
             return HTTPResponse(response.status, body, dict(response.headers))
     except urllib.error.HTTPError as error:
-        # Deliberately do not read or persist the error body or request headers.
-        return HTTPResponse(error.code, {}, {})
+        # Never persist an error body or headers. A 429 keeps only its error code,
+        # which separates a documented pre-inference rejection from other 429s.
+        if error.code != 429:
+            return HTTPResponse(error.code, {}, {})
+        try:
+            code = _error_code(error.read(64 * 1024))
+        except (OSError, ValueError):
+            code = None
+        return HTTPResponse(429, {"error": {"code": code}} if code else {}, {})
+
+
+def _error_code(raw: bytes) -> str | None:
+    try:
+        body = json.loads(raw)
+    except (UnicodeDecodeError, ValueError):
+        return None
+    error = body.get("error") if isinstance(body, dict) else None
+    code = error.get("code") if isinstance(error, dict) else None
+    return code if isinstance(code, str) and re.fullmatch(r"[a-z_]{1,64}", code) else None
 
 
 class ProviderBackend:
@@ -133,11 +153,21 @@ class ProviderBackend:
             for field_name in _RATES:
                 if route.get(field_name) is not None:
                     _number(route[field_name], field_name)
-            for field_name in ("max_input_tokens", "input_overhead_tokens", "max_retries"):
+            for field_name in ("max_input_tokens", "input_overhead_tokens", "max_retries", "max_concurrent_requests"):
                 if field_name in route:
-                    _integer(route[field_name], field_name, minimum=1 if field_name == "max_input_tokens" else 0)
-            if route.get("max_retries", 0) != 0:
-                raise ProviderError("automatic retries are not supported; unknown outcomes cannot be retried")
+                    _integer(route[field_name], field_name,
+                             minimum=1 if field_name in {"max_input_tokens", "max_concurrent_requests"} else 0)
+            if "fail_fast" in route and (type(route["fail_fast"]) is not bool
+                                         or (route["fail_fast"] and provider not in _REJECTED_BEFORE_INFERENCE)):
+                raise ProviderError("fail_fast is a boolean for routes with a documented pre-inference rejection")
+            # Only a documented pre-inference rejection is retried. Timeouts and other
+            # failures can be billed, so they hold their reservation and never retry.
+            if route.get("max_retries", 0) > 10 or (route.get("max_retries", 0) and route.get("fail_fast") is not True):
+                raise ProviderError("retries are limited to 10 after confirmed fail-fast rejections")
+            if route.get("max_concurrent_requests", 1) > 200:
+                raise ProviderError("max_concurrent_requests exceeds the provider's 200 per-model limit")
+            if "retry_backoff_seconds" in route:
+                _number(route["retry_backoff_seconds"], "retry_backoff_seconds", 0, 60)
             if "timeout_seconds" in route:
                 if _number(route["timeout_seconds"], "timeout_seconds") == 0:
                     raise ProviderError("timeout_seconds must be positive")
@@ -164,6 +194,19 @@ class ProviderBackend:
         self.ledger.summary()  # Validate ownership/open state without key access.
         self.transport = _http_transport if transport is None else transport
         self.evidence_kind = evidence_kind
+        self._sleep = asyncio.sleep
+        self._slots: dict[str, asyncio.Semaphore] = {}
+        self._slots_loop = None
+
+    def _slot(self, model_key: str, route: dict) -> asyncio.Semaphore:
+        """One in-flight request cap per route, shared by every town in this process."""
+        loop = asyncio.get_running_loop()
+        if loop is not self._slots_loop:
+            self._slots, self._slots_loop = {}, loop
+        if model_key not in self._slots:
+            self._slots[model_key] = asyncio.Semaphore(
+                route.get("max_concurrent_requests", DEFAULT_MAX_CONCURRENT_REQUESTS))
+        return self._slots[model_key]
 
     @property
     def manifest(self):
@@ -210,6 +253,8 @@ class ProviderBackend:
         if provider == "Anthropic" and output_parameter != "max_tokens":
             raise ProviderError("Anthropic requires max_tokens")
         body = {"model": route["model_id"], "messages": messages, output_parameter: max_output}
+        if route.get("fail_fast") is True:
+            body["fail_fast"] = True
         if provider == "Anthropic":
             systems = []
             while messages and messages[0]["role"] == "system":
@@ -306,7 +351,7 @@ class ProviderBackend:
                 "provider_api_calls": 0, "input_tokens": None, "output_tokens": None,
                 "cached_input_tokens": None, "reasoning_tokens": None, "cost_usd": None,
                 "cost_status": "not_submitted", "attempts": [], "pricing_sha256": pricing_sha256,
-                "execution_mode": execution_mode}
+                "execution_mode": execution_mode, "cache_usage": None}
 
     @staticmethod
     def _usage(body, route, receipt):
@@ -321,14 +366,20 @@ class ProviderBackend:
         usage = body.get("usage")
         if not isinstance(usage, dict):
             raise ProviderError("provider usage is missing")
+        # A missing cache count is priced as if every input token were uncached:
+        # a conservative estimate, marked so replay and summaries can see it.
         if route["provider"] == "Anthropic":
             uncached = _integer(usage.get("input_tokens"), "input_tokens")
             output = _integer(usage.get("output_tokens"), "output_tokens")
             receipt["output_tokens"] = output
-            cached = _integer(usage.get("cache_read_input_tokens"), "cache_read_input_tokens")
-            created = _integer(usage.get("cache_creation_input_tokens"), "cache_creation_input_tokens")
-            receipt.update(input_tokens=uncached + cached + created, output_tokens=output,
-                           cached_input_tokens=cached, cache_creation_input_tokens=created)
+            cached = usage.get("cache_read_input_tokens")
+            if cached is not None:
+                cached = _integer(cached, "cache_read_input_tokens")
+            created = usage.get("cache_creation_input_tokens")
+            created = 0 if created is None else _integer(created, "cache_creation_input_tokens")
+            receipt.update(input_tokens=uncached + (cached or 0) + created, output_tokens=output,
+                           cached_input_tokens=cached, cache_creation_input_tokens=created,
+                           cache_usage="unreported" if cached is None else "reported")
             reasoning = usage.get("output_tokens_details", {})
             if isinstance(reasoning, dict) and "thinking_tokens" in reasoning:
                 receipt["reasoning_tokens"] = _integer(reasoning["thinking_tokens"], "thinking_tokens")
@@ -341,23 +392,28 @@ class ProviderBackend:
             output = _integer(usage.get("completion_tokens"), "completion_tokens")
             receipt.update(input_tokens=total, output_tokens=output)
             details = usage.get("prompt_tokens_details")
+            if details is None:
+                details = {}
             if not isinstance(details, dict):
-                raise ProviderError("cached input usage is missing")
-            cached = _integer(details.get("cached_tokens"), "cached_tokens")
-            if cached > total:
-                raise ProviderError("cached input exceeds total input")
-            receipt.update(input_tokens=total, output_tokens=output, cached_input_tokens=cached)
+                raise ProviderError("invalid cached input usage")
+            cached = details.get("cached_tokens")
+            if cached is not None:
+                cached = _integer(cached, "cached_tokens")
+                if cached > total:
+                    raise ProviderError("cached input exceeds total input")
+            receipt.update(input_tokens=total, output_tokens=output, cached_input_tokens=cached,
+                           cache_usage="unreported" if cached is None else "reported")
             # Newer OpenAI APIs can bill cache writes at a separate input rate.
             # No cache-write mode is requested here; an unexpected charge stops.
             if details.get("cache_write_tokens", 0) != 0 or usage.get("cache_creation_input_tokens", 0) != 0:
                 raise ProviderError("unexpected cache writes have no approved price")
-            uncached = total - cached
+            uncached = total - (cached or 0)
             reasoning = usage.get("completion_tokens_details", {})
             if isinstance(reasoning, dict) and "reasoning_tokens" in reasoning:
                 receipt["reasoning_tokens"] = _integer(reasoning["reasoning_tokens"], "reasoning_tokens")
         if receipt["reasoning_tokens"] is not None and receipt["reasoning_tokens"] > output:
             raise ProviderError("reasoning usage exceeds output usage")
-        cost = (Decimal(uncached) * money(route[_RATES[0]]) + Decimal(cached) * money(route[_RATES[2]])
+        cost = (Decimal(uncached) * money(route[_RATES[0]]) + Decimal(cached or 0) * money(route[_RATES[2]])
                 + Decimal(output) * money(route[_RATES[1]])) / Decimal(1_000_000)
         receipt.update(cost_usd=float(cost), cost_status="calculated_from_usage")
         return cost
@@ -385,7 +441,7 @@ class ProviderBackend:
                 "provider_api_calls": 0, "input_tokens": None, "output_tokens": None,
                 "cached_input_tokens": None, "reasoning_tokens": None, "cost_usd": None,
                 "cost_status": "not_submitted", "attempts": [], "pricing_sha256": None,
-                "execution_mode": None}
+                "execution_mode": None, "cache_usage": None}
             raise ProviderError(str(error), receipt) from None
         receipt = self._receipt(route, mode, pricing_hash)
         key = os.environ.get(route["api_key_env"])
@@ -396,16 +452,34 @@ class ProviderBackend:
             headers.update({"x-api-key": key, "anthropic-version": route.get("anthropic_version", "2023-06-01")})
         else:
             headers["Authorization"] = "Bearer " + key
+        retries = route.get("max_retries", 0)
+        backoff = float(route.get("retry_backoff_seconds", 2))
+        for index in range(retries + 1):
+            async with self._slot(request.model_key, route):
+                result = await self._attempt(index, request, route, body, headers, key,
+                                             pricing_hash, reserved, receipt)
+            if result is not None:
+                return result
+            if index < retries:
+                try:
+                    await self._sleep(min(30.0, backoff * 2 ** index))
+                except asyncio.CancelledError as error:
+                    error.receipt = clone(receipt)   # keep the free attempts on record
+                    raise
+        raise ProviderError("provider rejected every attempt before inference", receipt)
+
+    async def _attempt(self, index, request, route, body, headers, key, pricing_hash, reserved, receipt):
+        """Send one attempt. Returns None only for a documented pre-inference rejection."""
         try:
             reservation_id = self.ledger.reserve(reserved, {"model_key": request.model_key, "provider": route["provider"],
                 "model_id": route["model_id"], "request_sha256": digest(body), "pricing_sha256": pricing_hash,
-                "attempt_index": 0, "input_token_bound": route["max_input_tokens"],
+                "attempt_index": index, "input_token_bound": route["max_input_tokens"],
                 "max_output_tokens": request.settings["max_tokens"], "evidence_kind": self.evidence_kind})
         except (BudgetError, OSError):
             raise ProviderError("budget does not permit this request", receipt) from None
-        receipt["provider_api_calls"] = 1
+        receipt["provider_api_calls"] += 1
         receipt["cost_status"] = "unknown"
-        attempt = {"attempt_index": 0, "reservation_id": reservation_id, "status": "started"}
+        attempt = {"attempt_index": index, "reservation_id": reservation_id, "status": "started"}
         receipt["attempts"].append(attempt)
         cost = None
         settled = False
@@ -422,10 +496,19 @@ class ProviderBackend:
             if not isinstance(response, HTTPResponse) or type(response.status_code) is not int:
                 raise ProviderError("transport returned an invalid response")
             attempt["http_status"] = response.status_code
+            if self._rejected_before_inference(route, response):
+                code = _REJECTED_BEFORE_INFERENCE[route["provider"]]
+                attempt.update(status="rejected", error_code=code)
+                receipt.update(cost_usd=0.0, cost_status="rejected_before_inference", error_code=code)
+                self._redact_receipt(receipt, key)
+                self.ledger.settle(reservation_id, 0, {**self._ledger_receipt(receipt), "http_status": 429})
+                settled = True
+                return None
             if not 200 <= response.status_code < 300:
                 raise ProviderError("provider returned a non-success HTTP status")
             if not isinstance(response.body, dict):
                 raise ProviderError("provider returned invalid JSON")
+            receipt.pop("error_code", None)
             cost = self._usage(response.body, route, receipt)
             # Reported usage checks protect subsequent calls even if verified
             # bounds or the provider's accounting assumptions were wrong.
@@ -460,6 +543,14 @@ class ProviderBackend:
                 raise
             # Never interpolate a transport exception, HTTP body, key or headers.
             raise ProviderError("provider request failed; consult the sanitized receipt", receipt) from None
+
+    @staticmethod
+    def _rejected_before_inference(route, response) -> bool:
+        """Only the provider's documented fail-fast capacity rejection is known to be free."""
+        expected = _REJECTED_BEFORE_INFERENCE.get(route["provider"])
+        error = response.body.get("error") if isinstance(response.body, dict) else None
+        return (route.get("fail_fast") is True and expected is not None and response.status_code == 429
+                and isinstance(error, dict) and error.get("code") == expected)
 
     @staticmethod
     def _redact_receipt(receipt, key):
