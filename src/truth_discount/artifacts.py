@@ -15,7 +15,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from .config import build_manifest, load_config, render_template, render_values
-from .contracts import canonical_bytes, digest
+from .contracts import REJECTED_BEFORE_INFERENCE, canonical_bytes, digest
 from .scoring import make_judge_input, paired_metrics, parse_judge_response, town_metrics
 
 
@@ -203,8 +203,10 @@ def _provider_receipt(call: dict[str, Any], execution: dict[str, Any]) -> None:
     _require(all(_optional_number(receipt[k], integer=True) for k in _USAGE_COUNTERS),
              "invalid provider token usage")
     _require(_optional_number(receipt["cost_usd"]), "invalid provider cost")
-    _require(receipt["cost_status"] in {"calculated_from_usage", "unknown", "not_submitted"},
+    _require(receipt["cost_status"] in {"calculated_from_usage", "unknown", "not_submitted",
+                                        "rejected_before_inference"},
              "invalid provider cost status")
+    _require(receipt.get("cache_usage") in {None, "reported", "unreported"}, "invalid cache usage marker")
     _require(receipt["request_id"] is None or isinstance(receipt["request_id"], str),
              "invalid provider request identity")
     _require(isinstance(receipt["attempts"], list)
@@ -212,9 +214,18 @@ def _provider_receipt(call: dict[str, Any], execution: dict[str, Any]) -> None:
     attempts = receipt["attempts"]
     _require(len(attempts) == receipt["provider_api_calls"], "provider attempt count mismatch")
     _require(all(type(a.get("attempt_index")) is int and a["attempt_index"] >= 0
-                 and a.get("status") in {"completed", "failed", "cancelled"} for a in attempts)
+                 and a.get("status") in {"completed", "failed", "cancelled", "rejected"} for a in attempts)
              and len({a["attempt_index"] for a in attempts}) == len(attempts),
              "invalid terminal provider attempt")
+    # A free attempt must be the provider's documented pre-inference rejection,
+    # and only a route that asked for fail-fast handling can produce one.
+    rejected = [a for a in attempts if a["status"] == "rejected"]
+    if rejected:
+        expected_code = REJECTED_BEFORE_INFERENCE.get(receipt["actual_provider"])
+        _require(isinstance(route, dict) and route.get("fail_fast") is True and expected_code is not None
+                 and all(a.get("http_status") == 429 and a.get("error_code") == expected_code for a in rejected)
+                 and all(a["status"] == "rejected" for a in attempts[:-1]),
+                 "free provider attempt is not a documented pre-inference rejection")
     for key in ("actual_provider", "actual_model", "provider_api_calls", "cost_usd"):
         _require(canonical_bytes(call.get(key)) == canonical_bytes(receipt[key]),
                  "provider receipt projection mismatch: " + key)
@@ -250,15 +261,23 @@ def _provider_receipt(call: dict[str, Any], execution: dict[str, Any]) -> None:
     if receipt["reasoning_tokens"] is not None and receipt["output_tokens"] is not None:
         _require(receipt["reasoning_tokens"] <= receipt["output_tokens"], "reasoning usage exceeds output")
     if receipt["cost_status"] == "calculated_from_usage":
-        _require(all(receipt[k] is not None for k in ("input_tokens", "output_tokens", "cached_input_tokens"))
+        _require(all(receipt[k] is not None for k in ("input_tokens", "output_tokens"))
                  and receipt.get("cache_creation_input_tokens", 0) == 0,
                  "calculated cost lacks priced usage")
-        uncached = receipt["input_tokens"] - receipt["cached_input_tokens"]
+        # Older bundles have no marker; they always reported the cached count.
+        cached = receipt["cached_input_tokens"]
+        _require((cached is None) == (receipt.get("cache_usage") == "unreported"),
+                 "cache usage marker does not match the reported cached count")
+        uncached = receipt["input_tokens"] - (cached or 0)
         expected_cost = float((Decimal(uncached) * Decimal(str(pricing["input_usd_per_million"]))
-                               + Decimal(receipt["cached_input_tokens"]) * Decimal(str(pricing["cached_input_usd_per_million"]))
+                               + Decimal(cached or 0) * Decimal(str(pricing["cached_input_usd_per_million"]))
                                + Decimal(receipt["output_tokens"]) * Decimal(str(pricing["output_usd_per_million"])))
                               / Decimal(1_000_000))
         _require(receipt["cost_usd"] == expected_cost, "provider usage-derived cost mismatch")
+    elif receipt["cost_status"] == "rejected_before_inference":
+        _require(call["status"] != "completed" and receipt["cost_usd"] == 0
+                 and len(rejected) == len(attempts) and all(receipt[k] is None for k in _USAGE_COUNTERS),
+                 "free rejection receipt claims a completed or billed attempt")
     else:
         _require(receipt["cost_status"] == "unknown" and receipt["cost_usd"] is None,
                  "unobserved provider cost must remain unknown")
@@ -586,11 +605,93 @@ def _audit_town(directory: Path) -> dict[str, Any]:
     return town
 
 
+def _receipt_accounting(towns: list[dict[str, Any]], evidence_kind: str) -> dict[str, Any]:
+    """Count recorded attempts without turning unknown charges into zero.
+
+    These are saved-receipt calculations only. A ledger reconciliation is
+    separate evidence and cannot be inferred by replaying a town bundle.
+    """
+    calls = [call for town in towns for call in town["calls"]]
+    receipts = [call.get("token_usage") for call in calls]
+    submitted = [call for call in calls if call["provider_api_calls"] > 0]
+    unknown_charges = sum(not isinstance(call.get("token_usage"), dict)
+                          or call["token_usage"].get("cost_usd") is None for call in submitted)
+    known_cost = float(sum((Decimal(str(receipt["cost_usd"])) for receipt in receipts
+                            if isinstance(receipt, dict) and receipt.get("cost_usd") is not None),
+                           Decimal(0)))
+    total_cost = (_known_sum([town["token_usage"] for town in towns], "cost_usd")
+                  if evidence_kind != "synthetic_fixture" else None)
+    return {
+        "town_count": len(towns),
+        "completed_town_count": sum(town["run_status"] == "completed" for town in towns),
+        "call_count": len(calls),
+        "provider_api_calls": sum(town["token_usage"]["provider_api_calls"] for town in towns),
+        "simulated_provider_requests": sum(town["token_usage"].get("simulated_provider_requests", 0)
+                                            for town in towns),
+        "provider_request_attempts": sum(call["provider_api_calls"] for call in calls),
+        "fixture_callback_invocations": sum(town["token_usage"]["fixture_callback_invocations"]
+                                             for town in towns),
+        "input_tokens": (_known_sum([town["token_usage"] for town in towns], "input_tokens")
+                         if evidence_kind != "synthetic_fixture" else None),
+        "output_tokens": (_known_sum([town["token_usage"] for town in towns], "output_tokens")
+                          if evidence_kind != "synthetic_fixture" else None),
+        "recorded_known_input_tokens_subtotal": (sum(receipt["input_tokens"] for receipt in receipts
+                                                     if isinstance(receipt, dict) and receipt.get("input_tokens") is not None)
+                                                 if evidence_kind != "synthetic_fixture" else None),
+        "recorded_known_output_tokens_subtotal": (sum(receipt["output_tokens"] for receipt in receipts
+                                                      if isinstance(receipt, dict) and receipt.get("output_tokens") is not None)
+                                                  if evidence_kind != "synthetic_fixture" else None),
+        "cost_usd": total_cost if evidence_kind == "development_pilot" else None,
+        "simulated_cost_usd": total_cost if evidence_kind == "mocked_provider" else None,
+        "recorded_known_cost_subtotal_usd": known_cost if evidence_kind == "development_pilot" else None,
+        "recorded_known_simulated_cost_subtotal_usd": known_cost if evidence_kind == "mocked_provider" else None,
+        "unknown_charge_calls": unknown_charges,
+        "unknown_usage_calls": sum(not isinstance(call.get("token_usage"), dict)
+                                   or any(call["token_usage"].get(key) is None
+                                          for key in ("input_tokens", "output_tokens"))
+                                   for call in submitted),
+        "cache_usage_unreported_calls": sum(isinstance(receipt, dict)
+                                             and receipt.get("cache_usage") == "unreported"
+                                             for receipt in receipts),
+        "reconciliation_required": unknown_charges > 0,
+        "ledger_reconciled": False,
+        "billing_verified": False,
+    }
+
+
+def archived_attempt_paths(output_root: Path) -> list[Path]:
+    """Enumerate every preserved town attempt, rejecting unaccountable layouts."""
+    # Resume preserves previous attempts outside the active town directories.
+    # Discover directories, not manifests: an incomplete/corrupt archive must
+    # never vanish from accounting merely because its manifest is missing.
+    archived_paths: list[Path] = []
+    archive_root = Path(output_root) / "_incomplete"
+    if archive_root.exists():
+        _require(archive_root.is_dir(), "archived attempt root is not a directory")
+        for attempt in sorted(archive_root.iterdir()):
+            _require(attempt.is_dir() and re.fullmatch(r"attempt-[1-9][0-9]*", attempt.name) is not None,
+                     "unexpected entry in archived attempt root")
+            children = sorted(attempt.iterdir())
+            _require(bool(children) and all(child.is_dir() for child in children),
+                     "archived attempt has missing or unexpected town entries")
+            archived_paths.extend(children)
+    return archived_paths
+
+
 def summarize(output_root: Path) -> dict[str, Any]:
-    paths = sorted(p.parent for p in Path(output_root).glob("*/manifest.json"))
+    output_root = Path(output_root)
+    paths = sorted(p.parent for p in output_root.glob("*/manifest.json"))
     _require(bool(paths), "no saved towns found")
     towns = [audit_town(p) for p in paths]
-    evidence_kinds = {t["evidence_kind"] for t in towns}
+    archived_paths = archived_attempt_paths(output_root)
+    archived_towns = []
+    for path in archived_paths:
+        try:
+            archived_towns.append(audit_town(path))
+        except (InvalidBundle, OSError) as error:
+            raise InvalidBundle("cannot account for archived attempt "
+                                + path.relative_to(output_root).as_posix() + ": " + str(error)) from error
+    evidence_kinds = {t["evidence_kind"] for t in towns + archived_towns}
     _require(len(evidence_kinds) == 1, "cannot pool fixture, mocked-provider and development-pilot evidence")
     evidence_kind = next(iter(evidence_kinds))
     pairs = paired_metrics(towns)
@@ -612,10 +713,28 @@ def summarize(output_root: Path) -> dict[str, Any]:
         for key in ("input_tokens", "output_tokens", "cost_usd"):
             result[key] = _known_sum([t["token_usage"] for t in towns], key)
         result["cost_status"] = "calculated_from_usage" if result["cost_usd"] is not None else "unknown"
+        # These calls were priced as fully uncached input: an upper-bound estimate.
+        result["cache_usage_unreported_calls"] = sum(
+            isinstance(c.get("token_usage"), dict) and c["token_usage"].get("cache_usage") == "unreported"
+            for t in towns for c in t["calls"])
         result["billing_verified"] = False
         if evidence_kind == "mocked_provider":
             # Adapter estimates are useful fixture evidence, never billed charges.
             result["simulated_cost_usd"] = result.pop("cost_usd")
             result["cost_usd"] = None
             result["cost_status"] = "simulated_calculation" if result["simulated_cost_usd"] is not None else "unknown"
+    result["receipt_accounting"] = {
+        "source": "audited_saved_town_receipts",
+        "existing_summary_scope": "active_town_directories_only",
+        "archived_attempts_in_paired_metrics": False,
+        "ledger_reconciled": False,
+        "billing_verified": False,
+        "limitation": "Receipt totals do not resolve unknown charges or prove ledger/provider reconciliation.",
+        "archived_attempt_paths": [path.relative_to(output_root).as_posix() for path in archived_paths],
+        "active_towns": _receipt_accounting(towns, evidence_kind),
+        "completed_active_towns": _receipt_accounting(
+            [town for town in towns if town["run_status"] == "completed"], evidence_kind),
+        "archived_attempts": _receipt_accounting(archived_towns, evidence_kind),
+        "all_attempts": _receipt_accounting(towns + archived_towns, evidence_kind),
+    }
     return result

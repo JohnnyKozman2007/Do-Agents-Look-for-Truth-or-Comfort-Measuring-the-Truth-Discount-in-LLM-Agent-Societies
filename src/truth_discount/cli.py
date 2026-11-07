@@ -49,6 +49,17 @@ def _parser() -> argparse.ArgumentParser:
     live.add_argument("--execute", action="store_true")
     live.add_argument("--spending-authorized", action="store_true",
                       help="use only after Ahmed explicitly releases the credit-use hold")
+    live.add_argument("--resume", action="store_true",
+                      help="continue an existing output: skip verified completed towns, set partial ones aside")
+    live.add_argument("--max-concurrent-towns", type=int, default=1,
+                      help="towns run at once (1-16); route max_concurrent_requests still caps requests")
+    ledger = commands.add_parser("ledger", help="show a budget ledger's unknown charges or reconcile one")
+    ledger.add_argument("--ledger", type=Path, required=True)
+    ledger.add_argument("--budget-usd", type=str, required=True, help="the ledger's fixed ceiling")
+    ledger.add_argument("--reconcile", metavar="RESERVATION_ID",
+                        help="record the billed amount for one unknown charge")
+    ledger.add_argument("--actual-usd", type=str, help="billed amount from the provider's usage records")
+    ledger.add_argument("--note", type=str, help="where the billed amount came from")
     # Accept --config before or after a planning/demo subcommand without resetting
     # a global value when the subcommand option is absent.
     for command in (validate, manifest, demo, live):
@@ -86,6 +97,19 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "summarize":
             _print_json(summarize(args.output_root))
             return 0
+        if args.command == "ledger":
+            from .budget import BudgetLedger
+            if not args.ledger.is_file():
+                raise ValueError("ledger file does not exist")
+            if args.reconcile and (args.actual_usd is None or not args.note):
+                raise ValueError("--reconcile needs --actual-usd and --note")
+            if not args.reconcile and (args.actual_usd is not None or args.note):
+                raise ValueError("--actual-usd and --note are only used with --reconcile")
+            with BudgetLedger(args.ledger, args.budget_usd) as ledger:
+                if args.reconcile:
+                    ledger.reconcile(args.reconcile, args.actual_usd, args.note)
+                _print_json({"budget": ledger.summary(), "unknown_reservations": ledger.unknown_reservations()})
+            return 0
 
         config = load_config(args.config)
         if args.command == "live":
@@ -100,15 +124,17 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("execution requires explicit release of the spending hold")
             if not args.ledger or not args.budget_usd:
                 raise ValueError("execution requires --ledger and --budget-usd")
-            if args.output.exists():
-                raise ValueError("refusing existing output directory")
+            if args.output.exists() and not args.resume:
+                raise ValueError("refusing existing output directory; add --resume to continue it")
             if info["execution_gates"]:
                 raise ValueError("; ".join(info["execution_gates"]))
             from .budget import BudgetLedger
             from .providers import ProviderBackend
             with BudgetLedger(args.ledger, args.budget_usd) as ledger:
                 backend = ProviderBackend(providers, ledger)
-                result = asyncio.run(collect(config, providers, runs, args.output, backend))
+                result = asyncio.run(collect(config, providers, runs, args.output, backend,
+                                             resume=args.resume,
+                                             max_concurrent_towns=args.max_concurrent_towns))
                 _print_json({**result, "budget": ledger.summary()})
             return 0
         manifest = build_manifest(config)

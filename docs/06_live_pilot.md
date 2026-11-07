@@ -27,17 +27,47 @@ Once the hold has been explicitly released, execution requires all of:
 - `--execute` and `--spending-authorized`;
 - an approved manifest with verified pricing/settings and unchanged configured model IDs/providers;
 - `--ledger` pointing to a durable budget ledger and an explicit `--budget-usd` ceiling;
-- a new output directory, preventing an accidental overwrite of paid runs.
+- a new output directory, preventing an accidental overwrite of paid runs, or `--resume` to continue one (see below).
 
-The CLI checks all required request kinds, manifest equality and key presence before collection. It never selects an alternative model or silently retries a failed request. Actual account access and provider response compatibility still require a separately authorized live smoke test.
+The CLI checks all required request kinds, manifest equality and key presence before collection. It never selects an alternative model. The only retried failure is a documented pre-inference rejection (see below). Actual account access and provider response compatibility still require a separately authorized live smoke test. That smoke test should also confirm Qwen's GO/SKIP replies are non-empty with the explicit `reasoning_effort: none` setting.
 
 ## Cost control and failures
 
-Each request reserves its declared maximum input/output cost before submission. A process lock protects the ledger against concurrent writers, and a thread lock protects concurrent calls in one process. The cap remains fixed when the ledger is reopened. Reservations use the input cap, not an optimistic character estimate.
+Each request reserves its declared maximum input/output cost before submission. Reservations use the input cap, not an optimistic character estimate. A process lock protects the ledger against concurrent writers, and a thread lock protects concurrent calls in one process.
+
+The ledger is an append-only JSON Lines journal. Its header fixes a random identity and the cap. Each reserve and settlement adds one durable event. Incremental hashing avoids rewriting or rehashing the full history per request. Collection also atomically refreshes a small external `budget_checkpoint.json` after every ledger mutation, before a reservation can return and submit a request. If that anchor cannot be saved, collection holds the reservation and blocks later requests. Filesystem latency still affects performance.
+
+Reopening replays the journal, preserving earlier spending and held reservations. An incomplete final append is discarded, and any pending request becomes an `interrupted_request` that stays held. Valid older v2 journals gain an appended identity event without rewriting their history. Older single-file ledgers are refused. Do not replace a paid ledger to bypass this check. A reviewed migration must preserve its spending and unresolved charges.
 
 Successful receipts record provider/model/request IDs, token categories, calculated token cost, request attempts and the pricing hash. Cache and reasoning counts are not double-counted. Calculated charges from usage are not verified invoices. The local guard does not impose an account-wide or provider-enforced limit on other clients.
 
-Missing usage, HTTP failures, timeouts or cancellations can leave the actual charge unknown. The ledger retains the reservation and blocks new requests. Unresolved reservations also block collection after a restart. Do not delete that state or retry ambiguous calls to make a run appear complete. Paid empty or malformed model responses still retain their usage and cost records. Partial towns remain saved for inspection.
+Missing usage, HTTP failures, timeouts or cancellations can leave the actual charge unknown. The ledger keeps the reservation and blocks new requests, including after a restart. Never delete the ledger or start a new one to get past this. Instead, look up the billed amount in the provider's usage records and record it:
+
+```bash
+PYTHONPATH=src python3 -m truth_discount.cli ledger --ledger ledgers/pilot.jsonl --budget-usd 20
+PYTHONPATH=src python3 -m truth_discount.cli ledger --ledger ledgers/pilot.jsonl --budget-usd 20 \
+  --reconcile <reservation id> --actual-usd 0.0004 --note "DeepInfra usage page, 19 Nov"
+```
+
+The first command lists unknown charges. The second records one. If the billed amount cannot be found and the operator uses the reserved amount conservatively, the note must identify that estimate. It is not invoice verification. Paid empty or malformed model responses still retain their usage and cost records.
+
+### Rejections and retries
+
+DeepInfra routes send `fail_fast: true`. When a model has no spare capacity, DeepInfra then answers at once with HTTP 429 and error code `engine_overloaded`. DeepInfra documents that such a request never reaches the model and is not billed ([fail fast](https://docs.deepinfra.com/chat/overview#fail-fast)). Only that exact answer is recorded as $0 and retried, up to `max_retries` times with doubling waits from `retry_backoff_seconds`. Each attempt has its own reservation. Every other failure holds its reservation and is never retried. This includes 429 `Rate limited`, 5xx errors, dropped connections and timeouts. The HTTP client keeps only the error code from a 429 body, never the body or headers.
+
+### Missing cache counts
+
+DeepInfra's usage may omit `prompt_tokens_details.cached_tokens`. When valid total prompt/output counts are present, a response without a cache count is priced as if every input token were uncached. The receipt records the conservative estimate with `cache_usage: "unreported"`. Replay recomputes that price, and `summarize` reports `cache_usage_unreported_calls`. Missing input or output token counts still leave the charge unknown. Native Anthropic cache counters follow a different format, and the current native route does not request cache writes.
+
+### Resume and several towns at once
+
+`--resume` continues an existing output directory only with its original ledger identity and fixed cap. It verifies the exact journal prefix recorded in `budget_checkpoint.json`, allowing new reconciliations and later events but rejecting a replacement ledger or rewound/rewritten spending history. The execution plan must retain identical configuration, provider manifest, run selection and evidence kind. Legacy output plans without this binding require review and do not automatically resume.
+
+Before reading credentials or making requests, collection audits every active and archived attempt against that plan. Completed towns are skipped only when their configuration/provider hashes, evidence kind and full run mapping match. A valid incomplete town can be preserved under `_incomplete/attempt-N/<run id>/` and rerun after any unknown charge is reconciled. A mismatched, corrupt or unverifiable town stops collection for review without moving or deleting its evidence. Each resume appends a line to `resume_log.jsonl`.
+
+Existing top-level summary fields continue to describe active town directories. `receipt_accounting` separately reports active towns, completed active towns, archived attempts and all saved attempts. Archived attempts never enter paired outcome metrics. Unknown archived charges keep all-attempt cost unknown, with known subtotals reported separately. The collector's `budget_accounting` gives the entire bound ledger, including prior batches, partial attempts and operator reconciliation. Bundle receipt totals do not establish reconciled billing, and mocked costs remain simulated.
+
+`--max-concurrent-towns N` (1-16) runs several towns at once. They share one ledger and one per-route request limit, `max_concurrent_requests`, which defaults to 32. The example manifest sets 150 for each DeepInfra model, below the 200 per-model account limit, and 8 for the judge. Once any town fails, no new town starts. Towns already running finish and save.
 
 The supplied routes limit input to 32,768 tokens, keeping Haiku within its published short-prompt price tier. The byte/framing check is a conservative local preflight, not a proof of provider tokenization. Unexpected token overruns or cache-write charges stop further collection.
 
@@ -57,6 +87,6 @@ The phone regex trigger and its final-judgment filter remain diagnostics. They d
 
 `--start-pair` and `--pairs-per-cell` declare disjoint ranges of the 39 configured pairs per cell. The default first batch has 16 towns. After verifying its actual completion, `--full-pilot --start-pair 1` selects the remaining 608 without selecting those first 16 IDs again.
 
-These are explicit work assignments, not automatic resume. Operators still need one shared completion/cost ledger, identical configuration/model manifests and an agreed handover. Never rerun an ambiguous paid town automatically. Native batch jobs, automated cross-person resume, human audit selection, GPT-4o audit execution and final statistical inference remain separate tasks.
+These are explicit work assignments between operators. `--resume` only continues one bound output directory with its original ledger. Operators still need one shared completion/cost ledger, identical configuration/model manifests and an agreed handover. A partial town is rerun only after its unknown charges are reconciled, and its original bundle is kept. Native batch jobs, automated cross-person resume, human audit selection, GPT-4o audit execution and final statistical inference remain separate tasks.
 
 See [published rates and planning scenarios](07_pricing_and_budget.md) before agreeing a funding amount.

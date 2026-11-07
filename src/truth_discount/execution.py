@@ -1,8 +1,13 @@
 """Plan and gate bounded development collection without changing the study."""
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime, timezone
+import itertools
 import json
+import os
 from pathlib import Path
+import tempfile
 from typing import Any
 
 from .config import build_manifest, render_contexts
@@ -96,25 +101,163 @@ def validate_backend(config: dict, runs: list[dict], backend) -> None:
         clone(config["hyperparameters"]["blind_judge_turns"]), judge, "judge", 5, 1, 0))
 
 
+def _set_aside(output: Path, directory: Path) -> str:
+    """Keep a partial or unverifiable town for reconciliation; paid evidence is never deleted."""
+    for attempt in itertools.count(1):
+        target = output / "_incomplete" / f"attempt-{attempt}" / directory.name
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            directory.rename(target)
+            return target.relative_to(output).as_posix()
+
+
+def _atomic_json(path: Path, value: dict) -> None:
+    """Durably replace a small state file before allowing another paid request."""
+    temporary = None
+    try:
+        descriptor, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(value, stream, sort_keys=True, allow_nan=False)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        if os.name != "nt":
+            directory = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    finally:
+        if temporary is not None and os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _audit_expected(directory: Path, config: dict, providers: dict, run: dict,
+                    evidence_kind: str) -> dict:
+    """Replay a saved attempt and bind it to this plan, not just its own config."""
+    from .artifacts import audit_town
+    try:
+        town = audit_town(directory)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise ValueError("saved town cannot be verified; preserve it for review: " + str(directory)) from error
+    if town.get("config_sha256") != digest(config):
+        raise ValueError("saved town config differs from execution plan: " + directory.name)
+    if town.get("execution_manifest_sha256") != digest(providers):
+        raise ValueError("saved town provider manifest differs from execution plan: " + directory.name)
+    if town.get("evidence_kind") != evidence_kind:
+        raise ValueError("saved town evidence kind differs from execution plan: " + directory.name)
+    if any(digest(town.get(key)) != digest(value) for key, value in run.items()):
+        raise ValueError("saved town run mapping differs from execution plan: " + directory.name)
+    return town
+
+
 async def collect(config: dict, providers: dict, runs: list[dict], output: Path,
-                  backend) -> dict:
-    from .artifacts import summarize
+                  backend, *, resume: bool = False, max_concurrent_towns: int = 1) -> dict:
+    from .artifacts import archived_attempt_paths, summarize
     from .runner import run_town
-    if output.exists():
-        raise FileExistsError("refusing existing output directory")
+    if type(max_concurrent_towns) is not int or not 1 <= max_concurrent_towns <= 16:
+        raise ValueError("max-concurrent-towns must be an integer from 1 to 16")
+    if output.exists() and not resume:
+        raise FileExistsError("refusing existing output directory; resume continues it")
+    if resume and not (output / "execution_plan.json").is_file():
+        raise ValueError("nothing to resume: the output has no execution plan")
     if digest(providers) != digest(backend.manifest):
         raise ValueError("backend manifest differs from the approved execution plan")
     info = plan(config, providers, runs)
     if info["execution_gates"]:
         raise ValueError("; ".join(info["execution_gates"]))
+    ledger = backend.ledger
+    current_checkpoint = ledger.checkpoint()
+    evidence_kind = backend.evidence_kind
+    binding = {key: current_checkpoint[key] for key in ("ledger_id", "limit_usd")}
+    info.update(execution_plan_version=2, evidence_kind=evidence_kind, ledger_binding=binding)
+    if resume:
+        saved = load_provider_manifest(output / "execution_plan.json")
+        if saved.get("execution_plan_version") != 2 or saved.get("ledger_binding") != binding:
+            raise ValueError("resume requires the original ledger identity and fixed cap; legacy unbound plans need review")
+        for key in ("config_sha256", "provider_manifest_sha256", "run_manifest_sha256"):
+            if saved.get(key) != info[key]:
+                raise ValueError("resume needs the same plan; changed: " + key)
+        if digest(saved) != digest(info):
+            raise ValueError("resume execution plan differs from the approved selection or evidence kind")
+        anchor = load_provider_manifest(output / "budget_checkpoint.json")
+        if set(anchor) != {"execution_plan_sha256", "ledger_checkpoint"} or anchor["execution_plan_sha256"] != digest(info):
+            raise ValueError("resume budget checkpoint belongs to a different execution plan")
+        ledger.verify_checkpoint(anchor["ledger_checkpoint"])
+    if ledger.summary()["blocked"]:
+        raise ValueError("budget ledger is blocked (" + ", ".join(ledger.summary()["block_reasons"])
+                         + "); record billed amounts with `truth-discount ledger --reconcile` first")
+    expected = {run["run_id"]: run for run in runs}
+    if len(expected) != len(runs):
+        raise ValueError("run selection contains duplicate town identities")
+    pending, skipped, partial = [], [], []
+    # Validate every saved attempt before moving files, reading keys or starting work.
+    for directory in sorted(output.glob("*/")) if resume else []:
+        if directory.name == "_incomplete":
+            continue
+        if directory.name not in expected:
+            raise ValueError("unexpected saved town outside the execution plan: " + directory.name)
+    for directory in archived_attempt_paths(output) if resume else []:
+        if not directory.is_dir() or directory.name not in expected:
+            raise ValueError("unexpected archived attempt outside the execution plan")
+        _audit_expected(directory, config, providers, expected[directory.name], evidence_kind)
+    for run in runs:
+        directory = output / run["run_id"]
+        if not directory.exists():
+            pending.append(run)
+        elif _audit_expected(directory, config, providers, run, evidence_kind)["run_status"] == "completed":
+            skipped.append(run["run_id"])
+        else:
+            partial.append(directory)
+            pending.append(run)
     validate_backend(config, runs, backend)
     needed = sorted({r["model_key"] for r in runs} | {info["primary_judge_key"]})
     backend.validate_credentials(needed)
-    output.mkdir(parents=True, exist_ok=False)
-    (output / "execution_plan.json").write_text(json.dumps(info, indent=2), encoding="utf-8")
-    for run in runs:
-        town = await run_town(config, run, backend, output)
-        if town["run_status"] != "completed":
-            raise ValueError("collection stopped after incomplete town: " + run["run_id"])
+    if not resume:
+        output.mkdir(parents=True, exist_ok=False)
+        _atomic_json(output / "execution_plan.json", info)
+    plan_hash = digest(info)
+    def anchor_checkpoint(checkpoint):
+        _atomic_json(output / "budget_checkpoint.json", {
+            "execution_plan_sha256": plan_hash, "ledger_checkpoint": checkpoint})
+    # Each reserve/settle is anchored before the next request can proceed. A
+    # same-ID journal rewound behind that prefix is rejected after a hard crash.
+    anchor_checkpoint(ledger.checkpoint())
+    set_aside = [_set_aside(output, directory) for directory in partial]
+    if resume:
+        with (output / "resume_log.jsonl").open("a", encoding="utf-8") as log:
+            log.write(json.dumps({"resumed_utc": datetime.now(timezone.utc).isoformat(),
+                                  "skipped_verified_towns": len(skipped), "set_aside": set_aside,
+                                  "pending_towns": len(pending)}) + "\n")
+    # Towns share one backend, so one ledger and one per-route request limit.
+    # After any failure no new town starts; towns already running finish and save.
+    queue, failures = list(pending), []
+
+    async def worker():
+        while queue and not failures:
+            run = queue.pop(0)
+            try:
+                town = await run_town(config, run, backend, output)
+            except Exception as error:
+                failures.append((run["run_id"], error))
+                return
+            if town["run_status"] != "completed":
+                failures.append((run["run_id"], None))
+                return
+
+    ledger.set_checkpoint_callback(anchor_checkpoint)
+    try:
+        await asyncio.gather(*(worker() for _ in range(max(1, min(max_concurrent_towns, len(pending))))))
+    finally:
+        ledger.set_checkpoint_callback(None)
+    if failures:
+        run_id, error = failures[0]
+        if error is not None:
+            raise error
+        raise ValueError("collection stopped after incomplete town: " + run_id)
     return {**summarize(output), "output_root": str(output),
-            "execution_plan_sha256": digest(info), "study_eligible": False}
+            "execution_plan_sha256": plan_hash, "study_eligible": False,
+            "budget_accounting": {"scope": "entire_bound_ledger_including_prior_attempts_and_batches",
+                                  "evidence_kind": evidence_kind, "billing_verified": False,
+                                  "ledger_id": binding["ledger_id"], "budget": ledger.summary()},
+            "resumed": resume, "skipped_verified_towns": len(skipped), "set_aside_towns": set_aside}
