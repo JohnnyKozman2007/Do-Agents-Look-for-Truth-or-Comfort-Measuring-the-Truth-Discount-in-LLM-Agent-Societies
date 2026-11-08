@@ -35,3 +35,5 @@ See [live-pilot gates and commands](docs/06_live_pilot.md) and [published rates 
 After a run, [pilot analysis and the judge audit](docs/08_analysis_and_audit.md) produce descriptive tables and measure human/automated-label agreement. The generated 64-cell main study remains a separate future plan, not a completed pilot result or execution instruction. See the [writing handoff](docs/09_writing_and_analysis_handoff.md), [related work](docs/10_related_work.md) and [bibliography](paper/references.bib) before framing the paper's contribution.
 
 Use the [finished-pilot workflow](docs/11_finished_pilot_review.md) to check the exported plan, missing towns and saved costs before analysis. It also explains the separate smoke/main-batch coverage and human-label handoff.
+
+The [judge-validation workflow](docs/12_judge_validation_plan.md) prepares an offline inventory and separate blind calibration sample that includes rule-coded omissions. The proposed controls remain unapproved and make no model calls.

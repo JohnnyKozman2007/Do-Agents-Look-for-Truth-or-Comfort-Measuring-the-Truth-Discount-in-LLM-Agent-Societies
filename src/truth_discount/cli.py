@@ -73,6 +73,12 @@ def _parser() -> argparse.ArgumentParser:
     sample.add_argument("--out", type=Path, required=True, help="new directory for the sheet and private key")
     sample.add_argument("--size", type=int, default=100)
     sample.add_argument("--seed", type=int, default=2027)
+    validation = commands.add_parser("prepare-judge-validation",
+                                     help="offline inventory and blind calibration sample of every phone-call path")
+    validation.add_argument("output_root", type=Path, help="finished saved collection snapshot")
+    validation.add_argument("--out", type=Path, required=True, help="new directory outside the collection")
+    validation.add_argument("--size", type=int, default=100)
+    validation.add_argument("--seed", type=int, default=20261108)
     score = commands.add_parser("audit-score", help="Cohen's kappa of human labels against the judge")
     score.add_argument("audit_dir", type=Path, help="directory written by audit-sample")
     score.add_argument("sheets", type=Path, nargs="+", help="one filled labeling sheet per rater")
@@ -143,6 +149,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "audit-sample":
             from .judge_audit import make_audit
             _print_json(make_audit(args.output_root, args.out, size=args.size, seed=args.seed))
+            return 0
+        if args.command == "prepare-judge-validation":
+            from .judge_validation import prepare_validation
+            _print_json(prepare_validation(args.output_root, args.out, size=args.size, seed=args.seed))
             return 0
         if args.command == "audit-score":
             from .judge_audit import score_audit

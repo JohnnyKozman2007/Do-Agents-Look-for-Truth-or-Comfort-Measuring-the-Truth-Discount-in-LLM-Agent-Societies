@@ -56,3 +56,5 @@ The audit package binds the exact source bundle files, prompts, judge revision, 
 The configured 0.85 kappa target is a diagnostic benchmark. The automated judge is not a gold-standard human answer. A low value calls for review of disagreements and an explicit subsequent decision. It does not automatically authorize another model, paid rejudging or replacement of the reported labels.
 
 See [the writing handoff](09_writing_and_analysis_handoff.md) and [related work](10_related_work.md) for the interpretation and design-version limits.
+
+The [judge-validation plan](12_judge_validation_plan.md) adds a separate calibration preparation command covering every completed phone-call path, including rule-coded omissions. It preserves this original audit protocol and does not replace labels, select another primary judge or run provider controls.
