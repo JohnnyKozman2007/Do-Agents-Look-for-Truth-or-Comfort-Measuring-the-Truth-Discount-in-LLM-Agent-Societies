@@ -1,0 +1,81 @@
+{
+  "kind": "non_executable_judge_validation_proposal",
+  "version": 1,
+  "prepared_date": "2026-11-08",
+  "approved": false,
+  "execution_authorized": false,
+  "spending_authorized": false,
+  "primary_judge_replaced": false,
+  "reported_comparison": {
+    "status": "reported_not_reproduced",
+    "rows": 400,
+    "layer": "first_hand_only_diagnostic",
+    "original_label_quotas": {
+      "UNCERTAIN": 150,
+      "SKEPTICAL": 150,
+      "CHECKED_TRUE": 30,
+      "CHECKED_FALSE": 30,
+      "FACT": 20,
+      "NOT_MENTIONED": 20
+    },
+    "original_label_origin": "must_separate_actual_judge_from_rule_coded_omissions",
+    "raw_source_ids_and_outputs_available": false,
+    "primary_population_reconciled": false,
+    "headline_paired_estimator_reproduced": false
+  },
+  "minimum_control": {
+    "name": "haiku_matched_alternate_procedure",
+    "status": "pending_source_material_and_explicit_execution_approval",
+    "selection": "exact_original_400_ids_after_provenance_validation",
+    "model": "same_native_Haiku_route_as_original_where_available",
+    "prompt_and_schema": "exact_alternate_prompt_and_rationale_first_schema",
+    "settings": "match_alternate_procedure_and_record_unsupported_or_changed_fields",
+    "quote_contract": "do_not_claim_original_quote_validation_if_output_omits_quote",
+    "calls_performed_by_this_work": 0
+  },
+  "further_control_option": {
+    "status": "proposal_not_frozen",
+    "design": "model_by_format_under_a_common_rubric_and_supporting_quote_contract",
+    "require_exact_fields": [
+      "source_row_id",
+      "target_claim_hash",
+      "transcript_hash",
+      "prompt_hash",
+      "response_schema_hash",
+      "native_model_and_provider_route",
+      "generation_settings_hash",
+      "parser_revision",
+      "raw_response_hash",
+      "attempt_and_usage_receipts"
+    ]
+  },
+  "human_sets": {
+    "probability_calibration": {
+      "proposed_size": 100,
+      "population": "all_completed_phone_transcripts_including_rules_and_invalid_labels",
+      "strata": "truth_condition_by_listener_layer",
+      "selection": "fixed_seed_equal_quotas_with_Nh_nh_and_inclusion_probabilities",
+      "existing_audit_v1_replaced": false,
+      "human_labels_received": false
+    },
+    "reported_unanimous_disagreements": {
+      "reported_size": 42,
+      "status": "pending_exact_source_ids",
+      "purpose": "targeted_diagnosis_or_rubric_development_not_population_accuracy"
+    }
+  },
+  "analysis_boundaries": {
+    "default_label_view": "original",
+    "alternate_results": "diagnostic_or_explicit_sensitivity_until_team_decision",
+    "required_distinctions": [
+      "six_class_label_agreement",
+      "numerical_belief_score_agreement",
+      "omission_agreement",
+      "schema_and_quote_admissibility",
+      "human_agreement",
+      "configured_paired_town_estimator"
+    ],
+    "population_weighting": "requires_source_stratum_sizes_and_selection_probabilities",
+    "model_consensus_is_human_truth": false
+  }
+}

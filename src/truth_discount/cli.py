@@ -60,6 +60,28 @@ def _parser() -> argparse.ArgumentParser:
                         help="record the billed amount for one unknown charge")
     ledger.add_argument("--actual-usd", type=str, help="billed amount from the provider's usage records")
     ledger.add_argument("--note", type=str, help="where the billed amount came from")
+    analyze = commands.add_parser("analyze", help="per-cell truth discount, sensitivity bounds and model fits")
+    analyze.add_argument("output_root", type=Path, help="directory containing the saved town directories")
+    analyze.add_argument("--out", type=Path, required=True, help="new directory for tables, report and chart")
+    review = commands.add_parser("review-collection", help="read-only saved-plan coverage and receipt review")
+    review.add_argument("output_root", type=Path, help="finished collection snapshot, including archived attempts")
+    review.add_argument("--out", type=Path, required=True, help="new review directory outside the collection")
+    review.add_argument("--ledger-copy", type=Path,
+                        help="optional saved journal copy; inspected through another temporary copy only")
+    sample = commands.add_parser("audit-sample", help="stratified blind sample for the human judge audit")
+    sample.add_argument("output_root", type=Path)
+    sample.add_argument("--out", type=Path, required=True, help="new directory for the sheet and private key")
+    sample.add_argument("--size", type=int, default=100)
+    sample.add_argument("--seed", type=int, default=2027)
+    validation = commands.add_parser("prepare-judge-validation",
+                                     help="offline inventory and blind calibration sample of every phone-call path")
+    validation.add_argument("output_root", type=Path, help="finished saved collection snapshot")
+    validation.add_argument("--out", type=Path, required=True, help="new directory outside the collection")
+    validation.add_argument("--size", type=int, default=100)
+    validation.add_argument("--seed", type=int, default=20261108)
+    score = commands.add_parser("audit-score", help="Cohen's kappa of human labels against the judge")
+    score.add_argument("audit_dir", type=Path, help="directory written by audit-sample")
+    score.add_argument("sheets", type=Path, nargs="+", help="one filled labeling sheet per rater")
     rejudge = commands.add_parser("rejudge", help="re-ask the judge for malformed labels; preview without --execute")
     rejudge.add_argument("output_root", type=Path, help="a finished collection directory")
     rejudge.add_argument("--providers", type=Path, help="approved provider manifest, required for execution")
@@ -106,6 +128,35 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "summarize":
             _print_json(summarize(args.output_root))
+            return 0
+        if args.command == "analyze":
+            from .analysis import analyze
+            result = analyze(args.output_root, args.out)
+            _print_json({k: result[k] for k in ("evidence_kind", "towns", "pairs", "excluded_towns", "plot_written")}
+                        | {"model_fit": result["models"]["status"], "report": str(args.out / "report.md")})
+            return 0
+        if args.command == "review-collection":
+            from .review import review_collection
+            result = review_collection(args.output_root, args.out, args.ledger_copy)
+            missing = result["coverage"]["missing_run_ids"]
+            _print_json({"status": result["status"], "evidence_kind": result["evidence_kind"],
+                         "selected_complete": result["coverage"]["selected_complete"],
+                         "missing_towns": len(missing) if missing is not None else None,
+                         "full_matrix_complete": result["coverage"]["full_matrix_coverage"]["complete"],
+                         "ledger_status": result["ledger"]["status"], "issues": result["issues"],
+                         "report": str(args.out / "review.md")})
+            return 0
+        if args.command == "audit-sample":
+            from .judge_audit import make_audit
+            _print_json(make_audit(args.output_root, args.out, size=args.size, seed=args.seed))
+            return 0
+        if args.command == "prepare-judge-validation":
+            from .judge_validation import prepare_validation
+            _print_json(prepare_validation(args.output_root, args.out, size=args.size, seed=args.seed))
+            return 0
+        if args.command == "audit-score":
+            from .judge_audit import score_audit
+            _print_json(score_audit(args.audit_dir, args.sheets))
             return 0
         if args.command == "ledger":
             from .budget import BudgetLedger

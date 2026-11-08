@@ -14,7 +14,7 @@ import sys
 from typing import Any
 from urllib.parse import urlsplit
 
-from .config import build_manifest, load_config, render_template, render_values
+from .config import build_manifest, load_config, render_template, render_values, study_cells
 from .contracts import REJECTED_BEFORE_INFERENCE, canonical_bytes, digest
 from .scoring import make_judge_input, paired_metrics, parse_judge_response, town_metrics
 
@@ -478,7 +478,7 @@ def _audit_town(directory: Path) -> dict[str, Any]:
             checked = next(d for d in town["scene_2_first_hand_decisions"] if d["seat_id"] == first)
             is_checked = checked["decision"] == "GO"
             if version == LEGACY_SCHEMA and "literal_poster_quote_found" in row:
-                cell = next(c for c in config["pilot_cells"] if c["cell_id"] == town["cell_id"])
+                cell = next(c for c in study_cells(config) if c["cell_id"] == town["cell_id"])
                 condition = next(c for c in cell["conditions"] if c["condition_type"] == town["condition_type"])
                 poster = render_template(condition["ground_truth_noticeboard"], render_values(config, town, first))
                 quotes = [line["text"] for line in pair["lines"]

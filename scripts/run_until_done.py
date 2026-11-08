@@ -5,27 +5,31 @@ rejections are free and leave the ledger unblocked, but once a call has used all
 the run stops. This wrapper waits, then resumes, and repeats.
 
 A dropped connection or timeout leaves an unclear charge that blocks the ledger by design.
-With --auto-reconcile, the wrapper records each such charge the way an operator would, using
-scripts/reconcile_unknowns.py: the exact cost from a saved receipt when there is one, otherwise
-the reserved amount as a noted upper bound (never zero), and then resumes. Without the flag it
-stops and leaves that step to a person.
+With --auto-reconcile, the wrapper may use scripts/reconcile_unknowns.py to recover an audited
+priced receipt. A timeout or missing priced receipt stays unknown and stops recovery. A reserved
+amount is not a verified charge. Without the flag, unknown charges always require a person.
+Auto-reconciliation also requires --execute, --spending-authorized and explicit output, ledger
+and ceiling arguments. It never supplies spending authority or increases that ceiling.
 
 It stops for good on success, on a budget overrun, on the same failure twice in a row with no new
 towns saved, or after MAX_ROUNDS rounds.
 
-Usage, from the repo folder, with the API keys in the environment; the arguments are those of
-`truth_discount.cli live`, without --resume:
+Example after separate execution approval, using a $20 illustration rather than an authorization.
+The arguments are those of `truth_discount.cli live`, without --resume. Every resumed partial
+town may repeat previously paid calls. All attempts retain the same ledger and ceiling.
 
     python scripts/run_until_done.py --auto-reconcile --providers configs/providers.pilot.json \
-        --output outputs/pilot --ledger outputs/ledgers/team.jsonl --budget-usd 200 --execute \
+        --output outputs/pilot --ledger outputs/ledgers/team.jsonl --budget-usd 20 --execute \
         --spending-authorized --full-pilot --start-pair 1 --max-concurrent-towns 8
 """
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import time
 
 REPO = Path(__file__).resolve().parents[1]
@@ -33,6 +37,8 @@ BUSY = "provider rejected every attempt before inference"
 WAIT_SECONDS = 120
 MAX_ROUNDS = 60
 MAX_AUTO_RECONCILES = 30
+UNKNOWN_RECOVERY_ERRORS = ("budget ledger is blocked", "provider request failed; consult the sanitized receipt",
+                           "budget does not permit this request")
 
 
 def log(message: str) -> None:
@@ -40,7 +46,25 @@ def log(message: str) -> None:
 
 
 def value(args: list[str], flag: str) -> str | None:
-    return args[args.index(flag) + 1] if flag in args else None
+    """Read a unique option without disagreeing with argparse's last-value rule."""
+    found = []
+    for index, argument in enumerate(args):
+        if argument == flag:
+            if index + 1 == len(args) or args[index + 1].startswith("--"):
+                raise ValueError(f"{flag} requires a value")
+            found.append(args[index + 1])
+        elif argument.startswith(flag + "="):
+            found.append(argument.partition("=")[2])
+    if len(found) > 1:
+        raise ValueError(f"{flag} must be supplied only once")
+    if found and not found[0]:
+        raise ValueError(f"{flag} requires a nonempty value")
+    return found[0] if found else None
+
+
+def repo_path(value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else REPO / path
 
 
 def towns_saved(output: Path | None) -> int:
@@ -48,16 +72,53 @@ def towns_saved(output: Path | None) -> int:
 
 
 def ledger_state(env: dict, ledger: str, cap: str) -> dict:
-    proc = subprocess.run([sys.executable, "-m", "truth_discount.cli", "ledger", "--ledger", ledger,
-                           "--budget-usd", cap], cwd=REPO, env=env, capture_output=True, text=True, encoding="utf-8")
-    return json.loads(proc.stdout)["budget"] if proc.returncode == 0 else {"blocked": True, "block_reasons": ["unreadable"]}
+    # Opening BudgetLedger can append interrupted-request events. Inspect a
+    # byte-for-byte copy so status reads cannot reconcile or heal the original.
+    path = repo_path(ledger)
+    if not path.is_file():
+        return {"blocked": True, "block_reasons": ["ledger_missing"]}
+    try:
+        before = path.read_bytes()
+        if not before.endswith(b"\n"):
+            return {"blocked": True, "block_reasons": ["ledger_incomplete"]}
+        with tempfile.TemporaryDirectory(prefix="pilot-ledger-inspection-") as temporary:
+            snapshot = Path(temporary) / "ledger.jsonl"
+            snapshot.write_bytes(before)
+            proc = subprocess.run([sys.executable, "-m", "truth_discount.cli", "ledger", "--ledger", str(snapshot),
+                                   "--budget-usd", cap], cwd=REPO, env=env, capture_output=True,
+                                  text=True, encoding="utf-8")
+        if path.read_bytes() != before:
+            return {"blocked": True, "block_reasons": ["ledger_changed_during_inspection"]}
+        state = json.loads(proc.stdout)["budget"] if proc.returncode == 0 else None
+    except (OSError, ValueError, KeyError, TypeError):
+        state = None
+    return state if isinstance(state, dict) else {"blocked": True, "block_reasons": ["unreadable"]}
 
 
 def main() -> int:
     auto = "--auto-reconcile" in sys.argv
     args = [a for a in sys.argv[1:] if a not in ("--resume", "--auto-reconcile")]
-    output = Path(value(args, "--output")) if value(args, "--output") else None
-    ledger, cap = value(args, "--ledger"), value(args, "--budget-usd")
+    try:
+        if "--" in args:
+            raise ValueError("the recovery wrapper accepts live options only, without a -- positional separator")
+        output_arg = value(args, "--output")
+        ledger, cap = value(args, "--ledger"), value(args, "--budget-usd")
+        if auto:
+            if not ("--execute" in args and "--spending-authorized" in args and output_arg and ledger and cap):
+                raise ValueError("--auto-reconcile requires --execute and --spending-authorized, "
+                                 "plus --output, --ledger and --budget-usd")
+            try:
+                ceiling = Decimal(cap)
+            except InvalidOperation:
+                raise ValueError("--budget-usd must be a positive finite ceiling") from None
+            if not ceiling.is_finite() or ceiling <= 0:
+                raise ValueError("--budget-usd must be a positive finite ceiling")
+    except ValueError as error:
+        print("error: " + str(error), file=sys.stderr)
+        return 2
+    # All auto-reconciliation authority checks precede filesystem inspection,
+    # environment forwarding and every subprocess.
+    output = repo_path(output_arg) if output_arg else None
     env = dict(os.environ, PYTHONPATH=str(REPO / "src"))
     reconciles, last_failure = 0, None
     for round_number in range(1, MAX_ROUNDS + 1):
@@ -72,6 +133,9 @@ def main() -> int:
         if proc.returncode == 0:
             log("finished")
             return 0
+        if proc.returncode == 2:
+            log("invalid live command arguments; not inspecting or reconciling the ledger")
+            return proc.returncode
         failure = proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else f"exit {proc.returncode}"
         progressed = towns_saved(output) > before
         if failure == last_failure and not progressed:
@@ -82,16 +146,15 @@ def main() -> int:
             log(f"provider busy; resuming in {WAIT_SECONDS}s")
             time.sleep(WAIT_SECONDS)
             continue
-        if not auto or not (ledger and cap and output):
+        if not auto or not any(message in proc.stderr for message in UNKNOWN_RECOVERY_ERRORS):
             log("stopped for a reason other than a busy provider; not retrying")
             return proc.returncode
         state = ledger_state(env, ledger, cap)
         reasons = set(state.get("block_reasons", []))
         if not state.get("blocked"):
-            log("ledger not blocked; resuming in 30s")
-            time.sleep(30)
-            continue
-        if not reasons <= {"unknown_charge", "interrupted_request"}:
+            log("ledger not blocked; this error does not authorize automatic recovery")
+            return proc.returncode
+        if not reasons or not reasons <= {"unknown_charge", "interrupted_request"}:
             log(f"ledger blocked for {sorted(reasons)}; that needs a person, stopping")
             return proc.returncode
         if reconciles >= MAX_AUTO_RECONCILES:

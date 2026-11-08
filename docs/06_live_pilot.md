@@ -44,12 +44,16 @@ Successful receipts record provider/model/request IDs, token categories, calcula
 Missing usage, HTTP failures, timeouts or cancellations can leave the actual charge unknown. The ledger keeps the reservation and blocks new requests, including after a restart. Never delete the ledger or start a new one to get past this. Instead, look up the billed amount in the provider's usage records and record it:
 
 ```bash
-PYTHONPATH=src python3 -m truth_discount.cli ledger --ledger ledgers/pilot.jsonl --budget-usd 20
+python3 scripts/reconcile_unknowns.py ledgers/pilot.jsonl 20 outputs/pilot
 PYTHONPATH=src python3 -m truth_discount.cli ledger --ledger ledgers/pilot.jsonl --budget-usd 20 \
-  --reconcile <reservation id> --actual-usd 0.0004 --note "DeepInfra usage page, 19 Nov"
+  --reconcile "RESERVATION_ID" --actual-usd 0.0004 --note "Provider usage record reference"
 ```
 
-The first command lists unknown charges. The second records one. If the billed amount cannot be found and the operator uses the reserved amount conservatively, the note must identify that estimate. It is not invoice verification. Paid empty or malformed model responses still retain their usage and cost records.
+The first command previews source-bound receipt evidence through a temporary journal copy. It does not change the supplied journal. The second records one manually verified billed amount after replacing the example ID, amount and note. If the charge cannot be established, keep the reservation held. The general `ledger` command opens the journal for recovery and must not be used as a read-only evidence inspection tool. Paid empty or malformed model responses still retain their usage and cost records.
+
+`reconcile_unknowns.py --apply` accepts only a uniquely attributable priced receipt from audited active or archived bundles, with matching execution plan, journal identity, request and pricing. It does not guess from the reserved amount or apply a call-level aggregate cost to multiple reservations. Unresolved evidence leaves the hold in place. Usage-priced local accounting is still separate from provider invoice verification.
+
+The optional `scripts/run_until_done.py --auto-reconcile` requires explicit `--execute` and `--spending-authorized` flags plus the original ledger, cap and output. Preview or incomplete authority cannot invoke recovery. Only documented free-busy failures or successful source-bound reconciliation allow another attempt. Other failures stop. Retrying a partial town can repeat earlier paid calls, which remain in the same journal and archived attempts.
 
 ### Rejections and retries
 
@@ -77,7 +81,7 @@ The live judge occasionally returns a quote that is not the listener's words. It
 
 ```bash
 PYTHONPATH=src python3 -m truth_discount.cli rejudge outputs/pilot
-PYTHONPATH=src python3 -m truth_discount.cli rejudge outputs/pilot --providers configs/providers.pilot.json   --ledger outputs/ledgers/team.jsonl --budget-usd 200 --execute --spending-authorized
+PYTHONPATH=src python3 -m truth_discount.cli rejudge outputs/pilot --providers configs/providers.pilot.json   --ledger outputs/ledgers/team.jsonl --budget-usd 20 --execute --spending-authorized
 ```
 
 The first command previews the malformed count and complete pairs before and after, with no keys or spending. The second re-asks each malformed call up to 3 times. It spends through the same ledger and request limits, and appends every attempt with its receipt to `rejudged.jsonl` in the output directory. Saved towns are never modified, so they still replay. A rerun skips calls already re-judged. If an unclear charge stops it, reconcile and run it again.
@@ -98,6 +102,18 @@ The phone regex trigger and its final-judgment filter remain diagnostics. They d
 
 `--start-pair` and `--pairs-per-cell` declare disjoint ranges of the 39 configured pairs per cell. The default first batch has 16 towns. After verifying its actual completion, `--full-pilot --start-pair 1` selects the remaining 608 without selecting those first 16 IDs again.
 
-These are explicit work assignments between operators. `--resume` only continues one bound output directory with its original ledger. Operators still need one shared completion/cost ledger, identical configuration/model manifests and an agreed handover. A partial town is rerun only after its unknown charges are reconciled, and its original bundle is kept. Native batch jobs, automated cross-person resume, human audit selection, GPT-4o audit execution and final statistical inference remain separate tasks.
+These are explicit work assignments between operators. `--resume` only continues one bound output directory with its original ledger. Operators still need one shared completion/cost ledger, identical configuration/model manifests and an agreed handover. A partial town is rerun only after its unknown charges are reconciled, and its original bundle is kept. Native batch jobs, automated cross-person resume and GPT-4o audit execution remain separate tasks. The [analysis and the human judge audit](08_analysis_and_audit.md) read finished outputs.
+
+## Main study
+
+`configs/main_config.json` is the 64-cell factorial: every combination of closeness, authority, reliability, wealth and identity (gender × age). That is 4,992 towns per model and 9,984 in total. It is generated from the pilot config, so prompts, personas, layouts and models are identical:
+
+```bash
+PYTHONPATH=src python3 scripts/make_main_config.py
+```
+
+Regenerate it after any pilot-config change. A test fails if the two drift apart. Cell IDs count through `factorial_levels` with identity changing fastest. The pilot's four cells are main cells 1, 62, 30 and 46 (`pilot_cell_ids_in_main`). Artist allocation follows `seed_id + cell_id` parity, so main cell 30 swaps real and fake artists relative to pilot cell 3. Pilot towns are therefore not reused as main-study towns.
+
+Every command above accepts `--config configs/main_config.json`. The default selection is one pair per cell per model, which is 256 towns, and `--full-pilot` selects all 9,984. Use a new output directory. The ledger can be shared with the pilot only if its cap was set high enough at creation, because the cap can never be raised.
 
 See [published rates and planning scenarios](07_pricing_and_budget.md) before agreeing a funding amount.
