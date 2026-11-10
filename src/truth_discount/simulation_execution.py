@@ -357,10 +357,13 @@ async def collect_simulations(config: dict, providers: dict, runs: list[dict], o
             raise ValueError("simulation collection contains a symbolic link")
         if path.is_dir() and path.name != "_incomplete" and path.name not in expected:
             raise ValueError("unplanned simulation directory")
+    archived_failed_run_ids = set()
     for path in archived_attempt_paths(output) if resume else []:
         if path.name not in expected or path.is_symlink():
             raise ValueError("unplanned archived simulation attempt")
-        _audit_expected(path, info, expected[path.name])
+        past = _audit_expected(path, info, expected[path.name])
+        if past["generation_status"] != "completed":
+            archived_failed_run_ids.add(past["run_id"])
     pending, skipped, partial = [], [], []
     for run in runs:
         path = output / run["run_id"]
@@ -371,10 +374,14 @@ async def collect_simulations(config: dict, providers: dict, runs: list[dict], o
         else:
             partial.append(path)
             pending.append(run)
-    if partial and not regenerate_failed:
+    regenerated_run_ids = sorted({path.name for path in partial}
+                                | (archived_failed_run_ids & {run["run_id"] for run in pending}))
+    if regenerated_run_ids and not regenerate_failed:
         # Rerunning only failed towns keeps a success-selected sample, so it
         # must be an explicit, logged choice rather than a side effect of resume.
-        raise ValueError(f"{len(partial)} sealed failed generation(s), e.g. {partial[0].name}; "
+        # A crash after archival but before the next attempt must not make a
+        # previously failed allocation look like a never-started town.
+        raise ValueError(f"{len(regenerated_run_ids)} sealed failed generation(s), e.g. {regenerated_run_ids[0]}; "
                          "rerun them only with explicit regenerate_failed (--regenerate-failed)")
     # No judge route, judge key or judge preflight is needed at this stage.
     if pending:
@@ -394,9 +401,11 @@ async def collect_simulations(config: dict, providers: dict, runs: list[dict], o
             stream.write(json.dumps({"resumed_utc": datetime.now(timezone.utc).isoformat(),
                                      "skipped_run_ids": skipped, "archived": set_aside,
                                      "regenerate_failed": regenerate_failed,
+                                     "regenerated_run_ids": regenerated_run_ids,
                                      "pending_towns": len(pending)}) + "\n")
             stream.flush()
             os.fsync(stream.fileno())
+        _sync_directory(output)
     queue, failures = list(pending), []
     async def worker():
         while queue and not failures:

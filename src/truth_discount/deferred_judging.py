@@ -24,10 +24,13 @@ from .contracts import GenerationRequest, GenerationResponse, canonical_bytes, c
 from .execution import _atomic_json
 from .providers import ProviderBackend
 from .scoring import LABELS, make_judge_input, paired_metrics, parse_judge_response, town_metrics
-from .simulation_artifacts import durable_mkdir, source_sha256
+from .simulation_artifacts import GENERATION_SOURCE_FILES, durable_mkdir, source_sha256
 
 VERSION = "truth-discount-deferred-judging-1"
 PARSER_VERSION = "legacy-label-quote-v1"
+JUDGING_SOURCE_FILES = tuple(sorted(set(GENERATION_SOURCE_FILES) | {
+    "deferred_judging.py", "execution.py", "simulation_execution.py",
+}))
 _ID = re.compile(r"[A-Za-z0-9_.-]{1,100}\Z")
 _HASH = re.compile(r"[0-9a-f]{64}\Z")
 _PROFILE_FIELDS = {"version", "profile_id", "approved", "model_key", "provider_manifest", "settings",
@@ -153,6 +156,42 @@ def _planned_town(town: dict, info: dict, expected: dict) -> None:
             raise ValueError("source town differs from its collection's " + plan_key)
 
 
+def _source_inventory(root: Path) -> list[dict]:
+    """Record names and types without opening an original budget journal."""
+    inventory = []
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise ValueError("immutable source contains a symbolic link")
+        kind = "file" if path.is_file() else "directory" if path.is_dir() else None
+        if kind is None:
+            raise ValueError("immutable source contains an unsupported filesystem entry")
+        inventory.append({"path": path.relative_to(root).as_posix(), "kind": kind})
+    return inventory
+
+
+def _bind_payloads(bound: dict, root: Path, directory: Path, manifest: dict,
+                   manifest_bytes: bytes) -> None:
+    files = {**manifest["files"], "manifest.json": hashlib.sha256(manifest_bytes).hexdigest()}
+    for name, expected in files.items():
+        relative = (directory / name).relative_to(root).as_posix()
+        if relative in bound and bound[relative] != expected:
+            raise ValueError("conflicting immutable source file binding")
+        bound[relative] = expected
+
+
+def _verify_source_files(source: dict, directories: dict[str, Path]) -> None:
+    """Check all original payloads and collection controls without actor replay."""
+    for collection in source["collections"]:
+        directory = directories[collection["run_ids"][0]]
+        root = directory if collection["source_root_kind"] == "town" else directory.parent
+        if _source_inventory(root) != collection["file_inventory"]:
+            raise ValueError("immutable source file/archive inventory changed during judging")
+        for relative, expected in collection["bound_files_sha256"].items():
+            path = root / relative
+            if not path.is_file() or path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+                raise ValueError("immutable source payload or control changed during judging: " + relative)
+
+
 def _source(source_root, profile: dict) -> tuple[dict, list[dict], dict[str, Path]]:
     items, sources, directories = [], {}, {}
     common_config = common_evidence = common_implementation = None
@@ -178,7 +217,7 @@ def _source(source_root, profile: dict) -> tuple[dict, list[dict], dict[str, Pat
             expected = {run["run_id"]: run for run in collection_plan["runs"]}
             if not expected or len(expected) != len(collection_plan["runs"]):
                 raise ValueError("source collection plan has duplicate or missing run identities")
-        root_runs = []
+        root_runs, bound_files = [], {}
         for directory in candidates:
             if not (directory / "town.json").is_file() or not (directory / "manifest.json").is_file():
                 raise ValueError("unexpected source directory without a complete bundle")
@@ -222,15 +261,16 @@ def _source(source_root, profile: dict) -> tuple[dict, list[dict], dict[str, Pat
                 if key in actor_routes and actor_routes[key] != semantic:
                     raise ValueError("actor route, settings or pricing differs across source shards")
                 actor_routes[key] = semantic
-            manifest = _json((directory / "manifest.json").read_bytes())
+            manifest_bytes = (directory / "manifest.json").read_bytes()
+            manifest = _json(manifest_bytes)
+            _bind_payloads(bound_files, root, directory, manifest, manifest_bytes)
             if collection_plan is not None and profile["source_format"] == "simulation":
                 if (manifest.get("source_files_sha256") != collection_plan.get("source_files_sha256")
                         or manifest.get("runtime") != collection_plan.get("runtime")):
                     raise ValueError("source generation runtime differs from its original collection plan")
             if profile["source_format"] == "simulation":
                 source_hashes = manifest.get("source_files_sha256", {})
-                code = {name: source_hashes.get(name) for name in
-                        ("runner.py", "config.py", "providers.py", "contracts.py", "simulation_artifacts.py")}
+                code = {name: source_hashes.get(name) for name in GENERATION_SOURCE_FILES}
                 if any(not isinstance(value, str) or not _HASH.fullmatch(value) for value in code.values()):
                     raise ValueError("generation protocol source fingerprints are missing")
                 implementation = digest(code)
@@ -277,16 +317,24 @@ def _source(source_root, profile: dict) -> tuple[dict, list[dict], dict[str, Pat
             else:
                 past = audit_town(path)
             _planned_town(past, collection_plan, expected)
+            manifest_bytes = (path / "manifest.json").read_bytes()
+            archived_manifest = _json(manifest_bytes)
+            _bind_payloads(bound_files, root, path, archived_manifest, manifest_bytes)
             archives.append({"relative_path": path.relative_to(root).as_posix(), "run_id": past["run_id"],
-                             "manifest_sha256": digest(_json((path / "manifest.json").read_bytes())),
+                             "manifest_sha256": digest(archived_manifest),
                              "run_status": past["run_status"]})
         allocation = collection_plan.get("allocation") if collection_plan else None
         if allocation:
             allocation_ids.add(allocation["allocation_id"])
         controls = {name: hashlib.sha256((root / name).read_bytes()).hexdigest()
-                    for name in ("execution_plan.json", "budget_checkpoint.json") if (root / name).is_file()}
+                    for name in ("execution_plan.json", "budget_checkpoint.json", "resume_log.jsonl")
+                    if (root / name).is_file()}
+        bound_files.update(controls)
         collections.append({"run_ids": sorted(root_runs), "control_file_sha256": controls,
                             "allocation": clone(allocation), "archived_attempts": archives,
+                             "source_root_kind": "town" if (root / "town.json").is_file() else "collection",
+                             "file_inventory": _source_inventory(root),
+                             "bound_files_sha256": dict(sorted(bound_files.items())),
                             "collection_plan_verified": collection_plan is not None,
                             "ledger_history_verified": False, "billing_verified": False})
     if len(allocation_ids) > 1:
@@ -313,6 +361,8 @@ def _check_judge_independent(actor_routes: dict, profile: dict) -> None:
 def _unchanged(directory: Path, entry: dict) -> None:
     if digest(_json((directory / "manifest.json").read_bytes())) != entry["manifest_sha256"]:
         raise ValueError("source manifest changed during judging")
+    if hashlib.sha256((directory / "town.json").read_bytes()).hexdigest() != entry["town_sha256"]:
+        raise ValueError("source town changed during judging")
     if any(hashlib.sha256((directory / name).read_bytes()).hexdigest() != value
            for name, value in entry["critical_files_sha256"].items()):
         raise ValueError("source transcript or config changed during judging")
@@ -374,7 +424,7 @@ def plan_judging(source_root, profile: dict, *, audited: tuple | None = None) ->
     implementation = {"version": VERSION,
         "runtime": {"python": sys.version.split()[0], "implementation": platform.python_implementation()},
         "source_files_sha256": {name: source_sha256(Path(__file__).parent / name)
-                                for name in ("deferred_judging.py", "providers.py", "contracts.py", "scoring.py")}}
+                                for name in JUDGING_SOURCE_FILES}}
     return {"version": VERSION, "status": "blocked" if errors else "ready_for_access_validation",
             "judging_implementation": implementation,
             "execution_gates": errors, "profile": profile, "profile_sha256": digest(profile),
@@ -651,8 +701,13 @@ def _verify_saved(source_root, output: Path, profile: dict | None = None, *,
 def replay_judging(source_root, output: Path, profile: dict | None = None, *,
                    audited: tuple | None = None) -> dict:
     """Read-only strict replay. Never opens the original ledger or credentials."""
-    candidate = plan_judging(source_root, profile, audited=audited) if profile is not None else None
+    if profile is None:
+        raise ValueError("replay requires the explicit judge profile")
+    profile = _profile(profile)
+    audited = _source(source_root, profile) if audited is None else audited
+    candidate = plan_judging(source_root, profile, audited=audited)
     info, events = _verify_saved(source_root, output, profile, candidate=candidate, strict_runtime=False)
+    _verify_source_files(candidate["source"], audited[2])
     return _with_runtime(_summary(info, events), info, candidate)
 
 
@@ -795,6 +850,7 @@ async def _judge_collection(source_root, output: Path, profile: dict, backend, *
     # then strictly re-verify the plan, checkpoint and journal.
     for run_id, source_directory in directories.items():
         _unchanged(source_directory, source_entries[run_id])
+    _verify_source_files(candidate["source"], directories)
     final_info, final_events = _verify_saved(source_root, output, profile, candidate=candidate)
     result = _with_runtime(_summary(final_info, final_events), final_info, candidate)
     return {**result, "profile_output": str(directory), "resumed": resume,
