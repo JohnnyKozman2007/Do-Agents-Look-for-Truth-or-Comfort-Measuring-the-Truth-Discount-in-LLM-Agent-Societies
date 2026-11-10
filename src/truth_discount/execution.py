@@ -44,11 +44,11 @@ def select_runs(config: dict, model_keys: list[str] | None = None,
     return [run for run in runs if start_pair <= run["seed_id"] < end]
 
 
-def plan(config: dict, providers: dict, runs: list[dict]) -> dict:
+def plan(config: dict, providers: dict, runs: list[dict], *, include_judge: bool = True) -> dict:
     configured = {x["key"]: x for x in config["models"]["agent_models"]}
     judge = config["models"]["judge_models"][0]
     configured[judge["key"]] = judge
-    needed = sorted({r["model_key"] for r in runs} | {judge["key"]})
+    needed = sorted({r["model_key"] for r in runs} | ({judge["key"]} if include_judge else set()))
     errors = []
     if providers.get("version") != 1:
         errors.append("unsupported provider manifest version")
@@ -70,21 +70,21 @@ def plan(config: dict, providers: dict, runs: list[dict]) -> dict:
         for gate in ("settings_verified", "pricing_verified"):
             if route.get(gate) is not True:
                 errors.append(f"{key} needs {gate}")
-    if (config["hyperparameters"]["blind_judge_turns"].get("use_batch_api")
+    if (include_judge and config["hyperparameters"]["blind_judge_turns"].get("use_batch_api")
             and not routes.get(judge["key"], {}).get("allow_synchronous_judge")):
         errors.append("judge batch setting requires explicit approval of synchronous pilot override")
     return {"status": "blocked" if errors else "ready_for_access_validation",
             "execution_gates": errors, "planned_towns": len(runs),
             "planned_pairs": len({r["pair_id"] for r in runs}),
             "model_keys": sorted({r["model_key"] for r in runs}),
-            "primary_judge_key": judge["key"], "config_sha256": digest(config),
+            "primary_judge_key": judge["key"] if include_judge else None, "config_sha256": digest(config),
             "provider_manifest_sha256": digest(providers), "run_manifest_sha256": digest(runs),
             "runs": runs, "provider_api_calls": 0,
             "study_eligible": False, "spending_authorized_by_planning": False,
             "api_access_validated": False}
 
 
-def validate_backend(config: dict, runs: list[dict], backend) -> None:
+def validate_backend(config: dict, runs: list[dict], backend, *, include_judge: bool = True) -> None:
     """Check all request kinds before the first paid call, including the judge."""
     judge = config["models"]["judge_models"][0]["key"]
     for key in sorted({r["model_key"] for r in runs}):
@@ -97,9 +97,10 @@ def validate_backend(config: dict, runs: list[dict], backend) -> None:
                                         clone(config["hyperparameters"][setting_key]), key,
                                         kind, 2 if kind == "decision" else 3, 1, 1)
             backend.validate_request(request)
-    backend.validate_request(GenerationRequest(
-        [{"role": "user", "content": "Preflight validation only."}],
-        clone(config["hyperparameters"]["blind_judge_turns"]), judge, "judge", 5, 1, 0))
+    if include_judge:
+        backend.validate_request(GenerationRequest(
+            [{"role": "user", "content": "Preflight validation only."}],
+            clone(config["hyperparameters"]["blind_judge_turns"]), judge, "judge", 5, 1, 0))
 
 
 def _set_aside(output: Path, directory: Path) -> str:

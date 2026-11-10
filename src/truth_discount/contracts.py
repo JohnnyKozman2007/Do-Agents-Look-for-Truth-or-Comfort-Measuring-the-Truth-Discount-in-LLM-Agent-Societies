@@ -29,7 +29,12 @@ def digest(value: Any) -> str:
 def capture(value: Any, limit: int = 8192) -> dict[str, Any]:
     try:
         if is_dataclass(value) and not isinstance(value, type):
+            response = isinstance(value, GenerationResponse)
             value = asdict(value)
+            if response and value.get("native_response") is None:
+                # Preserve the historical text/usage capture contract when no
+                # native body exists (including all actor fixture responses).
+                value.pop("native_response", None)
         text = json.dumps(value, ensure_ascii=True, default=lambda x: {"python_type": type(x).__name__})
     except (TypeError, ValueError, RecursionError) as exc:
         text = json.dumps({"python_type": type(value).__name__, "capture_error": type(exc).__name__})
@@ -52,6 +57,9 @@ class GenerationRequest:
 class GenerationResponse:
     text: str
     usage: dict[str, Any] | None = None
+    # New deferred judges retain native blocks/stop reasons in their sidecars.
+    # This is not injected into actor histories and older bundles need no field.
+    native_response: dict[str, Any] | None = None
 
 
 class Backend(Protocol):

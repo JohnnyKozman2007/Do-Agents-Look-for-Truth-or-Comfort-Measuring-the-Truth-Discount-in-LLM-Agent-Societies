@@ -10,6 +10,7 @@ import re
 import time
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from .config import render_contexts, render_template, render_values
 from .contracts import (Backend, GenerationRequest, GenerationResponse, MalformedGeneration,
@@ -44,7 +45,9 @@ async def _phase(tasks: list[Any]) -> None:
 
 
 async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend,
-                   output_root: Path) -> dict[str, Any]:
+                   output_root: Path, *, defer_judging: bool = False) -> dict[str, Any]:
+    if type(defer_judging) is not bool:
+        raise ValueError("defer_judging must be a boolean")
     evidence_kind = getattr(backend, "evidence_kind", None)
     if evidence_kind not in {"synthetic_fixture", "mocked_provider", "development_pilot"}:
         raise ValueError("unsupported backend evidence kind; expected synthetic_fixture, mocked_provider or development_pilot")
@@ -80,6 +83,10 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
         "token_usage": {"provider_api_calls": 0, "input_tokens": None, "output_tokens": None,
                         "cost_usd": None, "fixture_callback_invocations": 0},
     }
+    if defer_judging:
+        town.update(schema_version="truth-discount-simulation-0.1",
+                    generation_attempt_id=uuid4().hex,
+                    generation_status="completed", evaluation_status="pending")
     if execution is not None:
         town["execution_manifest"] = execution
         town["execution_manifest_sha256"] = digest(execution)
@@ -87,6 +94,8 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
         "scene_5_mention_step_confirmed": "Regex trigger filtered by final whole-dialogue judgment, not earliest substantive mention",
         "scene_3_poster_evidence_passed": "Checked plus artist/board keywords, not semantic evidence-transfer adjudication",
     }
+    if defer_judging:
+        town["diagnostic_limits"]["scene_5_mention_step_confirmed"] = "Not computed: evaluation pending"
     active_scene = 1
     fatal: BaseException | None = None
 
@@ -231,6 +240,10 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
             transcript.append({"speaker": "listener", "name": names[seat], "text": reply, "funnel_step": 5})
         transcript.append({"speaker": "caller", "name": values["loved_one"], "text": funnel[6], "funnel_step": 6})
         add_other(seat, values["loved_one"], funnel[6])
+        if defer_judging:
+            # Preserve the existing actor conversation, including the regex
+            # branch. An ungraded phone is not an omission or a belief label.
+            return
         if mention_step is None:
             result = {"seat_id": seat, "status": "valid", "label": "NOT_MENTIONED", "quote": "",
                       "error": None, "provenance": "runner_phone_funnel_rule"}
@@ -290,11 +303,16 @@ async def run_town(config: dict[str, Any], run: dict[str, Any], backend: Backend
         for key in ("scene_3_catch_up_transcripts", "scene_3_poster_evidence_passed"):
             town[key].sort(key=lambda x: x["first_hand_seat"])
         decisions = town["scene_2_first_hand_decisions"] + town["scene_4_second_hand_decisions"]
-        town["metrics"] = town_metrics(config, town["judge_evaluations"], decisions)
+        town["metrics"] = None if defer_judging else town_metrics(config, town["judge_evaluations"], decisions)
         town["timestamps"]["finished_utc"] = datetime.now(timezone.utc).isoformat()
         town["token_usage"] = usage_totals(town["calls"], evidence_kind)
-        from .artifacts import save_town
-        save_town(directory, town, config)
+        if defer_judging:
+            town["generation_status"] = "completed" if town["run_status"] == "completed" else "failed"
+            from .simulation_artifacts import save_simulation
+            save_simulation(directory, town, config)
+        else:
+            from .artifacts import save_town
+            save_town(directory, town, config)
     if fatal is not None:
         raise fatal
     return clone(town)

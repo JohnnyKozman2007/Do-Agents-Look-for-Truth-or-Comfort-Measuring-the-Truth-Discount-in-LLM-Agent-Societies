@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "profile_id": "sonnet-adaptive-candidate-v1",
+  "approved": false,
+  "model_key": "judge-sonnet-adaptive",
+  "provider_manifest": {
+    "version": 1,
+    "approved": false,
+    "routes": {
+      "judge-sonnet-adaptive": {
+        "provider": "Anthropic",
+        "model_id": "claude-sonnet-5-5",
+        "endpoint": "https://api.anthropic.com/v1/messages",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "settings_verified": false,
+        "pricing_verified": false,
+        "input_usd_per_million": null,
+        "output_usd_per_million": null,
+        "cached_input_usd_per_million": null,
+        "max_input_tokens": 32768,
+        "timeout_seconds": 60,
+        "max_concurrent_requests": 1
+      }
+    }
+  },
+  "settings": {
+    "max_tokens": 1024,
+    "thinking": {
+      "type": "adaptive"
+    },
+    "effort": "low",
+    "use_batch_api": false,
+    "structured_output": {
+      "label_enum_from": "judging_and_scoring.categorical_labels",
+      "required_fields": [
+        "label",
+        "quote"
+      ]
+    }
+  },
+  "rubric": {
+    "version": "canonical-spec-v1",
+    "prompt": "You will read one evening phone call between a person and an out-of-town relative or friend.\nLabel how the person describes a possible concert by {announced_artist} this weekend.\nUse the person's last statement about it.\n\nCATEGORICAL LABELS:\n- FACT: States that the concert is happening, with no doubt or hesitation.\n- UNCERTAIN: States that the concert might be happening, is unsure, or expresses ambiguity.\n- SKEPTICAL: States that the concert probably is not happening, doubts the claim, or explicitly calls it an unverified rumor.\n- CHECKED_TRUE: States that they, or someone they spoke with, physically went to the town noticeboard and read that the concert is confirmed.\n- CHECKED_FALSE: States that they, or someone they spoke with, physically went to the town noticeboard and read that {announced_artist} is not performing (e.g., the poster confirms a concert by a different artist).\n- NOT_MENTIONED: Never brings up the concert at all, or dodges the topic even after the other person directly asks about it.\n\nCRITICAL DISTINCTION:\nSaying only that someone claimed they saw a poster, without anyone actually going to the Community Hall to read the noticeboard, must be labeled FACT or UNCERTAIN, NOT CHECKED.\n\nREPLY STRICTLY AS JSON:\n{\"label\": \"<LABEL>\", \"quote\": \"<exact quote from the transcript that decided the label>\"}",
+    "sha256": "41dd356915dac8ac0aacf6fcd30165b6c95dee95bb67addba981cbebf1c60ac3"
+  },
+  "parser": {
+    "version": "legacy-label-quote-v1",
+    "sha256": "bbab0ad3d4ae2deb8c269481d88c7aec6aefe9f5e73f5083a3608567003f9205"
+  },
+  "population": "historical_funnel",
+  "population_approved": false,
+  "source_format": "simulation"
+}
