@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from contextlib import contextmanager
+from collections import deque
+import asyncio
 import hashlib
 import json
 import os
@@ -16,13 +18,14 @@ from pathlib import Path
 import platform
 import re
 import sys
+import threading
 from typing import Any
 
 from . import scoring
 from .artifacts import _provider_receipt, archived_attempt_paths, audit_town
 from .contracts import GenerationRequest, GenerationResponse, canonical_bytes, capture, clone, digest, usage_totals
 from .execution import _atomic_json
-from .providers import ProviderBackend
+from .providers import DEFAULT_MAX_CONCURRENT_REQUESTS, ProviderBackend
 from .scoring import LABELS, make_judge_input, paired_metrics, parse_judge_response, town_metrics
 from .simulation_artifacts import GENERATION_SOURCE_FILES, durable_mkdir, source_sha256
 
@@ -383,10 +386,41 @@ def make_judge_selection(source_root, profile: dict, item_ids: list[str], *, app
             "item_ids": sorted(item_ids), "items_sha256": digest(selected)}
 
 
-def plan_judging(source_root, profile: dict, *, audited: tuple | None = None) -> dict:
+def _concurrency(value: int) -> int:
+    if type(value) is not int or not 1 <= value <= 32:
+        raise ValueError("max-concurrent-judgments must be an integer from 1 to 32")
+    return value
+
+
+def _execution_controls(profile: dict, maximum: int) -> dict:
+    maximum = _concurrency(maximum)
+    route = profile["provider_manifest"]["routes"][profile["model_key"]]
+    return {"version": 1, "max_concurrent_judgments": maximum,
+            "effective_max_concurrent_judgments": min(maximum, route.get(
+                "max_concurrent_requests", DEFAULT_MAX_CONCURRENT_REQUESTS)),
+            "failure_policy": "stop_new_items_and_drain_started_attempts"}
+
+
+def _saved_concurrency(output: Path, profile: dict) -> int:
+    """Read-only replay follows the saved execution version, never a new cap."""
+    _, path, _, _ = _paths(output, profile)
+    info = _json(path.read_bytes())
+    controls = info.get("execution_controls")
+    if controls is None:
+        return 1
+    if (not isinstance(controls, dict)
+            or controls != _execution_controls(profile, controls.get("max_concurrent_judgments"))
+            or controls["max_concurrent_judgments"] == 1):
+        raise ValueError("invalid versioned judging execution controls")
+    return controls["max_concurrent_judgments"]
+
+
+def plan_judging(source_root, profile: dict, *, audited: tuple | None = None,
+                 max_concurrent_judgments: int = 1) -> dict:
     """Plan one profile. `audited` reuses a `_source` result from this same call path,
     so a single command replays each source town once instead of once per check."""
     profile = _profile(profile)
+    maximum = _concurrency(max_concurrent_judgments)
     if audited is not None:
         if audited[0]["source_format"] != profile["source_format"]:
             raise ValueError("reused source audit has a different source format")
@@ -425,7 +459,7 @@ def plan_judging(source_root, profile: dict, *, audited: tuple | None = None) ->
         "runtime": {"python": sys.version.split()[0], "implementation": platform.python_implementation()},
         "source_files_sha256": {name: source_sha256(Path(__file__).parent / name)
                                 for name in JUDGING_SOURCE_FILES}}
-    return {"version": VERSION, "status": "blocked" if errors else "ready_for_access_validation",
+    result = {"version": VERSION, "status": "blocked" if errors else "ready_for_access_validation",
             "judging_implementation": implementation,
             "execution_gates": errors, "profile": profile, "profile_sha256": digest(profile),
             "source": source, "source_sha256": digest(source), "items_sha256": digest(items),
@@ -435,6 +469,11 @@ def plan_judging(source_root, profile: dict, *, audited: tuple | None = None) ->
             "planned_model_judgments": len(items) - rules, "planned_rule_labels": rules,
             "scoring_population": profile["population"], "provider_api_calls": 0,
             "api_access_validated": False, "spending_authorized_by_planning": False, "study_eligible": False}
+    # Serial plans retain their existing field layout. Parallel execution is
+    # explicitly versioned and frozen; resume never rewrites a saved choice.
+    if maximum != 1:
+        result["execution_controls"] = _execution_controls(profile, maximum)
+    return result
 
 
 def _events(path: Path) -> list[dict]:
@@ -679,7 +718,8 @@ def _verify_saved(source_root, output: Path, profile: dict | None = None, *,
     _, path, journal, anchor = _paths(output, profile)
     info = _json(path.read_bytes())
     if candidate is None:
-        candidate = plan_judging(source_root, profile)
+        candidate = plan_judging(source_root, profile,
+                                 max_concurrent_judgments=_saved_concurrency(output, profile))
     for key in candidate:
         saved, current = info.get(key), candidate[key]
         if key == "judging_implementation" and not strict_runtime:
@@ -705,7 +745,8 @@ def replay_judging(source_root, output: Path, profile: dict | None = None, *,
         raise ValueError("replay requires the explicit judge profile")
     profile = _profile(profile)
     audited = _source(source_root, profile) if audited is None else audited
-    candidate = plan_judging(source_root, profile, audited=audited)
+    candidate = plan_judging(source_root, profile, audited=audited,
+                             max_concurrent_judgments=_saved_concurrency(output, profile))
     info, events = _verify_saved(source_root, output, profile, candidate=candidate, strict_runtime=False)
     _verify_source_files(candidate["source"], audited[2])
     return _with_runtime(_summary(info, events), info, candidate)
@@ -720,6 +761,7 @@ def _with_runtime(result: dict, info: dict, candidate: dict) -> dict:
 
 async def _judge_collection(source_root, output: Path, profile: dict, backend, *, resume: bool = False,
                            retry_invalid: bool = False, retry_failed: bool = False,
+                           max_concurrent_judgments: int = 1,
                            execution_authorized: bool = False, spending_authorized: bool = False) -> dict:
     """Run only saved judge inputs after authority, source and ledger checks.
 
@@ -733,9 +775,11 @@ async def _judge_collection(source_root, output: Path, profile: dict, backend, *
         if type(value) is not bool:
             raise ValueError("resume and retry choices must be booleans")
     profile = _profile(profile)
+    maximum = _concurrency(max_concurrent_judgments)
     # Audit (replay) every source town once for this whole invocation.
     audited = _source(source_root, profile)
-    candidate = plan_judging(source_root, profile, audited=audited)
+    candidate = plan_judging(source_root, profile, audited=audited,
+                             max_concurrent_judgments=maximum)
     if candidate["execution_gates"]:
         raise ValueError("; ".join(candidate["execution_gates"]))
     if digest(backend.manifest) != digest(profile["provider_manifest"]):
@@ -789,63 +833,105 @@ async def _judge_collection(source_root, output: Path, profile: dict, backend, *
         _atomic_json(plan_path, info)
         _append(journal, events, {"type": "header", "plan_sha256": digest(info)})
     plan_hash = digest(info)
-    def checkpoint(value):
-        _atomic_json(anchor, {"plan_sha256": plan_hash, "ledger_checkpoint": value,
+    journal_mutex = threading.RLock()
+    latest_checkpoint = clone(ledger.checkpoint())
+    def checkpoint_locked(value):
+        nonlocal latest_checkpoint
+        if any(value.get(key) != binding[key] for key in ("ledger_id", "limit_usd")):
+            raise ValueError("judging checkpoint changed the original ledger binding")
+        if value["event_count"] > latest_checkpoint["event_count"]:
+            latest_checkpoint = clone(value)
+        elif (value["event_count"] == latest_checkpoint["event_count"]
+                and value != latest_checkpoint):
+            raise ValueError("conflicting ledger history at the same checkpoint")
+        _atomic_json(anchor, {"plan_sha256": plan_hash, "ledger_checkpoint": latest_checkpoint,
                               "journal_checkpoint": _journal_checkpoint(events)})
+    def checkpoint(value):
+        # A ledger callback already holds its ledger mutex. Never acquire that
+        # mutex while holding journal_mutex: this order also supports callbacks
+        # from another thread without a ledger/journal lock inversion.
+        with journal_mutex:
+            checkpoint_locked(value)
+    def record(payload):
+        value = ledger.checkpoint()
+        with journal_mutex:
+            _append(journal, events, payload)
+            # Another callback may have advanced since value was read. The
+            # cached checkpoint is monotone, so this write cannot rewind it.
+            checkpoint_locked(value)
     checkpoint(ledger.checkpoint())
     ledger.set_checkpoint_callback(checkpoint)
-    try:
-        for item, retry_reason in pending:
-            # Bound per-call work to this town's small input exports. Full saved
-            # response replay is done at planning and final audit, not N times
-            # for all N sources on every request.
-            _unchanged(directories[item["run_id"]], source_entries[item["run_id"]])
-            key = item["item_id"]
-            if profile["population"] == "historical_funnel" and item["funnel_trigger_step"] is None:
-                _append(journal, events, {"type": "rule", "item_id": key,
-                        "evaluation": {"status": "valid", "label": "NOT_MENTIONED", "quote": "", "error": None,
-                                       "provenance": "historical_phone_funnel_rule"}})
-                checkpoint(ledger.checkpoint())
-                continue
-            request = _request(item, profile)
-            attempt = len(histories[key]) + 1
-            _append(journal, events, {"type": "start", "item_id": key, "attempt": attempt,
-                    "request_sha256": digest(asdict(request)), "retry_reason": retry_reason})
-            checkpoint(ledger.checkpoint())
-            call = {"kind": "judge", "model_key": profile["model_key"], "request": asdict(request),
-                    "status": "failed", "response": None, "raw_response": None, "token_usage": None,
-                    "native_response": None,
-                    "actual_provider": None, "actual_model": None, "provider_api_calls": 0, "cost_usd": None}
-            failure = None
+    async def one(item, retry_reason):
+        # Bound per-call work to this town's small input exports. Full saved
+        # response replay is done once for the source collection, not N times.
+        _unchanged(directories[item["run_id"]], source_entries[item["run_id"]])
+        key = item["item_id"]
+        if profile["population"] == "historical_funnel" and item["funnel_trigger_step"] is None:
+            record({"type": "rule", "item_id": key,
+                    "evaluation": {"status": "valid", "label": "NOT_MENTIONED", "quote": "", "error": None,
+                                   "provenance": "historical_phone_funnel_rule"}})
+            return
+        request = _request(item, profile)
+        attempt = len(histories[key]) + 1
+        record({"type": "start", "item_id": key, "attempt": attempt,
+                "request_sha256": digest(asdict(request)), "retry_reason": retry_reason})
+        call = {"kind": "judge", "model_key": profile["model_key"], "request": asdict(request),
+                "status": "failed", "response": None, "raw_response": None, "token_usage": None,
+                "native_response": None,
+                "actual_provider": None, "actual_model": None, "provider_api_calls": 0, "cost_usd": None}
+        failure = None
+        try:
+            response = await backend.generate(request)
+            if not isinstance(response, GenerationResponse) or not isinstance(response.text, str):
+                raise ValueError("provider returned an unsupported generation response")
+            call.update(status="completed", response=response.text, token_usage=clone(response.usage),
+                        native_response=clone(getattr(response, "native_response", None)),
+                        raw_response=capture(response, limit=1_000_000))
+        except BaseException as error:
+            failure = error
+            call["native_response"] = clone(getattr(error, "native_response", None))
+            receipt = getattr(error, "receipt", None)
+            if isinstance(receipt, dict) and receipt:
+                call["token_usage"] = clone(receipt)
+                call["provider_receipt"] = clone(receipt)
+        if isinstance(call["token_usage"], dict):
+            call.update({k: call["token_usage"].get(k) for k in
+                         ("actual_provider", "actual_model", "provider_api_calls", "cost_usd")})
+        call["native_stop_reason"] = _stop_reason(call, profile)
+        call["parser_evaluation"] = (parse_judge_response(call["response"], item["phone_transcript"])
+                                     if call["status"] == "completed" else None)
+        parsed = _evaluation(call, item, profile)
+        record({"type": "finish", "item_id": key, "attempt": attempt,
+                "call": call, "evaluation": parsed})
+        if failure is not None:
+            raise ValueError("judging stopped after a provider failure; preserve receipts and reconcile before explicit retry") from None
+        _provider_receipt(call, profile["provider_manifest"])
+    queue, failures = deque(pending), []
+    async def worker():
+        # Queue ownership and this stop flag live on this one event loop. No
+        # await separates the failure check from taking the next unique item.
+        while queue and not failures:
+            item, retry_reason = queue.popleft()
             try:
-                response = await backend.generate(request)
-                if not isinstance(response, GenerationResponse) or not isinstance(response.text, str):
-                    raise ValueError("provider returned an unsupported generation response")
-                call.update(status="completed", response=response.text, token_usage=clone(response.usage),
-                            native_response=clone(getattr(response, "native_response", None)),
-                            raw_response=capture(response, limit=1_000_000))
+                await one(item, retry_reason)
             except BaseException as error:
-                failure = error
-                call["native_response"] = clone(getattr(error, "native_response", None))
-                receipt = getattr(error, "receipt", None)
-                if isinstance(receipt, dict) and receipt:
-                    call["token_usage"] = clone(receipt)
-                    call["provider_receipt"] = clone(receipt)
-            if isinstance(call["token_usage"], dict):
-                call.update({k: call["token_usage"].get(k) for k in
-                             ("actual_provider", "actual_model", "provider_api_calls", "cost_usd")})
-            call["native_stop_reason"] = _stop_reason(call, profile)
-            call["parser_evaluation"] = (parse_judge_response(call["response"], item["phone_transcript"])
-                                         if call["status"] == "completed" else None)
-            parsed = _evaluation(call, item, profile)
-            _append(journal, events, {"type": "finish", "item_id": key, "attempt": attempt,
-                                    "call": call, "evaluation": parsed})
-            checkpoint(ledger.checkpoint())
-            if failure is not None:
-                raise ValueError("judging stopped after a provider failure; preserve receipts and reconcile before explicit retry") from None
-            _provider_receipt(call, profile["provider_manifest"])
+                failures.append(error)
+                return
+    effective = _execution_controls(profile, maximum)["effective_max_concurrent_judgments"]
+    workers = [asyncio.create_task(worker()) for _ in range(min(effective, len(pending)))]
+    try:
+        try:
+            await asyncio.gather(*workers)
+        except BaseException:
+            # Do not detach the durable budget anchor while a started worker
+            # is still preserving its cancellation/failure receipt.
+            failures.append(ValueError("judging invocation interrupted"))
+            await asyncio.shield(asyncio.gather(*workers, return_exceptions=True))
+            raise
     finally:
         ledger.set_checkpoint_callback(None)
+    if failures:
+        raise failures[0]
     # Sources were fully audited once above; confirm no bound file changed since,
     # then strictly re-verify the plan, checkpoint and journal.
     for run_id, source_directory in directories.items():
@@ -901,9 +987,11 @@ def _durable_mkdir(path: Path, *, exist_ok: bool = True) -> None:
 
 async def judge_collection(source_root, output: Path, profile: dict, backend, *, resume: bool = False,
                            retry_invalid: bool = False, retry_failed: bool = False,
+                           max_concurrent_judgments: int = 1,
                            execution_authorized: bool = False, spending_authorized: bool = False) -> dict:
     if execution_authorized is not True or spending_authorized is not True:
         raise ValueError("separate execution and spending authorization are required; spending hold remains")
+    maximum = _concurrency(max_concurrent_judgments)
     profile = _profile(profile)
     target, _, _, _ = _paths(output, profile)
     for root in _roots(source_root):
@@ -915,6 +1003,7 @@ async def judge_collection(source_root, output: Path, profile: dict, backend, *,
     with _writer_lock(Path(output) / ("." + profile["profile_id"] + ".lock")):
         return await _judge_collection(source_root, output, profile, backend, resume=resume,
             retry_invalid=retry_invalid, retry_failed=retry_failed,
+            max_concurrent_judgments=maximum,
             execution_authorized=execution_authorized, spending_authorized=spending_authorized)
 
 

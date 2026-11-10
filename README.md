@@ -57,3 +57,11 @@ verified prices or account access. The new commands preview by default; paid
 execution requires separate explicit authority. Offline tests and synthetic
 demonstrations do not establish a real smoke test, completed human audit, main
 collection or paper result.
+
+## Saved judging and main analysis
+
+The [concurrent judging and analysis guide](docs/14_parallel_judging_and_analysis.md)
+describes bounded saved-judge workers, source-bound analysis tables and the
+unapproved ten-contrast/Holm policy proposal. These tools preserve the frozen
+simulation modules. Main outcome access, judge validation and spending remain
+separate approvals.

@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "approved": false,
+  "routes": {
+    "deepseek_v4_flash": {
+      "provider": "DeepInfra",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash",
+      "endpoint": "https://api.deepinfra.com/v1/openai/chat/completions",
+      "api_key_env": "DEEPINFRA_API_KEY",
+      "input_usd_per_million": 0.09,
+      "output_usd_per_million": 0.18,
+      "cached_input_usd_per_million": 0.018,
+      "max_input_tokens": 32768,
+      "timeout_seconds": 60,
+      "max_retries": 3,
+      "retry_backoff_seconds": 2,
+      "fail_fast": true,
+      "max_concurrent_requests": 150,
+      "settings_verified": true,
+      "pricing_verified": false,
+      "verified_nonreasoning": false,
+      "thinking_disabled_parameters": {
+        "reasoning_effort": "none"
+      },
+      "allow_synchronous_judge": false,
+      "pricing_source": "https://deepinfra.com/deepseek-ai/DeepSeek-V4-Flash",
+      "settings_source": "https://docs.deepinfra.com/chat/reasoning (reasoning_effort none); https://docs.deepinfra.com/chat/overview#fail-fast",
+      "verified_at": "2026-11-07T13:38:59+00:00"
+    },
+    "qwen_3_8_flash": {
+      "provider": "DeepInfra",
+      "model_id": "Qwen/Qwen3.8-Flash",
+      "endpoint": "https://api.deepinfra.com/v1/openai/chat/completions",
+      "api_key_env": "DEEPINFRA_API_KEY",
+      "input_usd_per_million": 0.113,
+      "output_usd_per_million": 0.382,
+      "cached_input_usd_per_million": 0.0141,
+      "max_input_tokens": 32768,
+      "timeout_seconds": 60,
+      "max_retries": 3,
+      "retry_backoff_seconds": 2,
+      "fail_fast": true,
+      "max_concurrent_requests": 150,
+      "settings_verified": true,
+      "pricing_verified": false,
+      "verified_nonreasoning": true,
+      "thinking_disabled_parameters": {
+        "reasoning_effort": "none"
+      },
+      "allow_synchronous_judge": false,
+      "pricing_source": "https://deepinfra.com/Qwen/Qwen3.8-Flash",
+      "settings_source": "https://docs.deepinfra.com/chat/reasoning (reasoning_effort none); https://docs.deepinfra.com/chat/overview#fail-fast",
+      "verified_at": "2026-11-07T13:38:59+00:00"
+    }
+  }
+}
