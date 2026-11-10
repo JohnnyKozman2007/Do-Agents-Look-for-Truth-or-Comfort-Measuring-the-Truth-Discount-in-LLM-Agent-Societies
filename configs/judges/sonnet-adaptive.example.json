@@ -24,7 +24,7 @@
     }
   },
   "settings": {
-    "max_tokens": 1024,
+    "max_tokens": 4096,
     "thinking": {
       "type": "adaptive"
     },

@@ -23,6 +23,8 @@ from .contracts import clone, digest, usage_totals
 from .budget import money
 from .execution import (_atomic_json, load_provider_manifest, plan,
                         validate_backend)
+from .simulation_artifacts import (durable_mkdir, generation_source_hashes,
+                                   sync_directory as _sync_directory)
 
 
 ALLOCATION_VERSION = "pair-stratified-round-robin-v1"
@@ -90,9 +92,8 @@ def simulation_plan(config: dict, providers: dict, runs: list[dict],
 
 
 def _source_hashes() -> dict[str, str]:
-    import hashlib
-    return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in sorted(Path(__file__).parent.glob("*.py"))}
+    # Same generation-only, line-ending-normalized fingerprint as each sealed bundle.
+    return generation_source_hashes()
 
 
 def _runtime() -> dict[str, str]:
@@ -100,24 +101,8 @@ def _runtime() -> dict[str, str]:
             "platform": sys.platform}
 
 
-def _sync_directory(path: Path) -> None:
-    if os.name != "nt":
-        descriptor = os.open(path, os.O_RDONLY)
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-
-
 def _durable_mkdir(path: Path, *, exist_ok: bool = False) -> None:
-    missing, current = [], path
-    while not current.exists():
-        missing.append(current)
-        current = current.parent
-    path.mkdir(parents=True, exist_ok=exist_ok)
-    for directory in missing:
-        _sync_directory(directory)
-        _sync_directory(directory.parent)
+    durable_mkdir(path, exist_ok=exist_ok)
 
 
 def _archive_partial(output: Path, directory: Path) -> str:
@@ -208,6 +193,8 @@ def review_simulations(roots: Path | list[Path]) -> dict[str, Any]:
     seen_runs, routes, files, configs, kinds = set(), {}, None, set(), set()
     town_count, completed_count, phone_count = 0, 0, 0
     pair_counts, aggregated_usage = Counter(), {}
+    # Failed attempts, current or archived, so selection by success is visible.
+    failed_by_cell, failed_by_status = Counter(), Counter()
     reports, selections, runtimes = [], set(), {}
     allocated, source_total, allocation_seen = set(), None, set()
     for root in roots:
@@ -264,6 +251,9 @@ def review_simulations(roots: Path | list[Path]) -> dict[str, Any]:
                 completed_count += 1
                 pair_counts[town["pair_id"]] += 1
                 phone_count += len(town["scene_5_phone_transcripts"])
+            else:
+                failed_by_cell[str(town["cell_id"])] += 1
+                failed_by_status[town["run_status"]] += 1
             # Keep one town in memory at a time; actor histories can be large.
             usage = usage_totals(town["calls"], town["evidence_kind"])
             for key, value in usage.items():
@@ -280,7 +270,10 @@ def review_simulations(roots: Path | list[Path]) -> dict[str, Any]:
         for path in archived:
             if path.name not in expected or path.is_symlink():
                 raise ValueError("unplanned archived simulation attempt")
-            _audit_expected(path, info, expected[path.name])
+            past = _audit_expected(path, info, expected[path.name])
+            if past["generation_status"] != "completed":
+                failed_by_cell[str(past["cell_id"])] += 1
+                failed_by_status[past["run_status"]] += 1
         reports.append({"root": str(root), "planned_towns": len(expected),
                         "completed_towns": len(completed), "missing_run_ids": sorted(set(expected) - present),
                         "incomplete_run_ids": sorted(present - completed), "archived_attempts": len(archived),
@@ -293,15 +286,24 @@ def review_simulations(roots: Path | list[Path]) -> dict[str, Any]:
              for k, v in aggregated_usage.items()}
     if next(iter(kinds)) != "synthetic_fixture":
         usage["cost_status"] = "known" if usage.get("cost_usd") is not None else "unknown"
-    return {"status": "generation_complete" if completed_count == len(allocated) else "generation_incomplete",
+    full_allocation = source_total is not None and len(allocated) == source_total
+    # Supplied shards can all be finished while other shards of the study are absent.
+    if completed_count != len(allocated):
+        status = "generation_incomplete"
+    else:
+        status = "generation_complete" if full_allocation else "shards_complete"
+    return {"status": status,
             "evidence_kind": next(iter(kinds)), "study_eligible": False,
             "study_results_generated": False, "evaluation_status": "pending",
             "towns": town_count, "completed_towns": completed_count,
             "completed_pairs": sum(n == 2 for n in pair_counts.values()),
             "unpaired_completed_pair_ids": sorted(p for p, n in pair_counts.items() if n != 2),
             "planned_towns": len(allocated), "source_selection_towns": source_total,
-            "full_allocation_present": source_total is not None and len(allocated) == source_total,
+            "full_allocation_present": full_allocation,
             "phone_transcripts": phone_count,
+            "failed_generation_attempts": sum(failed_by_cell.values()),
+            "failed_generation_attempts_by_cell": dict(sorted(failed_by_cell.items(), key=lambda x: int(x[0]))),
+            "failed_generation_attempts_by_status": dict(sorted(failed_by_status.items())),
             "judge_calls": 0, "metrics_available": False, "collections": reports,
             "runtime_profiles": [runtimes[k] for k in sorted(runtimes)],
             "runtime_variation": len(runtimes) > 1,
@@ -311,11 +313,13 @@ def review_simulations(roots: Path | list[Path]) -> dict[str, Any]:
 async def collect_simulations(config: dict, providers: dict, runs: list[dict], output: Path,
                               backend, *, allocation: dict | None = None, resume: bool = False,
                               max_concurrent_towns: int = 1, execution_authorized: bool = False,
-                              spending_authorized: bool = False) -> dict:
+                              spending_authorized: bool = False, regenerate_failed: bool = False) -> dict:
     from .artifacts import archived_attempt_paths
     from .runner import run_town
     if execution_authorized is not True or spending_authorized is not True:
         raise ValueError("simulation execution and spending authorization are required; hold remains")
+    if type(regenerate_failed) is not bool:
+        raise ValueError("regenerate_failed must be a boolean")
     output = Path(output)
     if type(max_concurrent_towns) is not int or not 1 <= max_concurrent_towns <= 16:
         raise ValueError("max-concurrent-towns must be an integer from 1 to 16")
@@ -367,6 +371,11 @@ async def collect_simulations(config: dict, providers: dict, runs: list[dict], o
         else:
             partial.append(path)
             pending.append(run)
+    if partial and not regenerate_failed:
+        # Rerunning only failed towns keeps a success-selected sample, so it
+        # must be an explicit, logged choice rather than a side effect of resume.
+        raise ValueError(f"{len(partial)} sealed failed generation(s), e.g. {partial[0].name}; "
+                         "rerun them only with explicit regenerate_failed (--regenerate-failed)")
     # No judge route, judge key or judge preflight is needed at this stage.
     if pending:
         validate_backend(config, pending, backend, include_judge=False)
@@ -384,6 +393,7 @@ async def collect_simulations(config: dict, providers: dict, runs: list[dict], o
         with (output / "resume_log.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps({"resumed_utc": datetime.now(timezone.utc).isoformat(),
                                      "skipped_run_ids": skipped, "archived": set_aside,
+                                     "regenerate_failed": regenerate_failed,
                                      "pending_towns": len(pending)}) + "\n")
             stream.flush()
             os.fsync(stream.fileno())

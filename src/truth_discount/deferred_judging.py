@@ -24,6 +24,7 @@ from .contracts import GenerationRequest, GenerationResponse, canonical_bytes, c
 from .execution import _atomic_json
 from .providers import ProviderBackend
 from .scoring import LABELS, make_judge_input, paired_metrics, parse_judge_response, town_metrics
+from .simulation_artifacts import durable_mkdir, source_sha256
 
 VERSION = "truth-discount-deferred-judging-1"
 PARSER_VERSION = "legacy-label-quote-v1"
@@ -34,8 +35,12 @@ _PROFILE_FIELDS = {"version", "profile_id", "approved", "model_key", "provider_m
 
 
 def parser_sha256() -> str:
-    """Fingerprint the unchanged parser implementation, not a guessed version."""
-    return hashlib.sha256(Path(scoring.__file__).read_bytes()).hexdigest()
+    """Fingerprint the unchanged parser implementation, not a guessed version.
+
+    Line endings are normalized so a Windows (CRLF) checkout of the same
+    commit matches the LF hash pinned in the judge profiles.
+    """
+    return source_sha256(Path(scoring.__file__))
 
 
 def _unique(pairs):
@@ -288,10 +293,7 @@ def _source(source_root, profile: dict) -> tuple[dict, list[dict], dict[str, Pat
         raise ValueError("source collections belong to different approved allocations")
     if len({x["item_id"] for x in items}) != len(items):
         raise ValueError("duplicate grading item ID")
-    judge_route = profile["provider_manifest"]["routes"][profile["model_key"]]
-    if any(route.get("provider") == judge_route["provider"] and route.get("model_id") == judge_route["model_id"]
-           for route in actor_routes.values()):
-        raise ValueError("judge model must be independent of the simulation actors")
+    _check_judge_independent(actor_routes, profile)
     binding = {"config_sha256": common_config, "evidence_kind": common_evidence,
                "source_format": profile["source_format"], "actor_routes": actor_routes,
                "generation_implementation_sha256": common_implementation,
@@ -299,6 +301,13 @@ def _source(source_root, profile: dict) -> tuple[dict, list[dict], dict[str, Pat
                "collections": sorted(collections, key=digest),
                "towns": [sources[k] for k in sorted(sources)]}
     return binding, sorted(items, key=lambda x: x["item_id"]), directories
+
+
+def _check_judge_independent(actor_routes: dict, profile: dict) -> None:
+    judge_route = profile["provider_manifest"]["routes"][profile["model_key"]]
+    if any(route.get("provider") == judge_route["provider"] and route.get("model_id") == judge_route["model_id"]
+           for route in actor_routes.values()):
+        raise ValueError("judge model must be independent of the simulation actors")
 
 
 def _unchanged(directory: Path, entry: dict) -> None:
@@ -324,9 +333,16 @@ def make_judge_selection(source_root, profile: dict, item_ids: list[str], *, app
             "item_ids": sorted(item_ids), "items_sha256": digest(selected)}
 
 
-def plan_judging(source_root, profile: dict) -> dict:
+def plan_judging(source_root, profile: dict, *, audited: tuple | None = None) -> dict:
+    """Plan one profile. `audited` reuses a `_source` result from this same call path,
+    so a single command replays each source town once instead of once per check."""
     profile = _profile(profile)
-    source, full_items, _ = _source(source_root, profile)
+    if audited is not None:
+        if audited[0]["source_format"] != profile["source_format"]:
+            raise ValueError("reused source audit has a different source format")
+        # The per-profile independence check still runs for a reused audit.
+        _check_judge_independent(audited[0]["actor_routes"], profile)
+    source, full_items, _ = audited if audited is not None else _source(source_root, profile)
     items = full_items
     errors = []
     if not profile["approved"]:
@@ -357,7 +373,7 @@ def plan_judging(source_root, profile: dict) -> dict:
     rules = sum(profile["population"] == "historical_funnel" and x["funnel_trigger_step"] is None for x in items)
     implementation = {"version": VERSION,
         "runtime": {"python": sys.version.split()[0], "implementation": platform.python_implementation()},
-        "source_files_sha256": {name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest()
+        "source_files_sha256": {name: source_sha256(Path(__file__).parent / name)
                                 for name in ("deferred_judging.py", "providers.py", "contracts.py", "scoring.py")}}
     return {"version": VERSION, "status": "blocked" if errors else "ready_for_access_validation",
             "judging_implementation": implementation,
@@ -596,15 +612,29 @@ def _paths(output: Path, profile: dict) -> tuple[Path, Path, Path, Path]:
     return directory, directory / "judging_plan.json", directory / "attempts.jsonl", directory / "budget_checkpoint.json"
 
 
-def _verify_saved(source_root, output: Path, profile: dict | None = None) -> tuple[dict, list[dict]]:
+def _without_runtime(implementation):
+    if not isinstance(implementation, dict):
+        return implementation
+    return {k: v for k, v in implementation.items() if k != "runtime"}
+
+
+def _verify_saved(source_root, output: Path, profile: dict | None = None, *,
+                  candidate: dict | None = None, strict_runtime: bool = True) -> tuple[dict, list[dict]]:
+    """Check a saved plan and journal. Resume binds the exact interpreter build;
+    a read-only replay (strict_runtime=False) only reports a different build,
+    because every saved judgment is recomputed from its stored response."""
     if profile is None:
         raise ValueError("replay requires the explicit judge profile")
     profile = _profile(profile)
     _, path, journal, anchor = _paths(output, profile)
     info = _json(path.read_bytes())
-    candidate = plan_judging(source_root, profile)
+    if candidate is None:
+        candidate = plan_judging(source_root, profile)
     for key in candidate:
-        if info.get(key) != candidate[key]:
+        saved, current = info.get(key), candidate[key]
+        if key == "judging_implementation" and not strict_runtime:
+            saved, current = _without_runtime(saved), _without_runtime(current)
+        if saved != current:
             raise ValueError("saved judging source/profile differs from the frozen plan: " + key)
     if set(info) != set(candidate) | {"evidence_kind", "ledger_binding"}:
         raise ValueError("unexpected frozen judging plan fields")
@@ -618,10 +648,19 @@ def _verify_saved(source_root, output: Path, profile: dict | None = None) -> tup
     return info, events
 
 
-def replay_judging(source_root, output: Path, profile: dict | None = None) -> dict:
+def replay_judging(source_root, output: Path, profile: dict | None = None, *,
+                   audited: tuple | None = None) -> dict:
     """Read-only strict replay. Never opens the original ledger or credentials."""
-    info, events = _verify_saved(source_root, output, profile)
-    return _summary(info, events)
+    candidate = plan_judging(source_root, profile, audited=audited) if profile is not None else None
+    info, events = _verify_saved(source_root, output, profile, candidate=candidate, strict_runtime=False)
+    return _with_runtime(_summary(info, events), info, candidate)
+
+
+def _with_runtime(result: dict, info: dict, candidate: dict) -> dict:
+    planned = (info.get("judging_implementation") or {}).get("runtime")
+    replayed = candidate["judging_implementation"]["runtime"]
+    return {**result, "replay_runtime": {"planned": planned, "replay": replayed,
+                                         "matches_plan": planned == replayed}}
 
 
 async def _judge_collection(source_root, output: Path, profile: dict, backend, *, resume: bool = False,
@@ -639,7 +678,9 @@ async def _judge_collection(source_root, output: Path, profile: dict, backend, *
         if type(value) is not bool:
             raise ValueError("resume and retry choices must be booleans")
     profile = _profile(profile)
-    candidate = plan_judging(source_root, profile)
+    # Audit (replay) every source town once for this whole invocation.
+    audited = _source(source_root, profile)
+    candidate = plan_judging(source_root, profile, audited=audited)
     if candidate["execution_gates"]:
         raise ValueError("; ".join(candidate["execution_gates"]))
     if digest(backend.manifest) != digest(profile["provider_manifest"]):
@@ -656,7 +697,7 @@ async def _judge_collection(source_root, output: Path, profile: dict, backend, *
     cp = ledger.checkpoint()
     binding = {k: cp[k] for k in ("ledger_id", "limit_usd")}
     if resume:
-        info, events = _verify_saved(source_root, output, profile)
+        info, events = _verify_saved(source_root, output, profile, candidate=candidate)
         if info["ledger_binding"] != binding or info["evidence_kind"] != backend.evidence_kind:
             raise ValueError("resume requires original ledger identity, fixed cap and evidence kind")
         ledger.verify_checkpoint(_json(anchor.read_bytes())["ledger_checkpoint"])
@@ -668,7 +709,7 @@ async def _judge_collection(source_root, output: Path, profile: dict, backend, *
     if ledger.summary()["blocked"]:
         raise ValueError("bound ledger has unresolved charges or storage failure; no calls may resume")
     histories = _fold(info, events) if resume else {x["item_id"]: [] for x in info["items"]}
-    _, _, directories = _source(source_root, profile)
+    directories = audited[2]
     source_entries = {x["run_id"]: x for x in info["source"]["towns"]}
     pending = []
     for item in info["items"]:
@@ -750,7 +791,12 @@ async def _judge_collection(source_root, output: Path, profile: dict, backend, *
             _provider_receipt(call, profile["provider_manifest"])
     finally:
         ledger.set_checkpoint_callback(None)
-    result = replay_judging(source_root, output, profile)
+    # Sources were fully audited once above; confirm no bound file changed since,
+    # then strictly re-verify the plan, checkpoint and journal.
+    for run_id, source_directory in directories.items():
+        _unchanged(source_directory, source_entries[run_id])
+    final_info, final_events = _verify_saved(source_root, output, profile, candidate=candidate)
+    result = _with_runtime(_summary(final_info, final_events), final_info, candidate)
     return {**result, "profile_output": str(directory), "resumed": resume,
             "budget_accounting": {"scope": "entire_original_bound_ledger", "ledger_id": binding["ledger_id"],
                                   "budget": ledger.summary(), "billing_verified": False}}
@@ -777,23 +823,24 @@ def _writer_lock(path: Path):
     try:
         yield
     finally:
-        stream.close()
+        # Release explicitly: Windows frees a closed handle's byte locks only
+        # asynchronously, so an immediate rerun could be refused otherwise.
+        try:
+            if os.name == "nt":
+                import msvcrt
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+        finally:
+            stream.close()
 
 
 def _durable_mkdir(path: Path, *, exist_ok: bool = True) -> None:
-    missing = []
-    candidate = path
-    while not candidate.exists():
-        missing.append(candidate)
-        candidate = candidate.parent
-    path.mkdir(parents=True, exist_ok=exist_ok)
-    if os.name != "nt":
-        for created in reversed(missing):
-            descriptor = os.open(created.parent, os.O_RDONLY)
-            try:
-                os.fsync(descriptor)
-            finally:
-                os.close(descriptor)
+    durable_mkdir(path, exist_ok=exist_ok)
 
 
 async def judge_collection(source_root, output: Path, profile: dict, backend, *, resume: bool = False,
@@ -819,8 +866,14 @@ def compare_judgments(source_root, collections: list[tuple[Path, dict]]) -> dict
     """Read-only matched profile agreement, never human correctness or gold."""
     if not isinstance(collections, list) or len(collections) < 2:
         raise ValueError("comparison requires at least two explicit profile outputs")
-    reports = [replay_judging(source_root, output, profile) for output, profile in collections]
     profiles = [_profile(profile) for _, profile in collections]
+    # Audit the shared source once per source format, not once per profile.
+    audited = {}
+    for profile in profiles:
+        if profile["source_format"] not in audited:
+            audited[profile["source_format"]] = _source(source_root, profile)
+    reports = [replay_judging(source_root, output, profile, audited=audited[profile["source_format"]])
+               for (output, _), profile in zip(collections, profiles)]
     if len({x["profile_id"] for x in reports}) != len(reports):
         raise ValueError("comparison profile IDs must be unique")
     if len({x["source_sha256"] for x in reports}) != 1 or len({p["population"] for p in profiles}) != 1:

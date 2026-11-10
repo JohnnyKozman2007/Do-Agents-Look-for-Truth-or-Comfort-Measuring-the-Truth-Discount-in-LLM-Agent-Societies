@@ -73,8 +73,12 @@ not independently authenticate provider weights or invoices.
 
 Resume uses the original command plus `--resume`, the same output directory,
 the original ledger and its fixed cap. It skips verified completed generations.
-Auditable incomplete attempts are retained under `_incomplete` before a new
-attempt is started. Judge failures never trigger actor regeneration.
+If a sealed town failed (timeout, malformed reply, provider error), resume stops
+and names it. Rerunning failed towns keeps only successful attempts, so it needs
+the explicit `--regenerate-failed` flag; each failed attempt is retained under
+`_incomplete`, logged in `resume_log.jsonl`, and counted per cell and status by
+`simulation-status` (`failed_generation_attempts_by_cell`), so the analysis can
+report it. Judge failures never trigger actor regeneration.
 
 For a custody transfer:
 
@@ -99,6 +103,13 @@ review rather than deleting it and paying to start over unnoticed.
 truth-discount simulation-status outputs/main-owner-0
 truth-discount simulation-status outputs/main-owner-0 outputs/main-owner-1
 ```
+
+Status reads `generation_complete` only when every shard of the allocation is
+supplied and finished; finished shards without the rest read `shards_complete`.
+Source versions are fingerprinted over the generation modules only (actor,
+config, provider, contract, budget, scoring and bundle code) with line endings
+normalized, so Windows and macOS/Linux checkouts of one commit match and later
+CLI or judging edits do not block resume.
 
 Cross-shard review rejects overlapping allocations, duplicates, incompatible
 configs, source versions and used actor routes. Only the local credential

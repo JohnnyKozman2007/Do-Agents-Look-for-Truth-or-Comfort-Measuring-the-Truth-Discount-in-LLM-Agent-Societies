@@ -102,6 +102,8 @@ def _parser() -> argparse.ArgumentParser:
     simulation.add_argument("--ledger", type=Path)
     simulation.add_argument("--budget-usd", type=str, help="this shard ledger's fixed allocation, not the project total")
     simulation.add_argument("--resume", action="store_true")
+    simulation.add_argument("--regenerate-failed", action="store_true",
+                            help="on resume, archive sealed failed towns and run them again (logged)")
     simulation.add_argument("--max-concurrent-towns", type=int, default=1)
     simulation.add_argument("--execute", action="store_true")
     simulation.add_argument("--spending-authorized", action="store_true",
@@ -350,7 +352,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = asyncio.run(collect_simulations(
                     config, providers, runs, args.output, backend, allocation=allocation,
                     resume=args.resume, max_concurrent_towns=args.max_concurrent_towns,
-                    execution_authorized=True, spending_authorized=True))
+                    execution_authorized=True, spending_authorized=True,
+                    regenerate_failed=args.regenerate_failed))
                 _print_json({**result, "budget": ledger.summary()})
             return 0
         if args.command == "live":

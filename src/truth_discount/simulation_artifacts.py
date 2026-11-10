@@ -85,7 +85,23 @@ def _pending(town: dict) -> None:
              "diagnostic interpretation mismatch")
 
 
-def _sync_directory(directory: Path) -> None:
+# Only modules that shape actor requests, replies, receipts or saved bundles.
+# Collector, CLI and judging code may change without invalidating sealed shards.
+GENERATION_SOURCE_FILES = ("artifacts.py", "budget.py", "config.py", "contracts.py",
+                           "providers.py", "runner.py", "scoring.py", "simulation_artifacts.py")
+
+
+def source_sha256(path: Path) -> str:
+    """Hash source text with LF line endings, so CRLF and LF checkouts of one commit match."""
+    return hashlib.sha256(Path(path).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def generation_source_hashes() -> dict[str, str]:
+    here = Path(__file__).parent
+    return {name: source_sha256(here / name) for name in GENERATION_SOURCE_FILES}
+
+
+def sync_directory(directory: Path) -> None:
     # Windows does not support opening directories for fsync through os.open.
     if os.name != "nt":
         descriptor = os.open(directory, os.O_RDONLY)
@@ -93,6 +109,22 @@ def _sync_directory(directory: Path) -> None:
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
+
+
+_sync_directory = sync_directory
+
+
+def durable_mkdir(path: Path, *, exist_ok: bool) -> None:
+    """Create a directory and flush each newly created level and its parent."""
+    path = Path(path)
+    missing, current = [], path
+    while not current.exists():
+        missing.append(current)
+        current = current.parent
+    path.mkdir(parents=True, exist_ok=exist_ok)
+    for created in reversed(missing):
+        sync_directory(created)
+        sync_directory(created.parent)
 
 
 def save_simulation(directory: Path, town: dict, config: dict) -> None:
@@ -115,8 +147,7 @@ def save_simulation(directory: Path, town: dict, config: dict) -> None:
         _sync_directory(path.parent)
     _sync_directory(directory.parent)
     data = _exports(town, config)
-    sources = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-               for p in sorted(Path(__file__).parent.glob("*.py"))}
+    sources = generation_source_hashes()
     runtime = {"python": sys.version.split()[0], "implementation": sys.implementation.name,
                "platform": sys.platform}
     manifest = {"schema_version": SIMULATION_SCHEMA, "evidence_kind": town["evidence_kind"],
