@@ -90,9 +90,61 @@ def _parser() -> argparse.ArgumentParser:
     rejudge.add_argument("--attempts", type=int, default=3, help="tries per malformed call (1-5)")
     rejudge.add_argument("--execute", action="store_true")
     rejudge.add_argument("--spending-authorized", action="store_true")
+    simulation = commands.add_parser("simulate", help="preview or explicitly authorize generation without a judge")
+    simulation.add_argument("--providers", type=Path, required=True, help="approved actor routes; no judge key needed")
+    simulation.add_argument("--output", type=Path, required=True)
+    simulation.add_argument("--model-key", action="append", dest="model_keys")
+    simulation.add_argument("--pairs-per-cell", type=int, default=1)
+    simulation.add_argument("--start-pair", type=int, default=0)
+    simulation.add_argument("--all-pairs", action="store_true", help="all39 pairs per configured cell")
+    simulation.add_argument("--shard-count", type=int, default=1)
+    simulation.add_argument("--shard-index", type=int, default=0, help="zero-based owner index, 0..shard-count-1")
+    simulation.add_argument("--ledger", type=Path)
+    simulation.add_argument("--budget-usd", type=str, help="this shard ledger's fixed allocation, not the project total")
+    simulation.add_argument("--resume", action="store_true")
+    simulation.add_argument("--regenerate-failed", action="store_true",
+                            help="on resume, archive sealed failed towns and run them again (logged)")
+    simulation.add_argument("--max-concurrent-towns", type=int, default=1)
+    simulation.add_argument("--execute", action="store_true")
+    simulation.add_argument("--spending-authorized", action="store_true",
+                            help="only after the separate credit-use hold is explicitly released")
+    simulation.add_argument("--plan-out", type=Path, help="save the zero-call allocation plan to a new JSON file")
+    simulation_demo = commands.add_parser("simulation-demo", help="four synthetic actor-only towns, zero network")
+    simulation_demo.add_argument("--output", type=Path, required=True)
+    simulation_demo.add_argument("--mode", choices=("mixed", "all_skip", "silent"), default="mixed")
+    simulation_status = commands.add_parser("simulation-status", help="read-only replay and coverage across allocated shards")
+    simulation_status.add_argument("source_roots", type=Path, nargs="+")
+    judging = commands.add_parser("judge-saved", help="preview or separately authorize scoring sealed transcripts")
+    judging.add_argument("source_roots", type=Path, nargs="+")
+    judging.add_argument("--profile", type=Path, required=True)
+    judging.add_argument("--output", type=Path, required=True)
+    judging.add_argument("--ledger", type=Path)
+    judging.add_argument("--budget-usd", type=str)
+    judging.add_argument("--resume", action="store_true")
+    judging.add_argument("--retry-invalid", action="store_true", help="explicit repair; first and latest results stay separate")
+    judging.add_argument("--retry-failed", action="store_true", help="retry only after original unknown costs are reconciled")
+    judging.add_argument("--execute", action="store_true")
+    judging.add_argument("--spending-authorized", action="store_true")
+    judge_status = commands.add_parser("judge-status", help="read-only source-bound scoring replay")
+    judge_status.add_argument("source_roots", type=Path, nargs="+")
+    judge_status.add_argument("--output", type=Path, required=True)
+    judge_status.add_argument("--profile", type=Path, required=True)
+    compare_judges = commands.add_parser("compare-judges", help="compare source-matched first judgments; not human accuracy")
+    compare_judges.add_argument("source_roots", type=Path, nargs="+")
+    compare_judges.add_argument("--profile", type=Path, action="append", required=True,
+                               help="repeat once per judge, in the same order as --judge-output")
+    compare_judges.add_argument("--judge-output", type=Path, action="append", required=True)
+    panel = commands.add_parser("prepare-panel-judging", help="bind the exact blind human cases to an unapproved judge profile")
+    panel.add_argument("source_roots", type=Path, nargs="+")
+    panel.add_argument("--profile", type=Path, required=True)
+    panel.add_argument("--profile-id", required=True, help="new distinct candidate ID")
+    panel.add_argument("--panel", type=Path, required=True, help="existing blind human_labeling.csv; labels are ignored")
+    panel.add_argument("--source-format", choices=("simulation", "legacy_pilot"))
+    panel.add_argument("--population", choices=("historical_funnel", "all_phones"))
+    panel.add_argument("--out", type=Path, required=True, help="new local candidate JSON; approval remains false")
     # Accept --config before or after a planning/demo subcommand without resetting
     # a global value when the subcommand option is absent.
-    for command in (validate, manifest, demo, live):
+    for command in (validate, manifest, demo, live, simulation, simulation_demo):
         command.add_argument("--config", type=Path, default=argparse.SUPPRESS, help="explicit pilot JSON path")
     return parser
 
@@ -126,6 +178,58 @@ def main(argv: list[str] | None = None) -> int:
     """
     args = _parser().parse_args(argv)
     try:
+        if args.command == "prepare-panel-judging":
+            from .deferred_judging import load_judge_profile
+            from .judge_selection import panel_profile
+            if any(Path(root).resolve() in args.out.resolve().parents for root in args.source_roots):
+                raise ValueError("candidate profile output must be outside the immutable source roots")
+            profile = load_judge_profile(args.profile)
+            if args.source_format:
+                profile["source_format"] = args.source_format
+            if args.population:
+                profile["population"] = args.population
+            candidate, report = panel_profile(args.source_roots, profile, args.panel, args.profile_id)
+            with args.out.open("xb") as stream:
+                stream.write(canonical_bytes(candidate))
+            _print_json({**report, "profile_output": str(args.out)})
+            return 0
+        if args.command == "simulation-status":
+            from .simulation_execution import review_simulations
+            _print_json(review_simulations(args.source_roots))
+            return 0
+        if args.command == "compare-judges":
+            from .deferred_judging import load_judge_profile, compare_judgments
+            if len(args.profile) != len(args.judge_output):
+                raise ValueError("supply one --judge-output for each --profile")
+            selected = [(output, load_judge_profile(profile))
+                        for output, profile in zip(args.judge_output, args.profile)]
+            _print_json(compare_judgments(args.source_roots, selected))
+            return 0
+        if args.command in {"judge-saved", "judge-status"}:
+            from .deferred_judging import (load_judge_profile, plan_judging,
+                                           judge_collection, replay_judging)
+            profile = load_judge_profile(args.profile)
+            if args.command == "judge-status":
+                _print_json(replay_judging(args.source_roots, args.output, profile))
+                return 0
+            info = plan_judging(args.source_roots, profile)
+            if not args.execute:
+                _print_json(info)
+                return 0
+            if not args.spending_authorized:
+                raise ValueError("judging requires explicit release of the separate spending hold")
+            if not args.ledger or not args.budget_usd:
+                raise ValueError("judging requires --ledger and --budget-usd")
+            from .budget import BudgetLedger
+            from .providers import ProviderBackend
+            with BudgetLedger(args.ledger, args.budget_usd) as ledger:
+                backend = ProviderBackend(profile["provider_manifest"], ledger)
+                result = asyncio.run(judge_collection(
+                    args.source_roots, args.output, profile, backend, resume=args.resume,
+                    retry_invalid=args.retry_invalid, retry_failed=args.retry_failed,
+                    execution_authorized=True, spending_authorized=True))
+                _print_json({**result, "budget": ledger.summary()})
+            return 0
         if args.command == "summarize":
             _print_json(summarize(args.output_root))
             return 0
@@ -203,6 +307,55 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         config = load_config(args.config)
+        if args.command == "simulation-demo":
+            from .simulation_artifacts import audit_simulation
+            if args.output.exists():
+                raise FileExistsError("refusing existing simulation demo directory")
+            runs = [r for r in build_manifest(config) if r["cell_id"] == 1 and r["seed_id"] == 0]
+            args.output.mkdir(parents=True)
+            async def demonstrate():
+                for run in runs:
+                    await run_town(config, run, FixtureBackend(mode=args.mode), args.output,
+                                   defer_judging=True)
+            asyncio.run(demonstrate())
+            towns = [audit_simulation(args.output / run["run_id"]) for run in runs]
+            _print_json({"evidence_kind": "synthetic_fixture", "study_eligible": False,
+                         "towns": len(towns), "phone_transcripts": sum(len(t["scene_5_phone_transcripts"]) for t in towns),
+                         "evaluation_status": "pending", "judge_calls": 0, "provider_api_calls": 0,
+                         "output_root": str(args.output)})
+            return 0
+        if args.command == "simulate":
+            from .execution import load_provider_manifest, select_runs
+            from .simulation_execution import allocate_runs, simulation_plan, collect_simulations
+            providers = load_provider_manifest(args.providers)
+            selection = select_runs(config, args.model_keys, args.pairs_per_cell,
+                                    args.all_pairs, args.start_pair)
+            runs, allocation = allocate_runs(config, selection, shard_count=args.shard_count,
+                                               shard_index=args.shard_index)
+            info = simulation_plan(config, providers, runs, allocation)
+            if args.plan_out:
+                with args.plan_out.open("xb") as stream:
+                    stream.write(canonical_bytes(info))
+            if not args.execute:
+                _print_json(info)
+                return 0
+            if not args.spending_authorized:
+                raise ValueError("simulation execution requires explicit release of the spending hold")
+            if not args.ledger or not args.budget_usd:
+                raise ValueError("simulation execution requires --ledger and --budget-usd")
+            if info["execution_gates"]:
+                raise ValueError("; ".join(info["execution_gates"]))
+            from .budget import BudgetLedger
+            from .providers import ProviderBackend
+            with BudgetLedger(args.ledger, args.budget_usd) as ledger:
+                backend = ProviderBackend(providers, ledger)
+                result = asyncio.run(collect_simulations(
+                    config, providers, runs, args.output, backend, allocation=allocation,
+                    resume=args.resume, max_concurrent_towns=args.max_concurrent_towns,
+                    execution_authorized=True, spending_authorized=True,
+                    regenerate_failed=args.regenerate_failed))
+                _print_json({**result, "budget": ledger.summary()})
+            return 0
         if args.command == "live":
             from .execution import load_provider_manifest, select_runs, plan, collect
             providers = load_provider_manifest(args.providers)

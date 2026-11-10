@@ -26,9 +26,10 @@ from .contracts import (REJECTED_BEFORE_INFERENCE as _REJECTED_BEFORE_INFERENCE,
 
 
 class ProviderError(ValueError):
-    def __init__(self, message: str, receipt: dict | None = None):
+    def __init__(self, message: str, receipt: dict | None = None, native_response: dict | None = None):
         super().__init__(message)
         self.receipt = clone(receipt or {})
+        self.native_response = clone(native_response) if native_response is not None else None
 
 
 @dataclass(frozen=True)
@@ -50,7 +51,7 @@ _ROUTE_FIELDS = {"provider", "model_id", "endpoint", "api_key_env", "input_usd_p
     "max_output_parameter", "max_retries", "pricing_source", "settings_source", "verified_at",
     "fail_fast", "retry_backoff_seconds", "max_concurrent_requests"}
 _SETTING_FIELDS = {"temperature", "top_p", "max_tokens", "presence_penalty", "frequency_penalty",
-    "disable_thinking", "thinking", "structured_output", "use_batch_api", "scene", "scenes", "description"}
+    "disable_thinking", "thinking", "effort", "reasoning_effort", "structured_output", "use_batch_api", "scene", "scenes", "description"}
 _LABELS = ["FACT", "UNCERTAIN", "SKEPTICAL", "CHECKED_TRUE", "CHECKED_FALSE", "NOT_MENTIONED"]
 _ID = re.compile(r"[A-Za-z0-9_./:\-]{1,256}\Z")
 _ENV = re.compile(r"[A-Z_][A-Z0-9_]{0,127}\Z")
@@ -118,6 +119,18 @@ def _error_code(raw: bytes) -> str | None:
     error = body.get("error") if isinstance(body, dict) else None
     code = error.get("code") if isinstance(error, dict) else None
     return code if isinstance(code, str) and re.fullmatch(r"[a-z_]{1,64}", code) else None
+
+
+def _contains_credential(value, credential: str) -> bool:
+    """Never retain an echoed key, including in non-text native response fields."""
+    if isinstance(value, str):
+        return credential in value
+    if isinstance(value, dict):
+        return any(_contains_credential(k, credential) or _contains_credential(v, credential)
+                   for k, v in value.items())
+    if isinstance(value, list):
+        return any(_contains_credential(v, credential) for v in value)
+    return False
 
 
 class ProviderBackend:
@@ -279,14 +292,35 @@ class ProviderBackend:
                 raise ProviderError("only the declared thinking-disabled protocol is supported")
             body.update(self._thinking_parameters(route))
         if "thinking" in settings:
-            if settings["thinking"] != {"type": "disabled"}:
+            adaptive = settings["thinking"] == {"type": "adaptive"}
+            if settings["thinking"] != {"type": "disabled"} and not adaptive:
                 raise ProviderError("unsupported native thinking setting")
+            if adaptive and (provider != "Anthropic" or request.kind != "judge"):
+                raise ProviderError("adaptive thinking is supported only for explicitly configured Anthropic judges")
+            if adaptive and "disable_thinking" in settings:
+                raise ProviderError("adaptive thinking conflicts with disable_thinking")
             if provider == "Anthropic":
                 body["thinking"] = clone(settings["thinking"])
             else:
                 # The abstract judge setting must also be explicitly mapped for
                 # an approved nonreasoning or compatible OpenAI judge route.
                 body.update(self._thinking_parameters(route))
+        if "effort" in settings:
+            # Model support remains an operator-verified profile input. A model
+            # name alone never establishes access or compatible settings.
+            if (provider != "Anthropic" or request.kind != "judge"
+                    or settings.get("thinking") != {"type": "adaptive"}
+                    or not isinstance(settings["effort"], str)
+                    or settings["effort"] not in {"low", "medium", "high", "xhigh", "max"}):
+                raise ProviderError("effort requires an approved adaptive Anthropic judge profile")
+            body.setdefault("output_config", {})["effort"] = settings["effort"]
+        if "reasoning_effort" in settings:
+            if (provider != "OpenAI" or request.kind != "judge"
+                    or "thinking" in settings or "disable_thinking" in settings
+                    or not isinstance(settings["reasoning_effort"], str)
+                    or settings["reasoning_effort"] not in {"none", "low", "medium", "high", "xhigh", "max"}):
+                raise ProviderError("reasoning_effort requires an explicitly configured OpenAI judge profile")
+            body["reasoning_effort"] = settings["reasoning_effort"]
         execution_mode = "synchronous"
         if "use_batch_api" in settings:
             if type(settings["use_batch_api"]) is not bool:
@@ -304,7 +338,7 @@ class ProviderBackend:
             schema = {"type": "object", "properties": {"label": {"type": "string", "enum": _LABELS}, "quote": {"type": "string"}},
                       "required": ["label", "quote"], "additionalProperties": False}
             if provider == "Anthropic":
-                body["output_config"] = {"format": {"type": "json_schema", "schema": schema}}
+                body.setdefault("output_config", {})["format"] = {"type": "json_schema", "schema": schema}
             else:
                 body["response_format"] = {"type": "json_schema", "json_schema": {"name": "belief_judgment", "strict": True, "schema": schema}}
         # The declared framing allowance is conservative, not a tokenizer proof.
@@ -421,12 +455,17 @@ class ProviderBackend:
         return cost
 
     @staticmethod
-    def _text(body, provider):
+    def _text(body, provider, *, allow_thinking=False):
         if provider == "Anthropic":
             content = body.get("content")
-            if not isinstance(content, list) or not content or any(not isinstance(block, dict) or block.get("type") != "text" or not isinstance(block.get("text"), str) for block in content):
+            allowed = {"text", "thinking", "redacted_thinking"} if allow_thinking else {"text"}
+            if (not isinstance(content, list) or not content
+                    or any(not isinstance(block, dict) or block.get("type") not in allowed
+                           or (block.get("type") == "text" and not isinstance(block.get("text"), str))
+                           for block in content)
+                    or not any(block.get("type") == "text" for block in content)):
                 raise ProviderError("provider returned unsupported nontext or missing content")
-            return "".join(block["text"] for block in content)
+            return "".join(block["text"] for block in content if block["type"] == "text")
         choices = body.get("choices")
         if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
             raise ProviderError("provider returned malformed choices")
@@ -485,6 +524,7 @@ class ProviderBackend:
         receipt["attempts"].append(attempt)
         cost = None
         settled = False
+        native_response = None
         try:
             arguments = ("POST", route["endpoint"], headers, clone(body), route["timeout_seconds"])
             async def invoke():
@@ -510,6 +550,8 @@ class ProviderBackend:
                 raise ProviderError("provider returned a non-success HTTP status")
             if not isinstance(response.body, dict):
                 raise ProviderError("provider returned invalid JSON")
+            if request.kind == "judge" and not _contains_credential(response.body, key):
+                native_response = clone(response.body)
             receipt.pop("error_code", None)
             cost = self._usage(response.body, route, receipt)
             # Reported usage checks protect subsequent calls even if verified
@@ -518,7 +560,8 @@ class ProviderBackend:
                 cost = None
                 receipt.update(cost_usd=None, cost_status="unknown")
                 raise ProviderError("provider usage exceeded declared token bounds")
-            text = self._text(response.body, route["provider"])
+            text = self._text(response.body, route["provider"], allow_thinking=(
+                request.kind == "judge" and request.settings.get("thinking") == {"type": "adaptive"}))
             if key in text:
                 raise ProviderError("provider returned credential-bearing content")
             attempt["status"] = "completed"
@@ -526,7 +569,7 @@ class ProviderBackend:
             self.ledger.settle(reservation_id, cost, self._ledger_receipt(receipt))
             settled = True
             self._redact_receipt(receipt, key)
-            return GenerationResponse(text, clone(receipt))
+            return GenerationResponse(text, clone(receipt), native_response)
         except BaseException as error:
             attempt["status"] = "cancelled" if isinstance(error, asyncio.CancelledError) else "failed"
             receipt["error_code"] = "cancelled" if isinstance(error, asyncio.CancelledError) else "request_failed"
@@ -544,7 +587,8 @@ class ProviderBackend:
                 error.receipt = clone(receipt)
                 raise
             # Never interpolate a transport exception, HTTP body, key or headers.
-            raise ProviderError("provider request failed; consult the sanitized receipt", receipt) from None
+            raise ProviderError("provider request failed; consult the sanitized receipt", receipt,
+                                native_response=native_response) from None
 
     @staticmethod
     def _rejected_before_inference(route, response) -> bool:

@@ -37,3 +37,23 @@ After a run, [pilot analysis and the judge audit](docs/08_analysis_and_audit.md)
 Use the [finished-pilot workflow](docs/11_finished_pilot_review.md) to check the exported plan, missing towns and saved costs before analysis. It also explains the separate smoke/main-batch coverage and human-label handoff.
 
 The [judge-validation workflow](docs/12_judge_validation_plan.md) prepares an offline inventory and separate blind calibration sample that includes rule-coded omissions. The proposed controls remain unapproved and make no model calls.
+
+## Generation without a judge
+
+The [staged collection and handover guide](docs/13_deferred_judging_and_handover.md)
+describes `simulate`, `simulation-status`, `judge-saved`, `judge-status` and
+`compare-judges`. Simulation-only output preserves all twelve phone calls with
+pending evaluations; later judge profiles save separate, source-bound results.
+The existing actor prompts, phone branching and historical scored bundles are
+unchanged.
+
+The 9,984-town main plan can be allocated into six disjoint shards of 1,664 towns,
+keeping truth/rumour pairs together. Resume preserves completed generations,
+original ledger identity/cap and every archived attempt. Different native judge
+profiles can score the same sealed phones without generating towns again.
+
+Candidate profiles in `configs/judges/` are deliberately unapproved and have no
+verified prices or account access. The new commands preview by default; paid
+execution requires separate explicit authority. Offline tests and synthetic
+demonstrations do not establish a real smoke test, completed human audit, main
+collection or paper result.
