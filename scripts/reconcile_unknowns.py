@@ -5,6 +5,9 @@ Usage: python scripts/reconcile_unknowns.py EXISTING_LEDGER FIXED_CAP OUTPUT [OU
 Preview replays a temporary journal copy. Unpriced, ambiguous or unbound charges
 remain held. Calculated token costs are not invoice verification; manual billed
 reconciliation remains available through the ordinary ledger CLI.
+
+OUTPUT may be a legacy scored collection (`live`) or a sealed simulation-only
+collection (`simulate`); each is audited against its own saved plan.
 """
 from __future__ import annotations
 
@@ -47,6 +50,40 @@ def _snapshot(root: Path) -> dict:
     return result
 
 
+def _is_simulation(root: Path) -> bool:
+    try:
+        plan = json.loads((root / "execution_plan.json").read_bytes())
+    except (OSError, ValueError):
+        return False
+    return isinstance(plan, dict) and plan.get("execution_mode") == "simulation_only"
+
+
+def _audited_towns(root: Path, directories: list[Path]) -> tuple[dict, list[dict], dict]:
+    """Audit every saved attempt against its own plan: legacy scored or sealed simulation."""
+    if _is_simulation(root):
+        from truth_discount.simulation_execution import _audit_expected as _simulation_expected, _read_plan
+        saved = _read_plan(root)  # Also checks plan hashes and the checkpoint's ledger binding.
+        runs = {run["run_id"]: run for run in saved["runs"]}
+        towns = []
+        for directory in directories:
+            if directory.name not in runs:
+                raise ValueError("saved attempt is outside its execution plan")
+            towns.append(_simulation_expected(directory, saved, runs[directory.name]))
+        return saved, towns, saved["provider_manifest"]
+    towns = [audit_town(path) for path in directories]
+    config = load_config(directories[0] / "config.json")
+    saved = _validated_plan(root, towns, config)
+    if saved is None:
+        raise ValueError("saved execution plan belongs to another ledger or fixed cap")
+    providers = towns[0]["execution_manifest"]
+    runs = {run["run_id"]: run for run in saved["runs"]}
+    for directory in directories:
+        if directory.name not in runs:
+            raise ValueError("saved attempt is outside its execution plan")
+        _audit_expected(directory, config, providers, runs[directory.name], saved["evidence_kind"])
+    return saved, towns, providers
+
+
 def _bound_evidence(outputs: list[Path], ledger: BudgetLedger) -> tuple[list, list]:
     records, collections = [], []
     binding = {key: ledger.checkpoint()[key] for key in ("ledger_id", "limit_usd")}
@@ -56,23 +93,16 @@ def _bound_evidence(outputs: list[Path], ledger: BudgetLedger) -> tuple[list, li
         directories += archived_attempt_paths(root)
         if not directories:
             raise ValueError("no auditable saved attempts in output collection")
-        towns = [audit_town(path) for path in directories]
-        config = load_config(directories[0] / "config.json")
-        saved = _validated_plan(root, towns, config)
-        if saved is None or saved["ledger_binding"] != binding:
+        saved, towns, providers = _audited_towns(root, directories)
+        if saved["ledger_binding"] != binding:
             raise ValueError("saved execution plan belongs to another ledger or fixed cap")
         anchor = load_provider_manifest(root / "budget_checkpoint.json")
         if set(anchor) != {"execution_plan_sha256", "ledger_checkpoint"} or anchor["execution_plan_sha256"] != digest(saved):
             raise ValueError("saved budget checkpoint differs from execution plan")
         ledger.verify_checkpoint(anchor["ledger_checkpoint"])
-        runs = {run["run_id"]: run for run in saved["runs"]}
-        providers = towns[0]["execution_manifest"]
         backend = ProviderBackend(providers, ledger, transport=lambda *args: None,
                                   evidence_kind=saved["evidence_kind"])
-        for directory, town in zip(directories, towns):
-            if directory.name not in runs:
-                raise ValueError("saved attempt is outside its execution plan")
-            _audit_expected(directory, config, providers, runs[directory.name], saved["evidence_kind"])
+        for town in towns:
             for call in town["calls"]:
                 receipt = call.get("token_usage")
                 if not isinstance(receipt, dict):
