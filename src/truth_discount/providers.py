@@ -21,7 +21,8 @@ import urllib.error
 import urllib.request
 
 from .budget import BudgetError, BudgetLedger, money
-from .contracts import (REJECTED_BEFORE_INFERENCE as _REJECTED_BEFORE_INFERENCE, GenerationRequest,
+from .contracts import (RATE_LIMITED_BEFORE_INFERENCE as _RATE_LIMITED,
+                        REJECTED_BEFORE_INFERENCE as _REJECTED_BEFORE_INFERENCE, GenerationRequest,
                         GenerationResponse, canonical_bytes, clone, digest)
 
 
@@ -538,8 +539,8 @@ class ProviderBackend:
             if not isinstance(response, HTTPResponse) or type(response.status_code) is not int:
                 raise ProviderError("transport returned an invalid response")
             attempt["http_status"] = response.status_code
-            if self._rejected_before_inference(route, response):
-                code = _REJECTED_BEFORE_INFERENCE[route["provider"]]
+            code = self._rejected_before_inference(route, response)
+            if code:
                 attempt.update(status="rejected", error_code=code)
                 receipt.update(cost_usd=0.0, cost_status="rejected_before_inference", error_code=code)
                 self._redact_receipt(receipt, key)
@@ -591,12 +592,18 @@ class ProviderBackend:
                                 native_response=native_response) from None
 
     @staticmethod
-    def _rejected_before_inference(route, response) -> bool:
-        """Only the provider's documented fail-fast capacity rejection is known to be free."""
+    def _rejected_before_inference(route, response) -> str | None:
+        """Return the code of a free pre-inference 429 on a fail-fast route, else None.
+
+        DeepInfra's fail-fast `engine_overloaded` and its plain "Rate limited" 429 are both
+        refused before inference. Every other status, provider or route stays held.
+        """
         expected = _REJECTED_BEFORE_INFERENCE.get(route["provider"])
+        if route.get("fail_fast") is not True or expected is None or response.status_code != 429:
+            return None
         error = response.body.get("error") if isinstance(response.body, dict) else None
-        return (route.get("fail_fast") is True and expected is not None and response.status_code == 429
-                and isinstance(error, dict) and error.get("code") == expected)
+        code = error.get("code") if isinstance(error, dict) else None
+        return expected if code == expected else _RATE_LIMITED.get(route["provider"])
 
     @staticmethod
     def _redact_receipt(receipt, key):

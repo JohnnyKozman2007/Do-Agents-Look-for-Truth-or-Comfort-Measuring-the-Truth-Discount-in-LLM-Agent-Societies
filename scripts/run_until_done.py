@@ -1,8 +1,8 @@
 """Keep a collection going through provider busy spells and isolated unclear charges.
 
-DeepInfra sometimes turns requests away for a minute or more ("engine_overloaded"). Those
-rejections are free and leave the ledger unblocked, but once a call has used all its retries
-the run stops. This wrapper waits, then resumes, and repeats.
+DeepInfra sometimes turns requests away for a minute or more ("engine_overloaded" or a plain
+"Rate limited" 429). Those rejections are free and leave the ledger unblocked, but once a call
+has used all its retries the run stops. This wrapper waits, then resumes, and repeats.
 
 A dropped connection or timeout leaves an unclear charge that blocks the ledger by design.
 With --auto-reconcile, the wrapper may use scripts/reconcile_unknowns.py to recover an audited
