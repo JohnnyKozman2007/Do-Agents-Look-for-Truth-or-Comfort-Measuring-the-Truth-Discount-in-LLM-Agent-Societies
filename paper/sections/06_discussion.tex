@@ -1,0 +1,16 @@
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+\subsection{Social Comfort as an Epistemic Friction in Agent Societies}
+Our findings demonstrate that multi-agent LLM systems exhibit a systematic Truth Discount driven by social comfort and authority deference. When autonomous agents are placed in conversational settings, their default objective appears heavily shaped by conversational agreeableness and cooperative alignment. While conversational cooperativeness is a desirable property for interactive assistants, it functions as a severe epistemic vulnerability in multi-agent networks, where rumors propagate unchecked because agents actively avoid the friction of skeptical inquiry or public contradiction.
+
+This behavior likely reflects downstream artifacts of reinforcement learning from human feedback (RLHF), which heavily rewards conversational politeness, deference to authoritative personas, and avoidance of confrontational rebuttals. In decentralized multi-agent deployments (e.g., autonomous trading desks, civic simulations, intelligence analysis), this tendency towards artificial consensus poses tangible risks: errors and unsubstantiated rumors originating from high-status nodes will systematically propagate with minimal organic resistance.
+
+\subsection{Limitations and Boundary Conditions}
+We explicitly acknowledge several design limitations that bound the scope of our conclusions:
+\begin{itemize}
+    \item \textbf{Fixed Verification Cost:} In our study, verification was offered at a single fixed cost ($c = \$5$ from a $\$40$ budget). While this establishes that agents make non-trivial economic trade-offs, our design does not trace the complete elasticity curve of verification demand across variable price points or asymmetric penalties.
+    \item \textbf{Domain Specificity:} The experimental scenario focuses on community cultural events (free pop concerts). While this provides clean, emotionally balanced semantic mirroring, epistemic dynamics may diverge in high-stakes domains (e.g., medical misinformation, financial forecasts, crisis management) where agents might be prompted with specialized duty-of-care constraints.
+    \item \textbf{Network Scale and Depth:} The current town architecture models twelve agents across two conversational hops. Although this captures the critical transition from direct listeners to secondary observers, larger macroscopic networks with cyclic topologies or broadcasting channels may exhibit non-linear cascading behaviors or echo-chamber entrenchment.
+    \item \textbf{Pilot Scope vs.\ Full Factorial Space:} Our empirical findings are derived from a pre-registered four-cell pilot exploration ($N=624$ town executions per model). While these comparisons isolate key orthogonal contrasts in closeness and authority, the full 64-cell factorial landscape remains an objective for scaled future collection.
+\end{itemize}

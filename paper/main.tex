@@ -1,0 +1,72 @@
+\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
+\usepackage[submission]{aaai2027}  % DO NOT CHANGE THIS
+\usepackage[hyphens]{url}  % DO NOT CHANGE THIS
+\usepackage{graphicx} % DO NOT CHANGE THIS
+\urlstyle{rm} % DO NOT CHANGE THIS
+\def\UrlFont{\rm}  % DO NOT CHANGE THIS
+\usepackage{natbib}  % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\frenchspacing  % DO NOT CHANGE THIS
+\usepackage{amsmath,amssymb,booktabs}
+
+% PDF Metadata (Do not add /Title or /Author tags during anonymous submission)
+\pdfinfo{
+/TemplateVersion (2027.1)
+}
+
+% Section Numbering (AAAI supports 1 or 2; level 3 is not supported)
+\setcounter{secnumdepth}{2}
+
+\title{Do Agents Look for Truth or Comfort? Measuring the Truth Discount in LLM Agent Societies}
+
+\author{
+    Anonymous Submission
+}
+\affiliations{}
+
+\begin{document}
+
+\maketitle
+
+% 00. Abstract
+\input{sections/00_abstract.tex}
+
+% Optional: Anonymized Code and Artifact Repository Links (between abstract and Section 1)
+\begin{links}
+    \link{Code \& Reproducibility Repository}{https://anonymous.4open.science/r/truth-discount-agent-societies}
+    \link{Simulation Manifests \& Artifacts}{https://anonymous.4open.science/r/truth-discount-agent-societies/manifests}
+\end{links}
+
+% 01. Introduction
+\input{sections/01_introduction.tex}
+
+% 02. Related Work
+\input{sections/02_related_work.tex}
+
+% 03. Methodology
+\input{sections/03_methodology.tex}
+
+% 04. Experiments
+\input{sections/04_experiments.tex}
+
+% 05. Results
+\input{sections/05_results.tex}
+
+% 06. Discussion & Limitations
+\input{sections/06_discussion.tex}
+
+% 07. Ethics Statement (Unnumbered \section*{Ethical Statement})
+\input{sections/07_ethics_statement.tex}
+
+% References (Do NOT set \bibliographystyle; aaai2027.sty sets it to aaai2027.bst)
+\bibliography{references}
+
+% Supplementary Material / Appendices
+\appendix
+\input{sections/08_appendix.tex}
+
+% Check whether the conference requires the standalone reproducibility checklist questionnaire to be embedded.
+% If required by the venue, uncomment the following line:
+% \input{ReproducibilityChecklist.tex}
+
+\end{document}

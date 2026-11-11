@@ -1,0 +1,25 @@
+\section{Introduction}
+\label{sec:intro}
+
+Large Language Model (LLM) agents are increasingly organized into complex multi-agent architectures to simulate collective human behavior, conduct decentralized problem-solving, and study societal dynamics \citep{park2023generative,chuang-etal-2024-simulating}. While these systems exhibit sophisticated conversational fluidity and persona consistency, their decentralized interaction dynamics introduce serious vulnerabilities to misinformation, collective hallucination, and epistemic drift \citep{liu-etal-2025-stepwise,munker-etal-2026-dont}. When an agent receives an unverified assertion from an interlocutor, it faces a fundamental trade-off: should it accept and propagate the claim to maintain conversational harmony and social alignment, or should it incur the cognitive or material cost to verify the claim against objective ground truth?
+
+Human social psychology has long demonstrated that communication networks often discount truth in favor of social comfort, authority deference, and interpersonal rapport \citep{borah-etal-2026-persuasion}. However, in synthetic agent societies, it remains unknown whether autonomous LLM agents inherently exhibit a similar bias, or whether they systematically favor empirical evidence when verification is made available. Recent work has demonstrated that LLMs exhibit pronounced source preferences under knowledge conflicts \citep{schuster-etal-2026-whose} and substantial authority bias \citep{kumar2026authority}, frequently deferring to perceived status over factual accuracy. Yet, existing studies predominantly examine isolated, single-turn prompts or dyadic interactions without budget constraints or multi-hop conversational diffusion.
+
+To bridge this gap, we formalize and quantify the \textit{Truth Discount} in LLM agent societies. We define the Truth Discount as the gap in expressed belief and transmission velocity between a verifiably true claim and a counterfactually matched rumor, evaluated across controlled agent networks. Crucially, measuring this effect requires isolating epistemic veracity from semantic salience, emotional valence, and network topology. Prior observational studies of misinformation diffusion frequently confound claim veracity with sensationalist phrasing or topic differences.
+
+In this work, we propose a rigorously controlled \textit{Matched Twin World} experimental paradigm. For every simulated town exposed to an exciting community announcement (e.g., an upcoming cultural concert), we execute an exact twin simulation where the network topology, agent personas, conversational prompts, and scene sequences are strictly held identical, while only the empirical ground-truth status of the claim is toggled. Furthermore, we implement an explicit, costly verification mechanism: agents possess a finite budget and may voluntarily expend resources to inspect an objective town noticeboard before conversing with peers \citep{mahmud2026verification}.
+
+Our investigation addresses the following core research questions:
+\begin{enumerate}
+    \item \textbf{RQ1 (Truth Discount Quantification):} When network topology and claim excitement are held constant, do agent populations express higher belief and propagate claims more readily when the claim is true than when it is false?
+    \item \textbf{RQ2 (Source Profile Moderation):} How do the source's structural authority, interpersonal closeness, and declared reliability govern agents' willingness to verify claims versus accepting them uncritically?
+    \item \textbf{RQ3 (Verification Spillover):} When an agent directly verifies the ground truth, does that evidence successfully transmit across subsequent conversational hops, or does it decay into ambiguous social consensus?
+\end{enumerate}
+
+\paragraph{Contributions.} This work provides the following main contributions:
+\begin{itemize}
+    \item \textbf{The Matched Twin World Design:} A counterbalanced simulation architecture that guarantees identical semantic salience across truth and rumor conditions through synthetic artist pair switching, preventing topic and valence confounds.
+    \item \textbf{The Truth Discount Metric:} A formal difference-in-means estimator evaluating expressed belief and transmission fidelity under matched environments, complete with sensitivity bounds for silence and omission.
+    \item \textbf{Costly Verification Under Budget Constraints:} An operationalized decision framework where agents make voluntary, discrete verification choices (`GO` vs.\ `SKIP`) with simulated monetary trade-offs.
+    \item \textbf{Empirical Analysis of LLM Agent Social Dynamics:} A comprehensive evaluation across leading open and closed foundation models, evaluating the interplay between social comfort, authority deference, and factual ground truth.
+\end{itemize}

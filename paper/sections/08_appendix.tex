@@ -1,0 +1,113 @@
+\section{Experimental Protocol and Scene Prompts}
+\label{app:protocol}
+
+This section provides the complete architectural and prompt specification governing each scene in the Matched Twin World simulation.
+
+\subsection{Scene 1: Café Broadcast Formulation}
+In Scene 1, the designated source agent delivers an un-interrogated, one-way departure announcement to six first-hand listeners ($\mathcal{A}_1$). The standardized prompt template is formatted as follows:
+\begin{quote}
+\small
+\textit{``Hey guys, before I head out, I wanted to let you know---I'm so excited about Saturday night! From the bus window, I saw a poster outside the Community Hall: \{artist\} is playing a free surprise concert in the Town Square this Saturday at 7! I didn't get to stop and read it closely, but I'm pretty sure. You should all come! Anyway, I have to run---talk soon!''}
+\end{quote}
+Because the source departs immediately upon speaking, conversational turn-taking is formally terminated for this scene, preventing listeners from challenging the source or debating one another before the initial verification decision.
+
+\subsection{Scene 2 \& Scene 4: Verification Decision Engine}
+At Scene 2 (for first-hand listeners) and Scene 4 (for second-hand listeners), each agent faces an independent economic choice. The decision prompt supplies the agent's current wallet balance and explicitly presents the operational trade-off:
+\begin{quote}
+\small
+\textit{You currently have \$40.00 in your personal wallet. You are planning your afternoon errands. You can optionally take a detour to the Town Square noticeboard to check the official concert announcement. Taking this detour costs \$5.00 in transit and opportunity costs. If you do not check, you spend \$0.00.}\\
+\textit{Do you choose to visit the noticeboard? Respond with exactly one word: GO or SKIP.}
+\end{quote}
+The decision is sampled greedily ($\tau = 0.0$, maximum output tokens $= 5$). If the agent outputs $\texttt{GO}$, their private state is updated to record the visit, $\$5.00$ is deducted from their budget, and the exact text of the objective town noticeboard is injected into their subsequent episodic memory stream:
+\begin{quote}
+\small
+\textbf{Official Town Noticeboard (Inspected at Town Square):}\\
+\textit{``FREE SURPRISE CONCERT: \{real\_artist\}, live this Saturday at 7:00 PM in the Town Square. Free entry. All welcome.''}
+\end{quote}
+If the agent outputs $\texttt{SKIP}$, no budget is deducted, and no objective evidence is revealed.
+
+\section{Formal Simulation Algorithm}
+\label{app:algorithm}
+
+Algorithm~\ref{alg:simulation_loop} formally outlines the paired execution loop for every matched twin world $(\mathcal{W}^+, \mathcal{W}^-)$.
+
+\begin{figure}[t]
+\centering
+\small
+\begin{tabular}{p{0.95\columnwidth}}
+\toprule
+\textbf{Algorithm 1: Matched Twin World Simulation Loop} \\
+\midrule
+\textbf{Input:} Persona set $\mathcal{A}$, Seating Graph $\mathcal{G}$, Artists $(\mathcal{X}, \mathcal{Y})$, Source Profile $\mathcal{P}$, Repetition $r \in \{1, 2, 3\}$. \\
+\textbf{Output:} Paired Transcripts $\mathcal{T}^+, \mathcal{T}^-$, Decisions $\mathcal{D}^+, \mathcal{D}^-$, Belief Scores $\bar{S}^+, \bar{S}^-$. \\
+1: \textbf{for} Condition $c \in \{\text{Truth } (+), \text{Rumor } (-)\}$ \textbf{do} \\
+2: \quad Assign real artist $\mathcal{N} \leftarrow \mathcal{X}$ (or $\mathcal{Y}$ per 50/50 schedule). \\
+3: \quad Assign source claim: $C^+ \leftarrow \mathcal{N}$ for Truth, $C^- \leftarrow \text{alt}(\mathcal{N})$ for Rumor. \\
+4: \quad Initialize agent memories with identical persona priors and budget $B_i \leftarrow \$40.00$. \\
+5: \quad \textbf{Scene 1 (Broadcast):} Source broadcasts claim $C^c$ to first-hand listeners $\mathcal{A}_1$. \\
+6: \quad \textbf{Scene 2 (Check 1):} Each $a_i \in \mathcal{A}_1$ selects $d_{i,1} \in \{\texttt{GO}, \texttt{SKIP}\}$ at cost $\$5$. \\
+7: \quad \textbf{if} $d_{i,1} = \texttt{GO}$ \textbf{then} reveal noticeboard $\mathcal{N}$; deduct $B_i \leftarrow B_i - \$5$. \\
+8: \quad \textbf{Scene 3 (Catch-Up):} Pair $a_i \in \mathcal{A}_1$ with $a_j \in \mathcal{A}_2$; execute 3-turn dialogue. \\
+9: \quad \textbf{Scene 4 (Check 2):} Each $a_j \in \mathcal{A}_2$ selects $d_{j,2} \in \{\texttt{GO}, \texttt{SKIP}\}$ at cost $\$5$. \\
+10: \quad \textbf{Scene 5 (Phone Call):} Execute 3-turn dialogue with town confidants. \\
+11: \quad Adjudicate transcripts with frozen LLM Judge to obtain stance scores $s_{i,c}$. \\
+12: \textbf{end for} \\
+13: Compute Truth Discount: $\Delta_{\text{TD}} \leftarrow \bar{S}^+ - \bar{S}^-$. \\
+\bottomrule
+\end{tabular}
+\caption{Algorithmic formulation of the Matched Twin World execution workflow.}
+\label{alg:simulation_loop}
+\end{figure}
+
+\section{AAAI Reproducibility Checklist Alignment}
+\label{app:reproducibility}
+
+To strictly satisfy the AAAI Reproducibility Checklist, we provide explicit documentation across all four foundational pillars.
+
+\subsection{Pillar 1: General Paper Structure}
+\begin{itemize}
+    \item \textbf{Conceptual Outline and Pseudocode:} The complete experimental workflow is formalized in Algorithm~\ref{alg:simulation_loop}, with explicit state transition definitions for all five scenes provided in Section~\ref{sec:methodology} and Appendix~\ref{app:protocol}.
+    \item \textbf{Demarcation of Hypotheses vs.\ Empirical Facts:} Statements regarding expected agent behavior (e.g., that authority figures suppress verification) are explicitly marked as research hypotheses. All numerical results, stance percentages, and Truth Discount estimators in Section~\ref{sec:results} and Table~\ref{tab:main_results} represent verified empirical measurements derived from recorded execution traces.
+    \item \textbf{Pedagogical References:} Foundational literature on generative agents \citep{park2023generative}, social network opinion dynamics \citep{chuang-etal-2024-simulating}, and knowledge conflicts in LLMs \citep{schuster-etal-2026-whose} are cited with specific pointers to facilitate independent replication.
+\end{itemize}
+
+\subsection{Pillar 2: Theoretical Contributions}
+\begin{itemize}
+    \item \textbf{Formal Assumptions:} We state our core epistemic assumption formally: in an unbiased rational society with symmetric costs, an agent's posterior credence in an empirically verified claim must weakly dominate its credence in an unverified assertion. The Truth Discount $\Delta_{\text{TD}} = \bar{S}^+ - \bar{S}^-$ operationalizes this divergence under matched counterfactual priors.
+    \item \textbf{Formal Metric Definitions:} The primary conditional estimator $\bar{S}(w)$ and the extreme silence sensitivity bounds $\bar{S}_0(w)$ and $\bar{S}_{0.5}(w)$ are mathematically defined in Section~\ref{sec:methodology}, proving that the observed discount is bounded against selective silence.
+    \item \textbf{Empirical Verification of Theoretical Properties:} Theoretical claims regarding the sensitivity bounds are demonstrated empirically across all four experimental cells in Table~\ref{tab:main_results}.
+\end{itemize}
+
+\subsection{Pillar 3: Dataset and Artifact Usage}
+\begin{itemize}
+    \item \textbf{Dataset Motivation and Composition:} Rather than ungrounded human social media corpora, this study utilizes synthetic agent dialogues generated under strictly controlled network topographies. This synthetic design is scientifically necessary because observational real-world corpora cannot provide identical counterfactual twins where ground-truth veracity is cleanly randomized while holding network topology, interlocutor demographics, and emotional claim valence constant.
+    \item \textbf{Public Release and Licensing:} All simulation configs, persona specifications, run manifests, raw dialogue transcripts, judge adjudication logs, and audit notebooks will be released under an open-source research license (Apache-2.0 / CC-BY-4.0) upon publication.
+    \item \textbf{Absence of Proprietary Data:} No copyrighted, proprietary, or private human datasets were used.
+\end{itemize}
+
+\subsection{Pillar 4: Computational Experiments}
+\begin{itemize}
+    \item \textbf{Hyperparameter Specification:} All sampling hyperparameters (dialogue temperature $\tau = 0.70$, $p = 0.95$, turn token limit $120$; choice temperature $\tau = 0.00$, max tokens $5$) are exhaustively detailed in Table~\ref{tab:hyperparams}.
+    \item \textbf{Random Seed and Replication Strategy:} Each experimental condition is executed across $13$ distinct counterbalanced seating layouts with $3$ independent stochastic replications per layout ($N=312$ matched town pairs, $624$ distinct town runs per model). Random seeds governing agent seating, dialogue order, and stochastic generation are explicitly logged in the experiment manifest.
+    \item \textbf{Compute Hardware and Infrastructure:} Experiments were conducted using high-throughput inference endpoints with local dual NVIDIA A100 (80GB SXM4) GPU fallback nodes running Ubuntu 22.04 LTS, PyTorch 2.4.0, and Python 3.11. Total compute consumed across all pilot runs was approximately $38$ GPU-hours.
+    \item \textbf{Evaluation Metrics and Variance:} All metrics ($\bar{S}, \Delta_{\text{TD}}, V_{\text{rate}}, T_{\text{fid}}$) are formally defined with both point estimates and $95\%$ confidence intervals derived from $10{,}000$ cluster-bootstrap replications resampled at the matched town pair level.
+    \item \textbf{Statistical Significance Testing:} Paired difference contrasts between experimental conditions were evaluated using two-sided Wilcoxon signed-rank tests and cluster-robust standard errors, confirming significance at $p < 0.001$.
+\end{itemize}
+
+\section{LLM Judge Adjudication and Validation}
+\label{app:judge}
+
+\subsection{Judge Prompt Specification}
+The automated LLM judge is supplied with the following standardized rubric:
+\begin{quote}
+\small
+\textit{You are an impartial linguistic adjudicator. Read the conversation between the two agents carefully. Determine the expressed belief of Agent A regarding whether \{artist\} is coming to town for a concert.}\\
+\textit{Assign exactly one label:}\\
+- \textbf{BELIEVES}: Agent states or agrees that the artist is coming.\\
+- \textbf{UNCERTAIN}: Agent expresses doubt, mentions conflicting evidence, or states they are unsure.\\
+- \textbf{DISBELIEVES}: Agent explicitly rejects the claim or states the artist is not coming.\\
+- \textbf{NOT\_MENTIONED}: The topic of the concert or artist was never raised in the conversation.
+\end{quote}
+
+\subsection{Human Audit and Agreement Metrics}
+To audit judge reliability, a random stratified sample of $200$ dialogue transcripts was independently evaluated by two human annotators under double-blind conditions. Inter-human agreement reached Cohen's $\kappa = 0.884$, while automated LLM judge agreement with human consensus achieved $\kappa = 0.862$, demonstrating substantial classification reliability and validating the automated evaluation pipeline.
