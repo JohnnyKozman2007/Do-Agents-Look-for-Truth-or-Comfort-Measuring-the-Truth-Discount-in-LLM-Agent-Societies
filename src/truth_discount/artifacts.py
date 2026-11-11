@@ -15,7 +15,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from .config import build_manifest, load_config, render_template, render_values, study_cells
-from .contracts import REJECTED_BEFORE_INFERENCE, canonical_bytes, digest
+from .contracts import RATE_LIMITED_BEFORE_INFERENCE, REJECTED_BEFORE_INFERENCE, canonical_bytes, digest
 from .scoring import make_judge_input, paired_metrics, parse_judge_response, town_metrics
 
 
@@ -226,9 +226,10 @@ def _provider_receipt(call: dict[str, Any], execution: dict[str, Any]) -> None:
     # and only a route that asked for fail-fast handling can produce one.
     rejected = [a for a in attempts if a["status"] == "rejected"]
     if rejected:
-        expected_code = REJECTED_BEFORE_INFERENCE.get(receipt["actual_provider"])
-        _require(isinstance(route, dict) and route.get("fail_fast") is True and expected_code is not None
-                 and all(a.get("http_status") == 429 and a.get("error_code") == expected_code for a in rejected)
+        provider = receipt["actual_provider"]
+        free_codes = {REJECTED_BEFORE_INFERENCE.get(provider), RATE_LIMITED_BEFORE_INFERENCE.get(provider)} - {None}
+        _require(isinstance(route, dict) and route.get("fail_fast") is True and free_codes
+                 and all(a.get("http_status") == 429 and a.get("error_code") in free_codes for a in rejected)
                  and all(a["status"] == "rejected" for a in attempts[:-1]),
                  "free provider attempt is not a documented pre-inference rejection")
     for key in ("actual_provider", "actual_model", "provider_api_calls", "cost_usd"):
