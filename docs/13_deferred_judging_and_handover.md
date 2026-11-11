@@ -80,6 +80,21 @@ the explicit `--regenerate-failed` flag; each failed attempt is retained under
 `simulation-status` (`failed_generation_attempts_by_cell`), so the analysis can
 report it. Judge failures never trigger actor regeneration.
 
+To ride out DeepInfra busy spells and incomplete towns without watching the
+terminal, wrap the same `simulate` arguments with the recovery script. It waits
+and resumes after busy rejections and after incomplete towns with no unclear
+charge. With `--auto-reconcile` it also records unclear charges that have an
+audited priced receipt (`scripts/reconcile_unknowns.py` now reads simulation
+collections). A timeout without a priced receipt still stops for a person.
+
+```sh
+python scripts/run_until_done.py --simulate --auto-reconcile \
+  --config configs/main_config.json --providers configs/providers.actor.json \
+  --all-pairs --shard-count 6 --shard-index 0 --output outputs/main-owner-0 \
+  --ledger outputs/ledgers/main-owner-0.jsonl --budget-usd 10 \
+  --max-concurrent-towns 6 --regenerate-failed --execute --spending-authorized
+```
+
 For a custody transfer:
 
 1. Stop the previous owner and confirm they will not resume their copy.

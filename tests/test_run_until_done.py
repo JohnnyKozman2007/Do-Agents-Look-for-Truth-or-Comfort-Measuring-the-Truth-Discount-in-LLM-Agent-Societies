@@ -251,6 +251,56 @@ class RecoveryWrapperTests(unittest.TestCase):
                 state = wrapper.ledger_state({}, str(ledger), "20")
             self.assertEqual(state["block_reasons"], ["ledger_changed_during_inspection"])
 
+    def simulate_args(self, temporary, *extra):
+        output, ledger = Path(temporary) / "shard", Path(temporary) / "shard.jsonl"
+        return ["--simulate", "--output", str(output), "--ledger", str(ledger), "--budget-usd", "10",
+                *extra, "--execute", "--spending-authorized"], output
+
+    def test_simulate_mode_runs_simulate_and_resumes_an_incomplete_town(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args, output = self.simulate_args(temporary, "--regenerate-failed")
+            def response(command, **kwargs):
+                self.assertEqual(command[1:4], ["-m", "truth_discount.cli", "simulate"])
+                self.assertIn("--regenerate-failed", command)
+                self.assertNotIn("--simulate", command)
+                if not output.exists():
+                    output.mkdir()
+                    (output / "execution_plan.json").write_text("{}")
+                    self.assertNotIn("--resume", command)
+                    return SimpleNamespace(returncode=1, stdout="",
+                                           stderr="error: " + wrapper.INCOMPLETE + ": town-1")
+                self.assertIn("--resume", command)
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            with patch.object(wrapper, "ledger_state", return_value={"blocked": False}) as state:
+                code, run, sleep = self.invoke(args, response)
+            self.assertEqual((code, run.call_count), (0, 2))
+            self.assertEqual(sleep.call_args.args, (30,))
+            state.assert_called_once()
+
+    def test_simulate_incomplete_town_with_unclear_charge_needs_auto_reconcile(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args, _ = self.simulate_args(temporary, "--regenerate-failed")
+            blocked = {"blocked": True, "block_reasons": ["unknown_charge"], "unknown_count": 1}
+            with patch.object(wrapper, "ledger_state", return_value=blocked):
+                code, run, sleep = self.invoke(args, [SimpleNamespace(
+                    returncode=1, stdout="", stderr="error: " + wrapper.INCOMPLETE + ": town-1")])
+            self.assertEqual((code, run.call_count), (1, 1))
+            sleep.assert_not_called()
+
+    def test_live_mode_does_not_treat_incomplete_simulation_text_as_retryable(self):
+        code, run, sleep = self.invoke([], [SimpleNamespace(returncode=1, stdout="", stderr=wrapper.INCOMPLETE)])
+        self.assertEqual((code, run.call_count), (1, 1))
+        self.assertIn("live", run.call_args.args[0])
+        sleep.assert_not_called()
+
+    def test_simulate_without_regenerate_flag_warns_before_running(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args, _ = self.simulate_args(temporary)
+            code, run, _ = self.invoke(args, [SimpleNamespace(returncode=0, stdout="", stderr="")])
+            self.assertEqual(code, 0)
+            self.assertIn("without --regenerate-failed", self.stdout)
+            self.assertNotIn("--regenerate-failed", run.call_args.args[0])
+
 
 if __name__ == "__main__":
     unittest.main()
