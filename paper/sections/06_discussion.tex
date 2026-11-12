@@ -2,3 +2,20 @@
 \label{sec:discussion}
 
 % Section 6 content goes here.
+
+\subsection{Limitations}
+\label{sec:limitations}
+
+Beyond standard considerations regarding model selection, prompt phrasing, sampling temperature, and random seeds, our simulation design involves four structural limitations:
+
+\paragraph{High Verification Cost (\$5 on a \$40 Budget).}
+Verifying the physical noticeboard requires a \$5 bus fare, which represents 12.5\% of an agent's weekly \$40 budget. Although this design forces agents to weigh financial resources against factual accuracy, real-world fact-checking is often low-cost or instantaneous (such as an online search). Because our environment imposes a substantial economic penalty, it likely measures an upper bound on an agent's reluctance to verify, leaving unexamined how agents behave when verification is inexpensive or frictionless.
+
+\paragraph{Absence of Immediate Questioning.}
+To prevent listeners from influencing one another at the shared table, the source delivers the announcement while departing (\textit{``I have to run---talk soon!''}). While this isolation is necessary to establish an uncontaminated baseline, it removes the primary mechanism through which individuals scrutinize unverified information: immediate follow-up questioning (\textit{``Are you sure? Did you see the date?''}). Agents are placed in a passive role, evaluating claims---and resolving direct contradictions between two sources---without the ability to ask questions or engage in discussion.
+
+\paragraph{Linear Transmission Pipeline vs.\ Network Dynamics.}
+Information flows through a strict sequential pipeline: 1 Source $\to$ 6 First-Hand listeners $\to$ 6 isolated one-on-one conversations $\to$ 6 Second-Hand listeners. While this structure cleanly isolates how information degrades across communication layers, it omits critical dynamics of real social networks, such as group discussions, overlapping social circles, echo chambers, and community-wide rumor correction.
+
+\paragraph{Static Trait Descriptions vs.\ Historical Relationships.}
+Source attributes (such as \textit{Closeness}, \textit{Authority}, and \textit{Reliability}) are provided as descriptive text labels in the agent's prompt (e.g., \textit{``Close Friend''}, \textit{``Mayor''}). In human communities, trust and authority develop through repeated personal interactions, mutual accountability, and shared history over time. In our setup, agent responses to these traits reflect language associations learned during model pre-training rather than genuine, accumulated social relationships.
