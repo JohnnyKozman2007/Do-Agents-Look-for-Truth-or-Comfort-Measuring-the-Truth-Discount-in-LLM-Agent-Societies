@@ -120,11 +120,11 @@ We enforce strict methodological controls to eliminate non-source confounds:
 The main experiment manipulates \textbf{6 binary source attributes} ($2^6 = 64$ factorial cells): \textbf{Closeness} (Stranger vs.\ Friend), \textbf{Authority} (Citizen vs.\ Mayor), \textbf{Reliability} (Poor vs.\ Good record), \textbf{Wealth} (Poor vs.\ Rich), \textbf{Age} (Young vs.\ Old), and \textbf{Gender} (Man vs.\ Woman). Standardized prompt injection is used, withholding reliability from the source's own prompt to keep delivery invariant.
 
 Each town executes chronologically through five scenes: 
-(1)~\textit{Morning Broadcast:} Source announces the concert while exiting the Maple Street Caf\'{e} table with 6 First-Hand listeners;
-(2)~\textit{First-Hand Verification:} The 6 listeners independently make a deterministic binary choice (\texttt{GO} vs.\ \texttt{SKIP} at $T=0.0$; \texttt{GO} incurs \$5 and reveals the poster);
-(3)~\textit{Afternoon Catch-Up:} 6 dyadic pairs ($\text{Seat } i \leftrightarrow \text{Seat } i+6$) hold natural 4-turn chats, measuring unprompted transmission of claims and evidence;
+(1)~\textit{Morning Broadcast:} The Source announces the concert while exiting the Maple Street Caf\'{e} table with 6 First-Hand listeners;
+(2)~\textit{First-Hand Verification:} The 6 first-hand listeners independently make a deterministic binary choice (\texttt{GO} vs.\ \texttt{SKIP} at $T=0.0$; \texttt{GO} incurs \$5 and reveals the poster);
+(3)~\textit{Afternoon Catch-Up:} Each First-Hand listener talks 1-on-1 with a Second-Hand listener in a 4-turn dialogue; we analyze this transcript directly to determine social transmission: \textit{did they pass on the rumor and the verified noticeboard evidence (yes/no)?};
 (4)~\textit{Second-Hand Verification:} Second-hand listeners independently make the \$5 \texttt{GO}/\texttt{SKIP} decision; and
-(5)~\textit{Evening Phone Call:} All 12 listeners converse with an out-of-town loved one through a standardized funnel to elicit final expressed belief.
+(5)~\textit{Evening Phone Call:} \textbf{All 12 listeners (both First- and Second-Hand)} converse with a scripted out-of-town loved one via a 4-step progressive funnel: (i)~general daily life (``How was your day?''), (ii)~town news, (iii)~weekend plans, and (iv)~a direct inquiry (``Did you hear anything about a concert?''). Mentioning the concert or an artist at any step immediately triggers the elicitation follow-up (``Oh really? What's the story there?''); persistent evasion through step~(iv) logs \texttt{NOT\_MENTIONED}. We analyze this final response for \textbf{Belief}, categorized by the Blind Judge into one of 6 standardized buckets.
 
 \subsection{Two-Source Conflict Probes}
 \label{sec:probes}
@@ -161,7 +161,7 @@ Probe 2 (Anti-Agent) & 10 DNAs $\times$ 3 configs & 390 & 1,170 \\
 \label{sec:eval_stats}
 Belief is evaluated by an independent blind judge---\textbf{Claude Haiku 5.5} (\texttt{claude-haiku-5-5} via Anthropic Messages API, reasoning disabled)---disjoint from agent models to avoid self-preference bias. To validate the automated judge against human ground truth, two co-authors independently annotate a stratified benchmark of 100 transcripts blind to conditions (targeting Cohen's $\kappa \ge 0.85$), with \textbf{GPT-4o} serving as a secondary automated evaluator. 
 
-The judge categorizes Scene 5 phone calls into six labels: \texttt{FACT} ($1.0$), \texttt{CHECKED\_TRUE} ($1.0$), \texttt{UNCERTAIN} ($0.5$), \texttt{SKEPTICAL} ($0.0$), \texttt{CHECKED\_FALSE} ($0.0$), or \texttt{NOT\_MENTIONED}. The primary metric is the \textbf{Truth Discount}:
+The judge categorizes the Scene 5 phone calls of all 12 listeners into six discrete buckets: \texttt{FACT} ($1.0$), \texttt{CHECKED\_TRUE} ($1.0$), \texttt{UNCERTAIN} ($0.5$), \texttt{SKEPTICAL} ($0.0$), \texttt{CHECKED\_FALSE} ($0.0$), or \texttt{NOT\_MENTIONED}. The primary metric is the \textbf{Truth Discount}:
 \begin{equation}
 \Delta \text{Belief}_{c, s} = \text{Belief}_{\text{Truth Twin}, c, s} - \text{Belief}_{\text{Rumor Twin}, c, s}
 \end{equation}
