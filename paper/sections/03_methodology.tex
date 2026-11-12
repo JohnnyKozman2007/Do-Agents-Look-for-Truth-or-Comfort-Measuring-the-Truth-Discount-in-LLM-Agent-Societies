@@ -1,4 +1,77 @@
-\section{Methodology}
+\section{Methodology and Experimental Design}
 \label{sec:methodology}
 
-% Section 3 content goes here.
+To measure the Truth Discount in LLM agent societies, we construct a controlled multi-agent environment that isolates source-attribute biases from message content, linguistic confounds, and stochastic variance.
+
+\subsection{Environment, Verification \& Semantic Mirroring}
+\label{sec:env_design}
+Simulations take place in the fictional town of \textit{Alder Creek} (population $\sim$4,000; \$40 weekly character budget). The objective ground truth is a physical noticeboard outside the Community Hall legally listing all municipal weekend events. Inspecting the board requires a \$5 cross-town bus fare, creating an economic trade-off between trusting social claims for free versus paying to verify facts.
+
+To eliminate LLM direct-negation bias while maintaining identical conversational salience and perceived value across conditions, both truth claims and rumors are framed as an exciting, free surprise pop concert involving two invented artists vetted to have zero real-world footprint: \textit{Vesper Vance} and \textit{Kaelen Cross}. In a \textbf{Truth Twin} run, the source announces the real artist (confirmed on the noticeboard); in a \textbf{Rumor Twin} run, the source announces the false artist while the noticeboard still advertises the real performer, proving the rumor false.
+
+\subsection{Counterbalancing \& Bias Elimination Controls}
+\label{sec:bias_controls}
+We enforce strict methodological controls to eliminate non-source confounds:
+\begin{enumerate}
+    \item \textbf{Artist Counterbalancing \& Odd-Seed Alternation:} Across runs, each artist is the true performer in exactly 50\% of conditions. Because each cell has 39 seeds ($13\text{ layouts} \times 3\text{ repetitions}$), we partition seeds into a 20/19 split ($\approx$51.3\% vs.\ 48.7\%) and alternate the majority artist across consecutive cells, achieving an exact global 50/50 balance.
+    \item \textbf{Lore Decoupling:} The shared world prompt introduces artists in fixed alphabetical order, decoupled from ground truth.
+    \item \textbf{Latin Square Seating ($13 \times 13$):} 13 gender-neutral personas with mid-status occupations (excluding transit or authoritative roles) rotate through all 13 town seats via a cyclic Latin Square (Source: $1/13$; First-Hand listener: $6/13$; Second-Hand listener: $6/13$).
+    \item \textbf{Dyadic Twin Matching:} Afternoon catch-up pairs are mathematically fixed ($\text{Seat } i \leftrightarrow \text{Seat } i+6$), and twin pairs share the identical seed, seating, and pairings.
+    \item \textbf{Order \& Role Balancing in Probes:} Two-source departure order is counterbalanced 50/50, and Persona 14 (\textit{Parker}) is swapped 50/50 between source positions.
+    \item \textbf{Peer Contagion Elimination \& Context Hygiene:} Sources announce news as a one-way departure broadcast when leaving the caf\'{e}, eliminating table debate before verification decisions. Prompts omit experimental meta-tags (e.g., \texttt{[AGENT]}, \texttt{[SIMULATION]}) to prevent artificial hyper-rational safety behaviors.
+\end{enumerate}
+
+\subsection{Factorial Grid \& Simulation State Machine}
+\label{sec:factorial_workflow}
+The main experiment manipulates \textbf{6 binary source attributes} ($2^6 = 64$ factorial cells): \textbf{Closeness} (Stranger vs.\ Friend), \textbf{Authority} (Citizen vs.\ Mayor), \textbf{Reliability} (Poor vs.\ Good record), \textbf{Wealth} (Poor vs.\ Rich), \textbf{Age} (Young vs.\ Old), and \textbf{Gender} (Man vs.\ Woman). Standardized prompt injection is used, withholding reliability from the source's own prompt to keep delivery invariant.
+
+Each town executes chronologically through five scenes: 
+(1)~\textit{Morning Broadcast:} Source announces the concert while exiting the Maple Street Caf\'{e} table with 6 First-Hand listeners;
+(2)~\textit{First-Hand Verification:} The 6 listeners independently make a deterministic binary choice (\texttt{GO} vs.\ \texttt{SKIP} at $T=0.0$; \texttt{GO} incurs \$5 and reveals the poster);
+(3)~\textit{Afternoon Catch-Up:} 6 dyadic pairs ($\text{Seat } i \leftrightarrow \text{Seat } i+6$) hold natural 4-turn chats, measuring unprompted transmission of claims and evidence;
+(4)~\textit{Second-Hand Verification:} Second-hand listeners independently make the \$5 \texttt{GO}/\texttt{SKIP} decision; and
+(5)~\textit{Evening Phone Call:} All 12 listeners converse with an out-of-town loved one through a standardized funnel to elicit final expressed belief.
+
+\subsection{Two-Source Conflict Probes}
+\label{sec:probes}
+To evaluate belief under direct contradiction, we expand the town to 14 agents (2 Sources, 12 Listeners) using the Top 10 most persuasive liar profiles from the main factorial:
+\begin{itemize}
+    \item \textbf{Probe 1 (The Truth Table):} Pits two sources with identical profiles in \textit{Consensus Lie}, \textit{Consensus Truth}, and \textit{Direct Conflict} (one claims false, one claims true).
+    \item \textbf{Probe 2 (The Anti-Agent):} Pits the liar profiles against a truth-telling Anti-Agent in three configurations: \textit{Flip All} (all 6 traits inverted), \textit{Flip Social} (Closeness and Authority inverted), and \textit{Flip Demographics} (Age and Gender inverted).
+\end{itemize}
+
+\subsection{Sampling Matrix \& Evaluated Models}
+\label{sec:sampling_totals}
+Each cell evaluates 13 Latin Square layouts across 3 stochastic repetitions ($T=0.7$, $\text{top\_p}=0.95$), yielding 39 seeds per cell. As summarized in Table~\ref{tab:run_totals}, the suite contains \textbf{7,644 runs per model} across the Main Factorial (4,992), Pilot (312), Probe 1 (1,170), and Probe 2 (1,170). The full suite is executed across two open-weights model families via DeepInfra: \textbf{DeepSeek-V4-Flash} (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and \textbf{Qwen3.8-Flash} (\texttt{Qwen/Qwen3.8-Flash}), totaling \textbf{15,288 simulation runs}.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}llrr@{}}
+\toprule
+\textbf{Module} & \textbf{Design / Conditions} & \textbf{1 Rep} & \textbf{3 Reps} \\
+\midrule
+Main Factorial & 64 cells $\times$ 2 twins & 1,664 & 4,992 \\
+Pilot Study & 4 cells $\times$ 2 twins & 104 & 312 \\
+Probe 1 (Truth Table) & 10 DNAs $\times$ 3 configs & 390 & 1,170 \\
+Probe 2 (Anti-Agent) & 10 DNAs $\times$ 3 configs & 390 & 1,170 \\
+\midrule
+\textbf{Total per Model} & \textbf{196 conditions} & \textbf{2,548} & \textbf{7,644} \\
+\bottomrule
+\end{tabular*}
+\caption{Simulation run matrix across experimental modules.}
+\label{tab:run_totals}
+\end{table}
+
+\subsection{Evaluation Protocol \& Statistical Analysis}
+\label{sec:eval_stats}
+Belief is evaluated by an independent blind judge---\textbf{Claude Haiku 5.5} (\texttt{claude-haiku-5-5} via Anthropic Messages API, reasoning disabled)---disjoint from agent models to avoid self-preference bias. To validate the automated judge against human ground truth, two co-authors independently annotate a stratified benchmark of 100 transcripts blind to conditions (targeting Cohen's $\kappa \ge 0.85$), with \textbf{GPT-4o} serving as a secondary automated evaluator. 
+
+The judge categorizes Scene 5 phone calls into six labels: \texttt{FACT} ($1.0$), \texttt{CHECKED\_TRUE} ($1.0$), \texttt{UNCERTAIN} ($0.5$), \texttt{SKEPTICAL} ($0.0$), \texttt{CHECKED\_FALSE} ($0.0$), or \texttt{NOT\_MENTIONED}. The primary metric is the \textbf{Truth Discount}:
+\begin{equation}
+\Delta \text{Belief}_{c, s} = \text{Belief}_{\text{Truth Twin}, c, s} - \text{Belief}_{\text{Rumor Twin}, c, s}
+\end{equation}
+
+\texttt{NOT\_MENTIONED} is reported as an independent omission rate and bounded by pre-registered pessimistic ($0.0$) and neutral ($0.5$) sensitivity checks. Because the 12 listeners share a town, hypotheses are estimated using Linear Mixed-Effects Models (LMM) with town random intercepts and clustered standard errors. Multiplicity across our 10 planned confirmatory contrasts (evaluating main effects of all six knobs on the Truth Discount alongside key reliability-override and authority-closeness interactions) is controlled via Holm-Bonferroni step-down correction ($\alpha = 0.05$).
+
+\paragraph{Reproducibility Note.} All simulation code, prompt templates, configuration manifests, and raw trace artifacts are anonymously accessible at: \url{https://anonymous.4open.science/r/echotown-F565/}.
