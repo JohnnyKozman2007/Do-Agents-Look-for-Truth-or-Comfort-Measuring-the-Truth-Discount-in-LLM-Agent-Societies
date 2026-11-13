@@ -16,6 +16,7 @@ from .runner import run_town
 
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "pilot_config.json"
+MAIN_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "main_config.json"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -114,6 +115,36 @@ def _parser() -> argparse.ArgumentParser:
     simulation_demo.add_argument("--mode", choices=("mixed", "all_skip", "silent"), default="mixed")
     simulation_status = commands.add_parser("simulation-status", help="read-only replay and coverage across allocated shards")
     simulation_status.add_argument("source_roots", type=Path, nargs="+")
+    probe = commands.add_parser("probe-simulate", help="two-source probes: zero-call preview, or authorized generation")
+    probe.add_argument("--main-config", type=Path, default=MAIN_CONFIG, help="the unchanged main config")
+    probe.add_argument("--probe-spec", type=Path, required=True, help="probe spec bound to the main config")
+    probe.add_argument("--providers", type=Path, required=True, help="approved actor routes; no judge key needed")
+    probe.add_argument("--output", type=Path, required=True)
+    probe.add_argument("--model-key", action="append", dest="model_keys")
+    probe.add_argument("--probe", action="append", dest="probes", choices=("probe_1", "probe_2"))
+    probe.add_argument("--seeds-per-dna", type=int, default=1)
+    probe.add_argument("--start-seed", type=int, default=0)
+    probe.add_argument("--all-seeds", action="store_true", help="all 39 seeds per DNA and configuration")
+    probe.add_argument("--shard-count", type=int, default=1)
+    probe.add_argument("--shard-index", type=int, default=0, help="zero-based owner index, 0..shard-count-1")
+    probe.add_argument("--ledger", type=Path)
+    probe.add_argument("--budget-usd", type=str, help="this shard ledger's fixed allocation, not the project total")
+    probe.add_argument("--resume", action="store_true")
+    probe.add_argument("--regenerate-failed", action="store_true",
+                       help="on resume, archive sealed failed towns and run them again (logged)")
+    probe.add_argument("--max-concurrent-towns", type=int, default=1)
+    probe.add_argument("--execute", action="store_true")
+    probe.add_argument("--spending-authorized", action="store_true",
+                       help="only after the separate credit-use hold is explicitly released")
+    probe.add_argument("--plan-out", type=Path, help="save the zero-call allocation plan to a new JSON file")
+    probe.add_argument("--summary", action="store_true", help="preview counts only, without the full run list")
+    probe_demo = commands.add_parser("probe-demo", help="one synthetic group per probe and model, zero network")
+    probe_demo.add_argument("--main-config", type=Path, default=MAIN_CONFIG)
+    probe_demo.add_argument("--probe-spec", type=Path, required=True)
+    probe_demo.add_argument("--output", type=Path, required=True)
+    probe_demo.add_argument("--mode", choices=("mixed", "all_skip", "silent"), default="mixed")
+    probe_status = commands.add_parser("probe-status", help="read-only replay and coverage across probe shards")
+    probe_status.add_argument("source_roots", type=Path, nargs="+")
     judging = commands.add_parser("judge-saved", help="preview or separately authorize scoring sealed transcripts")
     judging.add_argument("source_roots", type=Path, nargs="+")
     judging.add_argument("--profile", type=Path, required=True)
@@ -170,6 +201,71 @@ async def _demo(config: dict, manifest: list[dict], output_root: Path, mode: str
             "selected_cell_id": 1, "selected_layout_id": 0, "selected_repetition_id": 0}
 
 
+def _probe_command(args) -> int:
+    """Two-source probes. Main-run commands, configs and fingerprinted modules are untouched."""
+    if args.command == "probe-status":
+        from .probe_execution import review_probe_simulations
+        _print_json(review_probe_simulations(args.source_roots))
+        return 0
+    from .probe_config import build_probe_manifest, describe_manifest, load_probe_spec
+    config = load_config(args.main_config)
+    spec = load_probe_spec(args.probe_spec, config)
+    if args.command == "probe-demo":
+        from .probe_artifacts import audit_probe_simulation
+        from .probe_runner import run_probe_town
+        if args.output.exists():
+            raise FileExistsError("refusing existing probe demo directory")
+        first = min(spec["dna_selection"]["cell_ids"] or [0])
+        runs = [r for r in build_probe_manifest(config, spec) if r["dna_cell_id"] == first and r["seed_id"] == 0]
+        args.output.mkdir(parents=True)
+        async def demonstrate():
+            for run in runs:
+                await run_probe_town(config, spec, run, FixtureBackend(mode=args.mode), args.output)
+        asyncio.run(demonstrate())
+        towns = [audit_probe_simulation(args.output / run["run_id"]) for run in runs]
+        _print_json({"evidence_kind": "synthetic_fixture", "study_eligible": False, "towns": len(towns),
+                     "configs": sorted({t["probe_config"] for t in towns}),
+                     "phone_transcripts": sum(len(t["scene_5_phone_transcripts"]) for t in towns),
+                     "evaluation_status": "pending", "judge_calls": 0, "provider_api_calls": 0,
+                     "output_root": str(args.output)})
+        return 0
+    from .execution import load_provider_manifest
+    from .probe_execution import (allocate_probe_runs, collect_probe_simulations, probe_plan,
+                                  select_probe_runs)
+    providers = load_provider_manifest(args.providers)
+    selection = select_probe_runs(config, spec, args.model_keys, args.probes, args.seeds_per_dna,
+                                  args.start_seed, args.all_seeds)
+    runs, allocation = allocate_probe_runs(config, spec, selection, shard_count=args.shard_count,
+                                           shard_index=args.shard_index)
+    info = probe_plan(config, spec, providers, runs, allocation)
+    if args.plan_out:
+        with args.plan_out.open("xb") as stream:
+            stream.write(canonical_bytes(info))
+    if not args.execute:
+        if args.summary:
+            info = {**{k: v for k, v in info.items() if k not in ("runs", "allocation")},
+                    "allocation": {k: v for k, v in allocation.items() if k not in ("source_run_ids", "run_ids", "group_ids")},
+                    "counts": describe_manifest(runs)}
+        _print_json(info)
+        return 0
+    if not args.spending_authorized:
+        raise ValueError("probe execution requires explicit release of the spending hold")
+    if not args.ledger or not args.budget_usd:
+        raise ValueError("probe execution requires --ledger and --budget-usd")
+    if info["execution_gates"]:
+        raise ValueError("; ".join(info["execution_gates"]))
+    from .budget import BudgetLedger
+    from .providers import ProviderBackend
+    with BudgetLedger(args.ledger, args.budget_usd) as ledger:
+        backend = ProviderBackend(providers, ledger)
+        result = asyncio.run(collect_probe_simulations(
+            config, spec, providers, runs, args.output, backend, allocation=allocation, resume=args.resume,
+            max_concurrent_towns=args.max_concurrent_towns, execution_authorized=True,
+            spending_authorized=True, regenerate_failed=args.regenerate_failed))
+        _print_json({**result, "budget": ledger.summary()})
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the CLI; return 0 on success and 1 on config, output, or replay errors.
 
@@ -197,6 +293,8 @@ def main(argv: list[str] | None = None) -> int:
             from .simulation_execution import review_simulations
             _print_json(review_simulations(args.source_roots))
             return 0
+        if args.command in ("probe-simulate", "probe-demo", "probe-status"):
+            return _probe_command(args)
         if args.command == "compare-judges":
             from .deferred_judging import load_judge_profile, compare_judgments
             if len(args.profile) != len(args.judge_output):
