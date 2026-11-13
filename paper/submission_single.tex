@@ -1,0 +1,473 @@
+\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
+\usepackage[submission]{aaai2027}  % DO NOT CHANGE THIS
+\usepackage[hyphens]{url}  % DO NOT CHANGE THIS
+\usepackage{graphicx} % DO NOT CHANGE THIS
+\urlstyle{rm} % DO NOT CHANGE THIS
+\def\UrlFont{\rm}  % DO NOT CHANGE THIS
+\usepackage{natbib}  % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\frenchspacing  % DO NOT CHANGE THIS
+\usepackage{amsmath,amssymb,booktabs}
+
+% PDF Metadata (Do not add /Title or /Author tags during anonymous submission)
+\pdfinfo{
+/TemplateVersion (2027.1)
+}
+
+% Section Numbering (AAAI supports 1 or 2; level 3 is not supported)
+\setcounter{secnumdepth}{2}
+
+\title{Do Agents Look for Truth or Comfort? Measuring the Truth Discount in LLM Agent Societies}
+
+\author{
+    Anonymous Submission
+}
+\affiliations{}
+
+\begin{document}
+
+\maketitle
+
+% 00. Abstract
+% --- BEGIN INLINED sections/00_abstract.tex ---
+\begin{abstract}
+% Add your abstract here.
+\end{abstract}
+
+% --- END INLINED sections/00_abstract.tex ---
+
+% Anonymized Code and Artifact Repository Links (between abstract and Section 1)
+\begin{links}
+    \link{Code \& Data}{https://anonymous.4open.science/r/echotown-F565/}
+\end{links}
+
+% 01. Introduction
+% --- BEGIN INLINED sections/01_introduction.tex ---
+\section{Introduction}
+\label{sec:intro}
+
+% Section 1 content goes here.
+
+% --- END INLINED sections/01_introduction.tex ---
+
+% 02. Related Work
+% --- BEGIN INLINED sections/02_related_work.tex ---
+\section{Related Work}
+\label{sec:related_work}
+
+Prior studies evaluate social influence in LLMs by measuring how often agents fail multiple-choice benchmarks (such as MMLU-Pro) or flip their answers when pressured by bots. Our work departs from this paradigm in three fundamental ways:
+
+\subsection{The ``Truth Discount'' vs.\ Benchmark Accuracy}
+\label{sec:rel_truth_discount}
+Existing literature measures raw task error or adoption thresholds when an agent is exposed to peer pressure~\citep{banerjee2026information,hu2026authority,becker2026conformity}. This confounds general test-taking ability with social deference. 
+
+Instead, we isolate the epistemic premium of truth itself through a counterfactual twin design. For every run where a source spreads a false rumor, we execute an identical twin world where the exact same source makes the exact same claim, but the claim is objectively true. The \textbf{Truth Discount} measures this gap:
+\begin{equation}
+\text{Truth Discount} = \text{Belief}_{\text{Truth Twin}} - \text{Belief}_{\text{Rumor Twin}}
+\end{equation}
+If agents prioritize reality, this gap is large. If social ties or perceived status lead agents to ignore facts, the Truth Discount collapses to zero.
+
+\subsection{Costly Empirical Verification vs.\ Passive Hints}
+\label{sec:rel_costly_verification}
+In existing benchmarks, claims are either impossible to verify (such as predicting tomorrow's weather) or verification is free (such as injecting an automatic fact-check prompt). While game-theoretic environments charge abstract token penalties~\citep{mahmud2026verification}, they do not capture practical trade-offs.
+
+In contrast, our agents face an explicit economic decision. Each listener operates under a finite personal budget (\$40). When hearing a claim, they choose between two concrete actions:
+\begin{itemize}
+    \item \textbf{Trust for free:} Accept a friend's or authority figure's claim without spending money.
+    \item \textbf{Pay to verify:} Spend \$5 of their budget (framed as bus fare) to travel across town and inspect the noticeboard for ground truth.
+\end{itemize}
+This replaces passive prompt-following with an active behavioral metric: whether an agent is willing to pay to discover the truth when social comfort is free.
+
+\subsection{A $2^6$ Factorial Grid vs.\ Isolated Knobs}
+\label{sec:rel_factorial_grid}
+Existing studies manipulate only one or two isolated variables at a time: sweeping peer volume $k$~\citep{banerjee2026information}, adding a single isolated authority tag like \textit{``Expert''}~\citep{hu2026authority,kumar2026authority}, or examining age and gender in isolated pairs without crossing them~\citep{schuster-etal-2026-whose}. These studies also assume social influence operates in a simple, additive manner.
+
+In contrast, we test a full $2^6 = 64$ factorial space, crossing six binary traits: closeness (stranger vs.\ friend), authority (citizen vs.\ mayor), reliability (liar vs.\ honest history), perceived wealth, age, and gender. Holding the background lore identical allows us to isolate both main effects and \textbf{non-linear social overrides}:
+\begin{itemize}
+    \item \textbf{The Friendship Override:} Does close friendship cause an agent to forgive a known track record of false claims?
+    \item \textbf{The Authority Override:} Does mayoral status induce listeners to accept claims from an unreliable source?
+\end{itemize}
+
+% --- END INLINED sections/02_related_work.tex ---
+
+% 03. Methodology and Experimental Design
+% --- BEGIN INLINED sections/03_methodology.tex ---
+\section{Methodology and Experimental Design}
+\label{sec:methodology}
+
+To measure the Truth Discount in LLM agent societies, we construct a controlled multi-agent environment that isolates source-attribute biases from message content, linguistic confounds, and stochastic variance.
+
+\subsection{Environment, Verification \& Semantic Mirroring}
+\label{sec:env_design}
+Simulations take place in the fictional town of \textit{Alder Creek} (population $\sim$4,000; \$40 weekly character budget). The objective ground truth is a physical noticeboard outside the Community Hall legally listing all municipal weekend events. Inspecting the board requires a \$5 cross-town bus fare, creating an economic trade-off between trusting social claims for free versus paying to verify facts.
+
+To eliminate LLM direct-negation bias while maintaining identical conversational salience and perceived value across conditions, both truth claims and rumors are framed as an exciting, free surprise pop concert involving two invented artists vetted to have zero real-world footprint: \textit{Vesper Vance} and \textit{Kaelen Cross}. In a \textbf{Truth Twin} run, the source announces the real artist (confirmed on the noticeboard); in a \textbf{Rumor Twin} run, the source announces the false artist while the noticeboard still advertises the real performer, proving the rumor false.
+
+\subsection{Counterbalancing \& Bias Elimination Controls}
+\label{sec:bias_controls}
+We enforce strict methodological controls to eliminate non-source confounds:
+\begin{enumerate}
+    \item \textbf{Artist Counterbalancing \& Odd-Seed Alternation:} Across runs, each artist is the true performer in exactly 50\% of conditions. Because each cell has 39 seeds ($13\text{ layouts} \times 3\text{ repetitions}$), we partition seeds into a 20/19 split ($\approx$51.3\% vs.\ 48.7\%) and alternate the majority artist across consecutive cells, achieving an exact global 50/50 balance.
+    \item \textbf{Lore Decoupling:} The shared world prompt introduces artists in fixed alphabetical order, decoupled from ground truth.
+    \item \textbf{Latin Square Seating ($13 \times 13$):} 13 gender-neutral personas with mid-status occupations (excluding transit or authoritative roles) rotate through all 13 town seats via a cyclic Latin Square (Source: $1/13$; First-Hand listener: $6/13$; Second-Hand listener: $6/13$).
+    \item \textbf{Dyadic Twin Matching:} Afternoon catch-up pairs are mathematically fixed ($\text{Seat } i \leftrightarrow \text{Seat } i+6$), and twin pairs share the identical seed, seating, and pairings.
+    \item \textbf{Order \& Role Balancing in Probes:} Two-source departure order is counterbalanced 50/50, and Persona 14 (\textit{Parker}) is swapped 50/50 between source positions.
+    \item \textbf{Peer Contagion Elimination \& Context Hygiene:} Sources announce news as a one-way departure broadcast when leaving the caf\'{e}, eliminating table debate before verification decisions. Prompts omit experimental meta-tags (e.g., \texttt{[AGENT]}, \texttt{[SIMULATION]}) to prevent artificial hyper-rational safety behaviors.
+\end{enumerate}
+
+\subsection{Factorial Grid \& Simulation State Machine}
+\label{sec:factorial_workflow}
+The main experiment manipulates \textbf{6 binary source attributes} ($2^6 = 64$ factorial cells): \textbf{Closeness} (Stranger vs.\ Friend), \textbf{Authority} (Citizen vs.\ Mayor), \textbf{Reliability} (Poor vs.\ Good record), \textbf{Wealth} (Poor vs.\ Rich), \textbf{Age} (Young vs.\ Old), and \textbf{Gender} (Man vs.\ Woman). Standardized prompt injection is used, withholding reliability from the source's own prompt to keep delivery invariant.
+
+Each town executes chronologically through five scenes: 
+(1)~\textit{Morning Broadcast:} The Source announces the concert while exiting the Maple Street Caf\'{e} table with 6 First-Hand listeners;
+(2)~\textit{First-Hand Verification:} The 6 first-hand listeners independently make a deterministic binary choice (\texttt{GO} vs.\ \texttt{SKIP} at $T=0.0$; \texttt{GO} incurs \$5 and reveals the poster);
+(3)~\textit{Afternoon Catch-Up:} Each First-Hand listener talks 1-on-1 with a Second-Hand listener in a 4-turn dialogue; we analyze this transcript directly to determine social transmission: \textit{did they pass on the rumor and the verified noticeboard evidence (yes/no)?};
+(4)~\textit{Second-Hand Verification:} Second-hand listeners independently make the \$5 \texttt{GO}/\texttt{SKIP} decision; and
+(5)~\textit{Evening Phone Call:} \textbf{All 12 listeners (both First- and Second-Hand)} converse with a scripted out-of-town loved one via a 4-step progressive funnel: (i)~general daily life (``How was your day?''), (ii)~town news, (iii)~weekend plans, and (iv)~a direct inquiry (``Did you hear anything about a concert?''). Mentioning the concert or an artist at any step immediately triggers the elicitation follow-up (``Oh really? What's the story there?''); persistent evasion through step~(iv) logs \texttt{NOT\_MENTIONED}. We analyze this final response for \textbf{Belief}, categorized by the Blind Judge into one of 6 standardized buckets.
+
+\subsection{Two-Source Conflict Probes}
+\label{sec:probes}
+To evaluate belief under direct contradiction, we expand the town to 14 agents (2 Sources, 12 Listeners) using the Top 10 most persuasive liar profiles from the main factorial:
+\begin{itemize}
+    \item \textbf{Probe 1 (The Truth Table):} Pits two sources with identical profiles in \textit{Consensus Lie}, \textit{Consensus Truth}, and \textit{Direct Conflict} (one claims false, one claims true).
+    \item \textbf{Probe 2 (The Anti-Agent):} Pits the liar profiles against a truth-telling Anti-Agent in three configurations: \textit{Flip All} (all 6 traits inverted), \textit{Flip Social} (Closeness and Authority inverted), and \textit{Flip Demographics} (Age and Gender inverted).
+\end{itemize}
+
+\subsection{Sampling Matrix \& Evaluated Models}
+\label{sec:sampling_totals}
+Each cell evaluates 13 Latin Square layouts across 3 stochastic repetitions ($T=0.7$, $\text{top\_p}=0.95$), yielding 39 seeds per cell. As summarized in Table~\ref{tab:run_totals}, the suite contains \textbf{7,644 runs per model} across the Main Factorial (4,992), Pilot (312), Probe 1 (1,170), and Probe 2 (1,170). The full suite is executed across two open-weights model families via DeepInfra: \textbf{DeepSeek-V4-Flash} (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and \textbf{Qwen3.8-Flash} (\texttt{Qwen/Qwen3.8-Flash}), totaling \textbf{15,288 simulation runs}.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}llrr@{}}
+\toprule
+\textbf{Module} & \textbf{Design / Conditions} & \textbf{1 Rep} & \textbf{3 Reps} \\
+\midrule
+Main Factorial & 64 cells $\times$ 2 twins & 1,664 & 4,992 \\
+Pilot Study & 4 cells $\times$ 2 twins & 104 & 312 \\
+Probe 1 (Truth Table) & 10 DNAs $\times$ 3 configs & 390 & 1,170 \\
+Probe 2 (Anti-Agent) & 10 DNAs $\times$ 3 configs & 390 & 1,170 \\
+\midrule
+\textbf{Total per Model} & \textbf{196 conditions} & \textbf{2,548} & \textbf{7,644} \\
+\bottomrule
+\end{tabular*}
+\caption{Simulation run matrix across experimental modules.}
+\label{tab:run_totals}
+\end{table}
+
+\subsection{Evaluation Protocol \& Statistical Analysis}
+\label{sec:eval_stats}
+Belief is evaluated by an independent blind judge---\textbf{Claude Haiku 5.5} (\texttt{claude-haiku-5-5} via Anthropic Messages API, reasoning disabled)---disjoint from agent models to avoid self-preference bias. To validate the automated judge against human ground truth, two co-authors independently annotate a stratified benchmark of 100 transcripts blind to conditions (targeting Cohen's $\kappa \ge 0.85$), with \textbf{GPT-4o} serving as a secondary automated evaluator. 
+
+The judge categorizes the Scene 5 phone calls of all 12 listeners into six discrete buckets: \texttt{FACT} ($1.0$), \texttt{CHECKED\_TRUE} ($1.0$), \texttt{UNCERTAIN} ($0.5$), \texttt{SKEPTICAL} ($0.0$), \texttt{CHECKED\_FALSE} ($0.0$), or \texttt{NOT\_MENTIONED}. The primary metric is the \textbf{Truth Discount}:
+\begin{equation}
+\Delta \text{Belief}_{c, s} = \text{Belief}_{\text{Truth Twin}, c, s} - \text{Belief}_{\text{Rumor Twin}, c, s}
+\end{equation}
+
+\texttt{NOT\_MENTIONED} is reported as an independent omission rate and bounded by pre-registered pessimistic ($0.0$) and neutral ($0.5$) sensitivity checks. Because the 12 listeners share a town, hypotheses are estimated using Linear Mixed-Effects Models (LMM) with town random intercepts and clustered standard errors. Multiplicity across our 10 planned confirmatory contrasts (evaluating main effects of all six knobs on the Truth Discount alongside key reliability-override and authority-closeness interactions) is controlled via Holm-Bonferroni step-down correction ($\alpha = 0.05$).
+
+\paragraph{Reproducibility Note.} All simulation code, prompt templates, configuration manifests, and raw trace artifacts are anonymously accessible at: \url{https://anonymous.4open.science/r/echotown-F565/}.
+
+% --- END INLINED sections/03_methodology.tex ---
+
+% 04. Experiments (consolidated into Section 3)
+% --- BEGIN INLINED sections/04_experiments.tex ---
+% Section 4 (Experiments) has been consolidated into Section 3: Methodology and Experimental Design.
+
+% --- END INLINED sections/04_experiments.tex ---
+
+% 05. Results
+% --- BEGIN INLINED sections/05_results.tex ---
+\section{Results}
+\label{sec:results}
+
+% Section 5 content goes here.
+
+% --- END INLINED sections/05_results.tex ---
+
+% 06. Discussion & Limitations
+% --- BEGIN INLINED sections/06_discussion.tex ---
+\section{Discussion}
+\label{sec:discussion}
+
+% Section 6 content goes here.
+
+\subsection{Limitations}
+\label{sec:limitations}
+
+Beyond standard considerations regarding model selection, prompt phrasing, sampling temperature, and random seeds, our simulation design involves four structural limitations:
+
+\paragraph{High Verification Cost (\$5 on a \$40 Budget).}
+Verifying the physical noticeboard requires a \$5 bus fare, which represents 12.5\% of an agent's weekly \$40 budget. Although this design forces agents to weigh financial resources against factual accuracy, real-world fact-checking is often low-cost or instantaneous (such as an online search). Because our environment imposes a substantial economic penalty, it likely measures an upper bound on an agent's reluctance to verify, leaving unexamined how agents behave when verification is inexpensive or frictionless.
+
+\paragraph{Absence of Immediate Questioning.}
+To prevent listeners from influencing one another at the shared table, the source delivers the announcement while departing (\textit{``I have to run---talk soon!''}). While this isolation is necessary to establish an uncontaminated baseline, it removes the primary mechanism through which individuals scrutinize unverified information: immediate follow-up questioning (\textit{``Are you sure? Did you see the date?''}). Agents are placed in a passive role, evaluating claims---and resolving direct contradictions between two sources---without the ability to ask questions or engage in discussion.
+
+\paragraph{Linear Transmission Pipeline vs.\ Network Dynamics.}
+Information flows through a strict sequential pipeline: 1 Source $\to$ 6 First-Hand listeners $\to$ 6 isolated one-on-one conversations $\to$ 6 Second-Hand listeners. While this structure cleanly isolates how information degrades across communication layers, it omits critical dynamics of real social networks, such as group discussions, overlapping social circles, echo chambers, and community-wide rumor correction.
+
+\paragraph{Static Trait Descriptions vs.\ Historical Relationships.}
+Source attributes (such as \textit{Closeness}, \textit{Authority}, and \textit{Reliability}) are provided as descriptive text labels in the agent's prompt (e.g., \textit{``Close Friend''}, \textit{``Mayor''}). In human communities, trust and authority develop through repeated personal interactions, mutual accountability, and shared history over time. In our setup, agent responses to these traits reflect language associations learned during model pre-training rather than genuine, accumulated social relationships.
+
+% --- END INLINED sections/06_discussion.tex ---
+
+% 07. Ethics Statement (Unnumbered \section*{Ethical Statement})
+% --- BEGIN INLINED sections/07_ethics_statement.tex ---
+\section*{Ethical Statement}
+\label{sec:ethics_statement}
+
+As LLM agent networks are increasingly trusted with automated workflows and shared deliberation, they risk amplifying ungrounded claims simply to keep conversations agreeable or defer to perceived authority. Understanding how and why artificial agents sacrifice factual truth for social comfort is a necessary step toward building effective verification checks and auditing systems. 
+
+To explore this safely without generating harmful blueprints for real-world manipulation, we intentionally restricted our experiments to low-stakes community concert rumors with invented artist names. We avoided politically sensitive, medical, or financial topics to prevent misuse. Furthermore, our experiments consist solely of simulated agent-to-agent interactions; no human subjects were exposed to false claims or deceptive interactions, and no private personal records were collected or processed.
+
+% --- END INLINED sections/07_ethics_statement.tex ---
+
+% References (Do NOT set \bibliographystyle; aaai2027.sty sets it to aaai2027.bst)
+\bibliography{references}
+
+% Supplementary Material / Appendices (Unlimited pages per workshop instructions)
+\appendix
+% --- BEGIN INLINED sections/08_appendix.tex ---
+\section{Experimental Protocol and Simulation Details}
+\label{app:protocol}
+
+% Detailed prompts, hyperparameter tables, seating topologies, and simulation execution parameters go here.
+
+\section{Declaration of Generative AI and AI-Assisted Technologies}
+\label{app:ai_disclosure}
+
+We used foundation model assistants (Google Gemini and Anthropic Claude) to help with manuscript preparation and development support. Their assistance was limited to drafting boilerplate code for running trials and plotting figures, organizing bibliography citations, and polishing text readability and \LaTeX{} formatting. 
+
+All primary scientific contributions---including the research questions, the counterbalanced twin-world design, the mathematical definition of the Truth Discount, the experimental runs, and the empirical findings---were designed, analyzed, and evaluated by the human authors. The authors are fully responsible for the contents, claims, and conclusions of this paper.
+
+% --- END INLINED sections/08_appendix.tex ---
+
+% AAAI Reproducibility Checklist (Confirmed required by Social Sim'27 workshop organizers)
+% --- BEGIN INLINED ReproducibilityChecklist.tex ---
+\makeatletter
+\@ifundefined{isChecklistMainFile}{
+  % We are compiling a standalone document
+  \newif\ifreproStandalone
+  \reproStandalonetrue
+}{
+  % We are being \input into the main paper
+  \newif\ifreproStandalone
+  \reproStandalonefalse
+}
+\makeatother
+
+\ifreproStandalone
+\documentclass[letterpaper]{article}
+\usepackage[submission]{aaai2027}
+\setlength{\pdfpagewidth}{8.5in}
+\setlength{\pdfpageheight}{11in}
+\frenchspacing
+
+\begin{document}
+\fi
+\setlength{\leftmargini}{20pt}
+\makeatletter\def\@listi{\leftmargin\leftmargini \topsep .5em \parsep .5em \itemsep .5em}
+\def\@listii{\leftmargin\leftmarginii \labelwidth\leftmarginii \advance\labelwidth-\labelsep \topsep .4em \parsep .4em \itemsep .4em}
+\def\@listiii{\leftmargin\leftmarginiii \labelwidth\leftmarginiii \advance\labelwidth-\labelsep \topsep .4em \parsep .4em \itemsep .4em}\makeatother
+
+\setcounter{secnumdepth}{0}
+\renewcommand\thesubsection{\arabic{subsection}}
+\renewcommand\labelenumi{\thesubsection.\arabic{enumi}}
+
+\newcounter{checksubsection}
+\newcounter{checkitem}[checksubsection]
+
+\newcommand{\checksubsection}[1]{%
+  \refstepcounter{checksubsection}%
+  \paragraph{\arabic{checksubsection}. #1}%
+  \setcounter{checkitem}{0}%
+}
+
+\newcommand{\checkitem}{%
+  \refstepcounter{checkitem}%
+  \item[\arabic{checksubsection}.\arabic{checkitem}.]%
+}
+\newcommand{\question}[2]{\normalcolor\checkitem #1 #2 \color{blue}}
+\newcommand{\ifyespoints}[1]{\makebox[0pt][l]{\hspace{-15pt}\normalcolor #1}}
+
+\section*{Reproducibility Checklist}
+
+\vspace{1em}
+\hrule
+\vspace{1em}
+
+\textbf{Instructions for Authors:}
+
+This document outlines key aspects for assessing reproducibility. Please provide your input by editing this \texttt{.tex} file directly.
+
+For each question (that applies), replace the ``Type your response here'' text with your answer.
+
+\vspace{1em}
+\noindent
+\textbf{Example:} If a question appears as
+%
+\begin{center}
+\noindent
+\begin{minipage}{.9\linewidth}
+\ttfamily\raggedright
+\string\question \{Proofs of all novel claims are included\} \{(yes/partial/no)\} \\
+Type your response here
+\end{minipage}
+\end{center}
+you would change it to:
+\begin{center}
+\noindent
+\begin{minipage}{.9\linewidth}
+\ttfamily\raggedright
+\string\question \{Proofs of all novel claims are included\} \{(yes/partial/no)\} \\
+yes
+\end{minipage}
+\end{center}
+%
+Please make sure to:
+\begin{itemize}\setlength{\itemsep}{.1em}
+\item Replace ONLY the ``Type your response here'' text and nothing else.
+\item Use one of the options listed for that question (e.g., \textbf{yes}, \textbf{no}, \textbf{partial}, or \textbf{NA}).
+\item \textbf{Not} modify any other part of the \texttt{\string\question} command or any other lines in this document.\\
+\end{itemize}
+
+You can \texttt{\string\input} this .tex file right before \texttt{\string\end\{document\}} of your main file or compile it as a stand-alone document. Check the instructions on your conference's website to see if you will be asked to provide this checklist with your paper or separately.
+
+\vspace{1em}
+\hrule
+\vspace{1em}
+
+% The questions start here
+
+\checksubsection{General Paper Structure}
+\begin{itemize}
+
+\question{Includes a conceptual outline and/or pseudocode description of AI methods introduced}{(yes/partial/no/NA)}
+Type your response here
+
+\question{Clearly delineates statements that are opinions, hypothesis, and speculation from objective facts and results}{(yes/no)}
+Type your response here
+
+\question{Provides well-marked pedagogical references for less-familiar readers to gain background necessary to replicate the paper}{(yes/no)}
+Type your response here
+
+\end{itemize}
+\checksubsection{Theoretical Contributions}
+\begin{itemize}
+
+\question{Does this paper make theoretical contributions?}{(yes/no)}
+Type your response here
+
+	\ifyespoints{\vspace{1.2em}If yes, please address the following points:}
+        \begin{itemize}
+	
+	\question{All assumptions and restrictions are stated clearly and formally}{(yes/partial/no)}
+	Type your response here
+
+	\question{All novel claims are stated formally (e.g., in theorem statements)}{(yes/partial/no)}
+	Type your response here
+
+	\question{Proofs of all novel claims are included}{(yes/partial/no)}
+	Type your response here
+
+	\question{Proof sketches or intuitions are given for complex and/or novel results}{(yes/partial/no)}
+	Type your response here
+
+	\question{Appropriate citations to theoretical tools used are given}{(yes/partial/no)}
+	Type your response here
+
+	\question{All theoretical claims are demonstrated empirically to hold}{(yes/partial/no/NA)}
+	Type your response here
+
+	\question{All experimental code used to eliminate or disprove claims is included}{(yes/no/NA)}
+	Type your response here
+	
+	\end{itemize}
+\end{itemize}
+
+\checksubsection{Dataset Usage}
+\begin{itemize}
+
+\question{Does this paper rely on one or more datasets?}{(yes/no)}
+Type your response here
+
+\ifyespoints{If yes, please address the following points:}
+\begin{itemize}
+
+	\question{A motivation is given for why the experiments are conducted on the selected datasets}{(yes/partial/no/NA)}
+	Type your response here
+
+	\question{All novel datasets introduced in this paper are included in a data appendix}{(yes/partial/no/NA)}
+	Type your response here
+
+	\question{All novel datasets introduced in this paper will be made publicly available upon publication of the paper with a license that allows free usage for research purposes}{(yes/partial/no/NA)}
+	Type your response here
+
+	\question{All datasets drawn from the existing literature (potentially including authors' own previously published work) are accompanied by appropriate citations}{(yes/no/NA)}
+	Type your response here
+
+	\question{All datasets drawn from the existing literature (potentially including authors' own previously published work) are publicly available}{(yes/partial/no/NA)}
+	Type your response here
+
+	\question{All datasets that are not publicly available are described in detail, with explanation why publicly available alternatives are not scientifically satisficing}{(yes/partial/no/NA)}
+	Type your response here
+
+\end{itemize}
+\end{itemize}
+
+\checksubsection{Computational Experiments}
+\begin{itemize}
+
+\question{Does this paper include computational experiments?}{(yes/no)}
+Type your response here
+
+\ifyespoints{If yes, please address the following points:}
+\begin{itemize}
+
+	\question{This paper states the number and range of values tried per (hyper-) parameter during development of the paper, along with the criterion used for selecting the final parameter setting}{(yes/partial/no/NA)}
+	Type your response here
+
+	\question{Any code required for pre-processing data is included in the appendix}{(yes/partial/no)}
+	Type your response here
+
+	\question{All source code required for conducting and analyzing the experiments is included in a code appendix}{(yes/partial/no)}
+	Type your response here
+
+	\question{All source code required for conducting and analyzing the experiments will be made publicly available upon publication of the paper with a license that allows free usage for research purposes}{(yes/partial/no)}
+	Type your response here
+        
+	\question{All source code implementing new methods have comments detailing the implementation, with references to the paper where each step comes from}{(yes/partial/no)}
+	Type your response here
+
+	\question{If an algorithm depends on randomness, then the method used for setting seeds is described in a way sufficient to allow replication of results}{(yes/partial/no/NA)}
+	Type your response here
+
+	\question{This paper specifies the computing infrastructure used for running experiments (hardware and software), including GPU/CPU models; amount of memory; operating system; names and versions of relevant software libraries and frameworks}{(yes/partial/no)}
+	Type your response here
+
+	\question{This paper formally describes evaluation metrics used and explains the motivation for choosing these metrics}{(yes/partial/no)}
+	Type your response here
+
+	\question{This paper states the number of algorithm runs used to compute each reported result}{(yes/no)}
+	Type your response here
+
+	\question{Analysis of experiments goes beyond single-dimensional summaries of performance (e.g., average; median) to include measures of variation, confidence, or other distributional information}{(yes/no)}
+	Type your response here
+
+	\question{The significance of any improvement or decrease in performance is judged using appropriate statistical tests (e.g., Wilcoxon signed-rank)}{(yes/partial/no)}
+	Type your response here
+
+	\question{This paper lists all final (hyper-)parameters used for each model/algorithm in the paper’s experiments}{(yes/partial/no/NA)}
+	Type your response here
+
+
+\end{itemize}
+\end{itemize}
+\ifreproStandalone
+\end{document}
+\fi
+% --- END INLINED ReproducibilityChecklist.tex ---
+
+\end{document}
