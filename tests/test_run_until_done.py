@@ -301,6 +301,30 @@ class RecoveryWrapperTests(unittest.TestCase):
             self.assertIn("without --regenerate-failed", self.stdout)
             self.assertNotIn("--regenerate-failed", run.call_args.args[0])
 
+    def test_probe_mode_drives_probe_simulate_and_resumes_an_incomplete_town(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args, output = self.simulate_args(temporary, "--regenerate-failed", "--probe", "probe_1")
+            args = ["--probe-simulate" if a == "--simulate" else a for a in args]
+            def response(command, **kwargs):
+                self.assertEqual(command[1:4], ["-m", "truth_discount.cli", "probe-simulate"])
+                self.assertNotIn("--probe-simulate", command)
+                self.assertEqual(command[command.index("--probe") + 1], "probe_1")
+                if not output.exists():
+                    output.mkdir()
+                    (output / "execution_plan.json").write_text("{}")
+                    return SimpleNamespace(returncode=1, stdout="",
+                                           stderr="error: " + wrapper.PROBE_INCOMPLETE + ": town-1")
+                self.assertIn("--resume", command)
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            with patch.object(wrapper, "ledger_state", return_value={"blocked": False}):
+                code, run, sleep = self.invoke(args, response)
+            self.assertEqual((code, run.call_count), (0, 2))
+            self.assertEqual(sleep.call_args.args, (30,))
+
+    def test_probe_and_main_simulate_modes_are_exclusive(self):
+        code, run, _ = self.invoke(["--simulate", "--probe-simulate"], [])
+        self.assertEqual((code, run.call_count), (2, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -57,3 +57,10 @@ verified prices or account access. The new commands preview by default; paid
 execution requires separate explicit authority. Offline tests and synthetic
 demonstrations do not establish a real smoke test, completed human audit, main
 collection or paper result.
+
+## Two-source probes
+
+The [two-source probe guide](docs/14_two_source_probes.md) describes `probe-simulate`,
+`probe-demo` and `probe-status` for Probes 1 and 2 (consensus and conflict between two
+scripted sources). They leave the main run's generation code unchanged. The probe spec stays
+unbuildable until the 10 probe DNAs are chosen from the frozen main analysis.

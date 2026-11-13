@@ -22,6 +22,10 @@ town may repeat previously paid calls. All attempts retain the same ledger and c
         --output outputs/pilot --ledger outputs/ledgers/team.jsonl --budget-usd 20 --execute \
         --spending-authorized --full-pilot --start-pair 1 --max-concurrent-towns 8
 
+With --probe-simulate it drives `truth_discount.cli probe-simulate` (two-source probes) the same
+way; unclear charges in a probe collection still stop for a person, since the receipt helper
+reads main-run collections only.
+
 With --simulate the wrapper drives `truth_discount.cli simulate` instead, using the same
 arguments as that command. A town that ends incomplete (timeout or malformed reply) stops a
 simulate run; when the ledger is not blocked, the wrapper resumes after a short wait. Sealed
@@ -51,6 +55,7 @@ MAX_AUTO_RECONCILES = 30
 UNKNOWN_RECOVERY_ERRORS = ("budget ledger is blocked", "provider request failed; consult the sanitized receipt",
                            "budget does not permit this request")
 INCOMPLETE = "simulation collection stopped after incomplete town"
+PROBE_INCOMPLETE = "probe collection stopped after incomplete town"
 
 
 def log(message: str) -> None:
@@ -110,9 +115,12 @@ def ledger_state(env: dict, ledger: str, cap: str) -> dict:
 def main() -> int:
     auto = "--auto-reconcile" in sys.argv
     simulate = "--simulate" in sys.argv
-    command = "simulate" if simulate else "live"
-    args = [a for a in sys.argv[1:] if a not in ("--resume", "--auto-reconcile", "--simulate")]
+    probe = "--probe-simulate" in sys.argv
+    command = "probe-simulate" if probe else "simulate" if simulate else "live"
+    args = [a for a in sys.argv[1:] if a not in ("--resume", "--auto-reconcile", "--simulate", "--probe-simulate")]
     try:
+        if simulate and probe:
+            raise ValueError("choose --simulate (main run) or --probe-simulate (two-source probes), not both")
         if "--" in args:
             raise ValueError(f"the recovery wrapper accepts {command} options only, without a -- positional separator")
         output_arg = value(args, "--output")
@@ -134,7 +142,7 @@ def main() -> int:
     # environment forwarding and every subprocess.
     output = repo_path(output_arg) if output_arg else None
     env = dict(os.environ, PYTHONPATH=str(REPO / "src"))
-    if simulate and "--execute" in args and "--regenerate-failed" not in args:
+    if (simulate or probe) and "--execute" in args and "--regenerate-failed" not in args:
         log("note: without --regenerate-failed, the first sealed failed town stops this wrapper")
     reconciles, last_failure = 0, None
     for round_number in range(1, MAX_ROUNDS + 1):
@@ -162,7 +170,7 @@ def main() -> int:
             log(f"provider busy; resuming in {WAIT_SECONDS}s")
             time.sleep(WAIT_SECONDS)
             continue
-        incomplete = simulate and INCOMPLETE in proc.stderr
+        incomplete = (simulate and INCOMPLETE in proc.stderr) or (probe and PROBE_INCOMPLETE in proc.stderr)
         if incomplete and ledger and cap and not ledger_state(env, ledger, cap).get("blocked"):
             # No unclear charge: the town is sealed as failed; resume archives and reruns
             # it only when --regenerate-failed was forwarded.

@@ -1,0 +1,26 @@
+{
+  "_comment": "TWO-SOURCE PROBE SPEC. Extends configs/main_config.json (bound by base_config_sha256). Fill dna_selection after the frozen main analysis: status 'final', the 10 main cell IDs, and the frozen rule. Departure lines and two-source contexts are drafts for team review; see docs/14_two_source_probes.md.",
+  "probe_spec_version": "1.0.0",
+  "base_config_sha256": "a8c34bdcd80fca13a60621640f46a121ab75177d7d7b45293c976760ef3efe9b",
+  "dna_selection": {
+    "status": "awaiting_main_results",
+    "rule": "TBD: set by the frozen analysis plan before anyone opens main-run results",
+    "cell_ids": []
+  },
+  "second_source_persona_id": 14,
+  "probes": {
+    "probe_1": ["consensus_lie", "consensus_truth", "direct_conflict"],
+    "probe_2": ["flip_all", "flip_social", "flip_demographics"]
+  },
+  "templates": {
+    "source_about": "About {source_name}: {identity_line} {authority_line} {wealth_line} {closeness_line} {reliability_line}",
+    "first_hand_listener_context": "{shared_header}\n\nYou have {budget} of spending money this week, like most people in town. Apart from {first_name} and {second_name}, you know the other regulars as friendly acquaintances: not close, but you chat whenever you meet.\n\n{first_about}\n\n{second_about}\n\nYou are at the long shared table at Maple Street Café having coffee with {first_name}, {second_name} and a few other regulars. Right as breakfast ends, {first_name} and then {second_name} stand up, share news about a concert on their way out, and leave. You finish your coffee and head off to your afternoon.",
+    "second_hand_listener_context": "{shared_header}\n\nYou have {budget} of spending money this week, like most people in town. Apart from {first_name} and {second_name}, you know the other regulars as friendly acquaintances: not close, but you chat whenever you meet.\n\n{first_about}\n\n{second_about}\n\nYou were busy this morning and missed the regulars' chat at Maple Street Café. You have just run into {partner_name}.",
+    "scene_3_first_hand_cue": "You've just run into {partner_name}, who missed the café this morning where {first_name} and {second_name} told everyone about a concert.",
+    "departures": {
+      "reinforcing_after_rumor": "Hey guys, before I take off too, I actually saw that same poster outside the Community Hall earlier today—{announced_artist} is definitely playing Saturday at 7! It's going to be packed. See you all there!",
+      "reinforcing_after_truth": "Hey guys, before I take off too, I actually walked right by that noticeboard outside the Community Hall this morning—{announced_artist} is definitely playing Saturday at 7! It's going to be packed. See you all there!",
+      "contradicting_truth": "Hey guys, before I head out, just so you know about that poster outside the Community Hall—I actually walked right by it on my way here. {announced_artist} is the one playing the free surprise concert in the Town Square this Saturday at 7! You should all come. Anyway, I've got to get going—see you all later!"
+    }
+  }
+}
