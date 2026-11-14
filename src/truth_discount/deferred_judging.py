@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from collections import deque
 import asyncio
 import hashlib
+import inspect
 import json
 import os
 from pathlib import Path
@@ -31,6 +32,8 @@ from .simulation_artifacts import GENERATION_SOURCE_FILES, durable_mkdir, source
 
 VERSION = "truth-discount-deferred-judging-1"
 PARSER_VERSION = "legacy-label-quote-v1"
+NORMALIZED_PARSER_VERSION = "quote-normalized-v1"
+SUPPORTED_PARSER_VERSIONS = {PARSER_VERSION, NORMALIZED_PARSER_VERSION}
 JUDGING_SOURCE_FILES = tuple(sorted(set(GENERATION_SOURCE_FILES) | {
     "deferred_judging.py", "execution.py", "simulation_execution.py",
 }))
@@ -40,13 +43,66 @@ _PROFILE_FIELDS = {"version", "profile_id", "approved", "model_key", "provider_m
                    "rubric", "parser", "population", "population_approved", "source_format", "selection"}
 
 
-def parser_sha256() -> str:
-    """Fingerprint the unchanged parser implementation, not a guessed version.
+def _normalize_quotes(text: str) -> str:
+    """Normalize smart/curly quotes, apostrophes, and accents to standard ASCII quotes."""
+    return (
+        text.replace("’", "'")
+        .replace("‘", "'")
+        .replace("´", "'")
+        .replace("`", "'")
+        .replace("“", '"')
+        .replace("”", '"')
+        .replace("„", '"')
+        .replace("‟", '"')
+    )
 
-    Line endings are normalized so a Windows (CRLF) checkout of the same
-    commit matches the LF hash pinned in the judge profiles.
-    """
-    return source_sha256(Path(scoring.__file__))
+
+def _parse_quote_normalized(text: str, phone_transcript: list[dict]) -> dict:
+    """Parse judge response normalizing smart quotes and whitespace."""
+    def malformed(error: str) -> dict:
+        return {"status": "malformed", "label": None, "quote": None, "error": error}
+
+    if not isinstance(text, str):
+        return malformed("response must be text")
+    try:
+        value = json.loads(
+            text, object_pairs_hook=_unique, parse_constant=scoring._reject_constant
+        )
+    except (ValueError, RecursionError):
+        return malformed("response must be one strict JSON object")
+    if not isinstance(value, dict) or set(value) != {"label", "quote"}:
+        return malformed("response must contain exactly label and quote")
+    label, quote = value["label"], value["quote"]
+    if not isinstance(label, str) or label not in LABELS:
+        return malformed("unknown categorical label")
+    if not isinstance(quote, str):
+        return malformed("quote must be a string")
+    try:
+        turns = scoring._phone_only(phone_transcript)
+    except (TypeError, ValueError):
+        return malformed("invalid phone transcript")
+    if quote == "" and label == "NOT_MENTIONED":
+        return {"status": "valid", "label": label, "quote": quote, "error": None}
+    if not quote.strip():
+        return malformed("a nonempty listener quote is required")
+    squashed_quote = "".join(_normalize_quotes(quote).split())
+    if not any(
+        turn["speaker"].casefold() in scoring._LISTENER_SPEAKERS
+        and squashed_quote in "".join(_normalize_quotes(turn["text"]).split())
+        for turn in turns
+    ):
+        return malformed("quote is not a substring of a listener turn, ignoring whitespace and quote variants")
+    return {"status": "valid", "label": label, "quote": quote, "error": None}
+
+
+def parser_sha256(version: str = PARSER_VERSION) -> str:
+    """Fingerprint the parser implementation, normalized across line endings."""
+    if version == PARSER_VERSION:
+        return source_sha256(Path(scoring.__file__))
+    if version == NORMALIZED_PARSER_VERSION:
+        code = inspect.getsource(_parse_quote_normalized).replace("\r\n", "\n").encode("utf-8")
+        return hashlib.sha256(code).hexdigest()
+    raise ValueError(f"unsupported parser version: {version}")
 
 
 def _unique(pairs):
@@ -107,7 +163,10 @@ def _profile(value: dict) -> dict:
             or rubric["sha256"] != hashlib.sha256(rubric["prompt"].encode()).hexdigest()):
         raise ValueError("rubric version or UTF-8 prompt hash mismatch")
     parser = result.get("parser")
-    if parser != {"version": PARSER_VERSION, "sha256": parser_sha256()}:
+    if not isinstance(parser, dict) or set(parser) != {"version", "sha256"}:
+        raise ValueError("judge profile parser must specify version and sha256")
+    version = parser.get("version")
+    if version not in SUPPORTED_PARSER_VERSIONS or parser.get("sha256") != parser_sha256(version):
         raise ValueError("unsupported parser version or implementation hash")
     if not isinstance(result.get("settings"), dict):
         raise ValueError("judge settings must be explicit")
@@ -534,6 +593,9 @@ def _evaluation(call: dict, item: dict, profile: dict) -> dict:
         return {"status": "unobserved", "label": None, "quote": None, "error": "native_refusal"}
     if stop is not None and stop not in {"end_turn", "stop_sequence", "stop"}:
         return {"status": "unobserved", "label": None, "quote": None, "error": "native_nonterminal_or_unknown_stop"}
+    parser_ver = profile.get("parser", {}).get("version", PARSER_VERSION)
+    if parser_ver == NORMALIZED_PARSER_VERSION:
+        return _parse_quote_normalized(call["response"], item["phone_transcript"])
     return parse_judge_response(call["response"], item["phone_transcript"])
 
 
@@ -623,7 +685,9 @@ def _fold(info: dict, events: list[dict]) -> dict[str, list[dict]]:
             if call.get("native_stop_reason") != _stop_reason(call, profile):
                 raise ValueError("saved native stop reason differs from the native response")
             parsed = _evaluation(call, item, profile)
-            parser_only = parse_judge_response(call["response"], item["phone_transcript"]) if call["status"] == "completed" else None
+            parser_ver = profile.get("parser", {}).get("version", PARSER_VERSION)
+            parser_fn = _parse_quote_normalized if parser_ver == NORMALIZED_PARSER_VERSION else parse_judge_response
+            parser_only = parser_fn(call["response"], item["phone_transcript"]) if call["status"] == "completed" else None
             if call.get("parser_evaluation") != parser_only:
                 raise ValueError("saved historical parser evaluation cannot be reproduced")
             if row["evaluation"] != parsed:
@@ -898,7 +962,9 @@ async def _judge_collection(source_root, output: Path, profile: dict, backend, *
             call.update({k: call["token_usage"].get(k) for k in
                          ("actual_provider", "actual_model", "provider_api_calls", "cost_usd")})
         call["native_stop_reason"] = _stop_reason(call, profile)
-        call["parser_evaluation"] = (parse_judge_response(call["response"], item["phone_transcript"])
+        parser_ver = profile.get("parser", {}).get("version", PARSER_VERSION)
+        parser_fn = _parse_quote_normalized if parser_ver == NORMALIZED_PARSER_VERSION else parse_judge_response
+        call["parser_evaluation"] = (parser_fn(call["response"], item["phone_transcript"])
                                      if call["status"] == "completed" else None)
         parsed = _evaluation(call, item, profile)
         record({"type": "finish", "item_id": key, "attempt": attempt,
