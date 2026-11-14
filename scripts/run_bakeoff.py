@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from truth_discount.budget import BudgetLedger
-from truth_discount.deferred_judging import _parse_quote_normalized
+from truth_discount.deferred_judging import _parse_quote_normalized, load_judge_profile
 
 SAMPLE_JSON = ROOT / "outputs" / "calibration_sample_100.json"
 HUMAN_LABELS_CSV = ROOT / "outputs" / "human_labels_100.csv"
@@ -20,6 +20,7 @@ PREDICTIONS_CACHE = ROOT / "outputs" / "bakeoff_predictions.json"
 REPORT_MD = ROOT / "outputs" / "BAKE_OFF_REPORT.md"
 LEDGER_FILE = ROOT / "outputs" / "ledgers" / "bake-off.jsonl"
 ENV_FILE = ROOT / ".env"
+GEMINI_PROFILE = ROOT / "configs" / "judges" / "gemini-3.7-flash.json"
 
 RUBRIC_TEMPLATE = """You will read one evening phone call between a person and an out-of-town relative or friend.
 Label how the person describes a possible concert by {announced_artist} this weekend.
@@ -242,9 +243,11 @@ async def main():
             {"input_cost": 1.50, "output_cost": 6.00}
         )
     if deepinfra_key:
+        profile = load_judge_profile(GEMINI_PROFILE)
+        route = profile["provider_manifest"]["routes"][profile["model_key"]]
         models_to_test["Gemini 3.7 Flash"] = (
-            lambda prompt: call_openai_compat("https://api.deepinfra.com/v1/openai/chat/completions", "google/gemini-3.7-flash", prompt, deepinfra_key),
-            {"input_cost": 0.15, "output_cost": 0.60}
+            lambda prompt: call_openai_compat(route["endpoint"], route["model_id"], prompt, deepinfra_key),
+            {"input_cost": route["input_usd_per_million"], "output_cost": route["output_usd_per_million"]},
         )
 
     if not models_to_test:
@@ -288,14 +291,14 @@ async def main():
         "# Judge Model Bake-Off Report",
         "",
         f"**Date:** Sat Nov 14 2026",
-        f"**Sample Size:** {len(items)} stratified pilot calls",
+        f"**Sample Size:** {len(items)} calls from the supplied bake-off sample",
         f"**Human Labels Available:** {len(human_labels)}",
         f"**Parser Version:** `quote-normalized-v1` (Smart-quote normalized)",
         f"**Ledger Path:** `{LEDGER_FILE}`",
         "",
         "## Summary Results",
         "",
-        "| Model | Valid Labels | Malformed % | Agreement w/ Human | Cohen's Kappa (κ) | Measured Cost (100 calls) | Est. Cost / 100k calls |",
+        "| Model | Valid Labels | Malformed % | Agreement w/ Human | Cohen's Kappa (κ) | Recorded Cost | Est. Cost / 100k calls |",
         "| :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
     ]
 
@@ -324,7 +327,7 @@ async def main():
             "$350" if "Sonnet" in name else
             "$250" if "GPT-4o" in name else
             "$120" if "Sol" in name or "Luna" in name else
-            "$25" if "Gemini" in name else
+            "Reprice from raw usage" if "Gemini" in name else
             "$20"
         )
         actual_cost = model_costs.get(name, 0.0)
@@ -334,6 +337,8 @@ async def main():
         print(f"Model: {name:20s} | Valid: {valid_count}/{len(evals)} | Malformed: {malformed_pct:.1f}% | Kappa: {kappa:.3f} | Agreement: {agreement_pct:.1f}% | Cost: ${actual_cost:.4f}")
 
     report_lines.extend([
+        "",
+        "Cached predictions retain the costs recorded when they were generated. Use the original token usage and the current route rates to update estimates.",
         "",
         "## Selection Rule Applied",
         "> **Rule:** The cheapest judge within 0.05 kappa (κ) of the best wins. Haiku wins ties.",

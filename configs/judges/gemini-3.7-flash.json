@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "profile_id": "gemini-3.7-flash-v1",
+  "profile_id": "gemini-3.7-flash-v2",
   "approved": true,
   "model_key": "judge-gemini-flash",
   "provider_manifest": {
@@ -14,9 +14,9 @@
         "api_key_env": "DEEPINFRA_API_KEY",
         "settings_verified": true,
         "pricing_verified": true,
-        "input_usd_per_million": 0.15,
-        "output_usd_per_million": 0.6,
-        "cached_input_usd_per_million": 0.0375,
+        "input_usd_per_million": 0.75,
+        "output_usd_per_million": 3.75,
+        "cached_input_usd_per_million": 0.75,
         "max_input_tokens": 32768,
         "timeout_seconds": 60,
         "max_retries": 3,
@@ -28,7 +28,7 @@
           "reasoning_effort": "none"
         },
         "allow_synchronous_judge": false,
-        "pricing_source": "https://deepinfra.com/google/gemini-3.7-flash (bake-off validated 2026-11-14)",
+        "pricing_source": "https://deepinfra.com/google/gemini-3.7-flash (published rates checked 2026-11-14; cached input budgeted at standard input rate because no discount is listed)",
         "settings_source": "https://docs.deepinfra.com/chat/reasoning (reasoning_effort none + json_schema + max_tokens 1500)",
         "verified_at": "2026-11-14T12:25:00+00:00"
       }
