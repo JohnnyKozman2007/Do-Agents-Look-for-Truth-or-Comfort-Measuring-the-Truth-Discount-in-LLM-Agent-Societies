@@ -409,13 +409,21 @@ class ReplayVersionTests(unittest.IsolatedAsyncioTestCase):
                 else:
                     attempts = call["token_usage"]["attempts"]
                     if change == "code":
-                        attempts[0]["error_code"] = "rate_limited"
+                        attempts[0]["error_code"] = "server_error"
                     else:
                         attempts.reverse()
                     call["raw_response"] = capture(GenerationResponse(call["response"], call["token_usage"]))
                 self.save(town, directory)
                 with self.assertRaisesRegex(InvalidBundle, "pre-inference rejection"):
                     audit_town(directory)
+
+    async def test_deepinfra_rate_limited_free_attempt_replays(self):
+        town, directory = await self.make(backend=FailFastReceipts(self.config))
+        for call in (c for c in town["calls"] if c["scene"] == 2):
+            call["token_usage"]["attempts"][0]["error_code"] = "rate_limited"
+            call["raw_response"] = capture(GenerationResponse(call["response"], call["token_usage"]))
+        self.save(town, directory)
+        self.assertEqual(audit_town(directory), town)
 
     async def test_mixed_fixture_and_mocked_outputs_are_not_pooled(self):
         await self.make(0)

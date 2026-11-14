@@ -252,10 +252,38 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.ledger.summary()["settled_usd"], 0)
         self.assertFalse(self.ledger.summary()["blocked"])
 
-    async def test_other_429s_and_rejections_without_fail_fast_hold_the_reservation(self):
-        cases = [(self.fail_fast_manifest(), HTTPResponse(429, {})),                    # "Rate limited"
-                 (self.fail_fast_manifest(), HTTPResponse(503, {"error": {"code": "engine_overloaded"}})),
-                 (manifest(), HTTPResponse(429, {"error": {"code": "engine_overloaded"}}))]
+    async def test_deepinfra_rate_limited_429_is_free_and_retried(self):
+        # The plain "Rate limited" 429 keeps no code, or an unrecognized one, from its body.
+        limited = [HTTPResponse(429, {}), HTTPResponse(429, {"error": {"code": "rate_limit_exceeded"}})]
+        backend = self.backend(self.fail_fast_manifest(), transport=self.scripted(*limited, response()))
+        backend._sleep = lambda seconds: asyncio.sleep(0)
+        result = await backend.generate(request())
+        self.assertEqual(result.text, "GO")
+        attempts = result.usage["attempts"]
+        self.assertEqual([(a["status"], a.get("error_code")) for a in attempts],
+                         [("rejected", "rate_limited"), ("rejected", "rate_limited"), ("completed", None)])
+        summary = self.ledger.summary()
+        self.assertEqual((summary["reservation_count"], summary["unknown_count"]), (3, 0))
+        self.assertAlmostEqual(summary["settled_usd"], result.usage["cost_usd"])
+        self.assertFalse(summary["blocked"])
+
+    async def test_exhausted_rate_limited_retries_cost_nothing_and_do_not_block(self):
+        backend = self.backend(self.fail_fast_manifest(retries=1),
+                               transport=self.scripted(HTTPResponse(429, {}), HTTPResponse(429, {})))
+        backend._sleep = lambda seconds: asyncio.sleep(0)
+        with self.assertRaisesRegex(ProviderError, "rejected every attempt before inference") as error:
+            await backend.generate(request())
+        receipt = error.exception.receipt
+        self.assertEqual((receipt["cost_usd"], receipt["cost_status"], receipt["error_code"]),
+                         (0.0, "rejected_before_inference", "rate_limited"))
+        self.assertEqual(self.ledger.summary()["settled_usd"], 0)
+        self.assertFalse(self.ledger.summary()["blocked"])
+
+    async def test_other_statuses_and_429s_without_fail_fast_hold_the_reservation(self):
+        cases = [(self.fail_fast_manifest(), HTTPResponse(503, {"error": {"code": "engine_overloaded"}})),
+                 (self.fail_fast_manifest(), HTTPResponse(500, {})),
+                 (manifest(), HTTPResponse(429, {"error": {"code": "engine_overloaded"}})),
+                 (manifest(), HTTPResponse(429, {}))]
         for number, (config, reply) in enumerate(cases):
             with self.subTest(case=number):
                 self.ledger.close()

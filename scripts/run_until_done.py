@@ -1,8 +1,8 @@
 """Keep a collection going through provider busy spells and isolated unclear charges.
 
-DeepInfra sometimes turns requests away for a minute or more ("engine_overloaded"). Those
-rejections are free and leave the ledger unblocked, but once a call has used all its retries
-the run stops. This wrapper waits, then resumes, and repeats.
+DeepInfra sometimes turns requests away for a minute or more ("engine_overloaded" or a plain
+"Rate limited" 429). Those rejections are free and leave the ledger unblocked, but once a call
+has used all its retries the run stops. This wrapper waits, then resumes, and repeats.
 
 A dropped connection or timeout leaves an unclear charge that blocks the ledger by design.
 With --auto-reconcile, the wrapper may use scripts/reconcile_unknowns.py to recover an audited
@@ -21,6 +21,17 @@ town may repeat previously paid calls. All attempts retain the same ledger and c
     python scripts/run_until_done.py --auto-reconcile --providers configs/providers.pilot.json \
         --output outputs/pilot --ledger outputs/ledgers/team.jsonl --budget-usd 20 --execute \
         --spending-authorized --full-pilot --start-pair 1 --max-concurrent-towns 8
+
+With --simulate the wrapper drives `truth_discount.cli simulate` instead, using the same
+arguments as that command. A town that ends incomplete (timeout or malformed reply) stops a
+simulate run; when the ledger is not blocked, the wrapper resumes after a short wait. Sealed
+failed towns are rerun only if --regenerate-failed is among the forwarded arguments, which keeps
+that choice explicit and logged. Example for one shard, after separate execution approval:
+
+    python scripts/run_until_done.py --simulate --auto-reconcile --config configs/main_config.json \
+        --providers local/providers.actor.json --all-pairs --shard-count 6 --shard-index 0 \
+        --output outputs/main-owner-0 --ledger outputs/ledgers/main-owner-0.jsonl --budget-usd 10 \
+        --max-concurrent-towns 6 --regenerate-failed --execute --spending-authorized
 """
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -39,6 +50,7 @@ MAX_ROUNDS = 60
 MAX_AUTO_RECONCILES = 30
 UNKNOWN_RECOVERY_ERRORS = ("budget ledger is blocked", "provider request failed; consult the sanitized receipt",
                            "budget does not permit this request")
+INCOMPLETE = "simulation collection stopped after incomplete town"
 
 
 def log(message: str) -> None:
@@ -97,10 +109,12 @@ def ledger_state(env: dict, ledger: str, cap: str) -> dict:
 
 def main() -> int:
     auto = "--auto-reconcile" in sys.argv
-    args = [a for a in sys.argv[1:] if a not in ("--resume", "--auto-reconcile")]
+    simulate = "--simulate" in sys.argv
+    command = "simulate" if simulate else "live"
+    args = [a for a in sys.argv[1:] if a not in ("--resume", "--auto-reconcile", "--simulate")]
     try:
         if "--" in args:
-            raise ValueError("the recovery wrapper accepts live options only, without a -- positional separator")
+            raise ValueError(f"the recovery wrapper accepts {command} options only, without a -- positional separator")
         output_arg = value(args, "--output")
         ledger, cap = value(args, "--ledger"), value(args, "--budget-usd")
         if auto:
@@ -120,12 +134,14 @@ def main() -> int:
     # environment forwarding and every subprocess.
     output = repo_path(output_arg) if output_arg else None
     env = dict(os.environ, PYTHONPATH=str(REPO / "src"))
+    if simulate and "--execute" in args and "--regenerate-failed" not in args:
+        log("note: without --regenerate-failed, the first sealed failed town stops this wrapper")
     reconciles, last_failure = 0, None
     for round_number in range(1, MAX_ROUNDS + 1):
         resume = ["--resume"] if output is not None and (output / "execution_plan.json").exists() else []
         before = towns_saved(output)
         log(f"round {round_number}{' (resume)' if resume else ''}; towns saved so far: {before}")
-        proc = subprocess.run([sys.executable, "-m", "truth_discount.cli", "live", *args, *resume],
+        proc = subprocess.run([sys.executable, "-m", "truth_discount.cli", command, *args, *resume],
                               cwd=REPO, env=env, capture_output=True, text=True, encoding="utf-8")
         sys.stdout.write(proc.stdout)
         sys.stderr.write(proc.stderr)
@@ -134,7 +150,7 @@ def main() -> int:
             log("finished")
             return 0
         if proc.returncode == 2:
-            log("invalid live command arguments; not inspecting or reconciling the ledger")
+            log(f"invalid {command} command arguments; not inspecting or reconciling the ledger")
             return proc.returncode
         failure = proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else f"exit {proc.returncode}"
         progressed = towns_saved(output) > before
@@ -146,7 +162,14 @@ def main() -> int:
             log(f"provider busy; resuming in {WAIT_SECONDS}s")
             time.sleep(WAIT_SECONDS)
             continue
-        if not auto or not any(message in proc.stderr for message in UNKNOWN_RECOVERY_ERRORS):
+        incomplete = simulate and INCOMPLETE in proc.stderr
+        if incomplete and ledger and cap and not ledger_state(env, ledger, cap).get("blocked"):
+            # No unclear charge: the town is sealed as failed; resume archives and reruns
+            # it only when --regenerate-failed was forwarded.
+            log("a town ended incomplete with no unclear charge; resuming in 30s")
+            time.sleep(30)
+            continue
+        if not auto or not (incomplete or any(message in proc.stderr for message in UNKNOWN_RECOVERY_ERRORS)):
             log("stopped for a reason other than a busy provider; not retrying")
             return proc.returncode
         state = ledger_state(env, ledger, cap)

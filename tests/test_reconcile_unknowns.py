@@ -299,5 +299,63 @@ class ReconcileUnknownsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.preview()["status"], "ready_for_explicit_apply")
 
 
+class SimulationReconcileTests(unittest.TestCase):
+    """A sealed simulation-only collection is audited against its own saved plan."""
+
+    def setUp(self):
+        import asyncio
+        import sys
+        sys.path.insert(0, str(ROOT / "tests"))
+        from test_live_cli import MockHTTP, approved_test_manifest
+        from truth_discount.execution import select_runs
+        from truth_discount.simulation_execution import allocate_runs, collect_simulations
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        root = Path(self.temp.name)
+        self.output, self.journal = root / "shard", root / "shard.jsonl"
+        config = load_config(ROOT / "configs/pilot_config.json")
+        providers = approved_test_manifest(config)
+        agents = {model["key"] for model in config["models"]["agent_models"]}
+        providers["routes"] = {k: v for k, v in providers["routes"].items() if k in agents}
+        selection = select_runs(config, [config["models"]["agent_models"][0]["key"]])[:2]
+        runs, allocation = allocate_runs(config, selection)
+        with BudgetLedger(self.journal, "1") as ledger:
+            settle = ledger.settle
+            self.target = None
+            def hold_first(identifier, amount, receipt=None):
+                # The provider priced this call, but the ledger only learned "unknown".
+                if self.target is None:
+                    self.target, self.known_amount = identifier, amount
+                    return settle(identifier, None, {"cost_status": "unknown"})
+                return settle(identifier, amount, receipt)
+            backend = ProviderBackend(providers, ledger, transport=MockHTTP(), evidence_kind="mocked_provider")
+            with patch.dict(os.environ, {"TEST_PROVIDER_KEY": "UNIT_TEST_NO_REAL_CREDENTIAL"}), \
+                 patch("socket.create_connection", side_effect=AssertionError("network forbidden")), \
+                 patch.object(ledger, "settle", side_effect=hold_first):
+                with self.assertRaises(Exception):
+                    asyncio.run(collect_simulations(config, providers, runs, self.output, backend,
+                        allocation=allocation, execution_authorized=True, spending_authorized=True))
+        lock = Path(str(self.journal) + ".lock")
+        if lock.exists():
+            lock.unlink()
+
+    def test_priced_simulation_receipt_is_recovered_and_collection_stays_resumable(self):
+        from truth_discount.simulation_execution import _read_plan
+        source = recovery._snapshot(self.output)
+        preview = recovery.reconcile_known(self.journal, "1", [self.output])
+        self.assertEqual(preview["status"], "ready_for_explicit_apply")
+        self.assertEqual(preview["eligible"][0]["reservation_id"], self.target)
+        self.assertEqual(source, recovery._snapshot(self.output))
+        applied = recovery.reconcile_known(self.journal, "1", [self.output], apply=True)
+        self.assertEqual((applied["status"], applied["applied_count"]), ("applied", 1))
+        self.assertEqual(applied["budget"]["unknown_count"], 0)
+        self.assertEqual(recovery.reconcile_known(self.journal, "1", [self.output])["status"], "no_unknown_charges")
+        # The rewritten anchor still binds the saved plan, so `simulate --resume` can continue.
+        saved = _read_plan(self.output)
+        with BudgetLedger(self.journal, "1") as ledger:
+            ledger.verify_checkpoint(json.loads((self.output / "budget_checkpoint.json").read_text())["ledger_checkpoint"])
+        self.assertEqual(saved["execution_mode"], "simulation_only")
+
+
 if __name__ == "__main__":
     unittest.main()

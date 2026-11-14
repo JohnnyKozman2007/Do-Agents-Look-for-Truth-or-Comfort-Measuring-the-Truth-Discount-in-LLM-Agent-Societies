@@ -11,6 +11,10 @@ from typing import Any, Protocol
 # DeepInfra: "A rejected request never reaches the model, so no inference happens
 # and nothing is billed." https://docs.deepinfra.com/chat/overview#fail-fast
 REJECTED_BEFORE_INFERENCE = {"DeepInfra": "engine_overloaded"}
+# DeepInfra's other 429 ("Rate limited", also sent "when a model becomes very busy")
+# is refused before inference too: on 2026-11-11 its billed usage matched only the
+# completed attempts. https://docs.deepinfra.com/account/rate-limits
+RATE_LIMITED_BEFORE_INFERENCE = {"DeepInfra": "rate_limited"}
 
 
 def canonical_bytes(value: Any) -> bytes:

@@ -1,0 +1,35 @@
+\section{Related Work}
+\label{sec:related_work}
+
+Prior studies evaluate social influence in LLMs by measuring how often agents fail multiple-choice benchmarks (such as MMLU-Pro) or flip their answers when pressured by bots. Our work departs from this paradigm in three fundamental ways:
+
+\subsection{The ``Truth Discount'' vs.\ Benchmark Accuracy}
+\label{sec:rel_truth_discount}
+Existing literature measures raw task error or adoption thresholds when an agent is exposed to peer pressure~\citep{banerjee2026information,hu2026authority,becker2026conformity}. This confounds general test-taking ability with social deference. 
+
+Instead, we isolate the epistemic premium of truth itself through a counterfactual twin design. For every run where a source spreads a false rumor, we execute an identical twin world where the exact same source makes the exact same claim, but the claim is objectively true. The \textbf{Truth Discount} measures this gap:
+\begin{equation}
+\text{Truth Discount} = \text{Belief}_{\text{Truth Twin}} - \text{Belief}_{\text{Rumor Twin}}
+\end{equation}
+If agents prioritize reality, this gap is large. If social ties or perceived status lead agents to ignore facts, the Truth Discount collapses to zero.
+
+\subsection{Costly Empirical Verification vs.\ Passive Hints}
+\label{sec:rel_costly_verification}
+In existing benchmarks, claims are either impossible to verify (such as predicting tomorrow's weather) or verification is free (such as injecting an automatic fact-check prompt). While game-theoretic environments charge abstract token penalties~\citep{mahmud2026verification}, they do not capture practical trade-offs.
+
+In contrast, our agents face an explicit economic decision. Each listener operates under a finite personal budget (\$40). When hearing a claim, they choose between two concrete actions:
+\begin{itemize}
+    \item \textbf{Trust for free:} Accept a friend's or authority figure's claim without spending money.
+    \item \textbf{Pay to verify:} Spend \$5 of their budget (framed as bus fare) to travel across town and inspect the noticeboard for ground truth.
+\end{itemize}
+This replaces passive prompt-following with an active behavioral metric: whether an agent is willing to pay to discover the truth when social comfort is free.
+
+\subsection{A $2^6$ Factorial Grid vs.\ Isolated Knobs}
+\label{sec:rel_factorial_grid}
+Existing studies manipulate only one or two isolated variables at a time: sweeping peer volume $k$~\citep{banerjee2026information}, adding a single isolated authority tag like \textit{``Expert''}~\citep{hu2026authority,kumar2026authority}, or examining age and gender in isolated pairs without crossing them~\citep{schuster-etal-2026-whose}. These studies also assume social influence operates in a simple, additive manner.
+
+In contrast, we test a full $2^6 = 64$ factorial space, crossing six binary traits: closeness (stranger vs.\ friend), authority (citizen vs.\ mayor), reliability (liar vs.\ honest history), perceived wealth, age, and gender. Holding the background lore identical allows us to isolate both main effects and \textbf{non-linear social overrides}:
+\begin{itemize}
+    \item \textbf{The Friendship Override:} Does close friendship cause an agent to forgive a known track record of false claims?
+    \item \textbf{The Authority Override:} Does mayoral status induce listeners to accept claims from an unreliable source?
+\end{itemize}

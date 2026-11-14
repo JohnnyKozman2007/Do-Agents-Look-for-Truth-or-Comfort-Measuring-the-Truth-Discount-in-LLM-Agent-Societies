@@ -228,3 +228,14 @@ __marimo__/
 # Generated offline plans and synthetic fixture bundles
 /outputs/
 /pilot-manifest.jsonl
+
+# TeX / LaTeX auxiliary build files
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
