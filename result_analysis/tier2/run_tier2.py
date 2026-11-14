@@ -23,6 +23,19 @@ import m9_who_checks  # noqa: E402
 from t2lib import read_listeners  # noqa: E402
 
 
+def run_metrics(df, boot, out_dir):
+    """Run metrics 7, 8 and 9 on a listener table and write their CSV tables to out_dir/tables. Returns the result dicts."""
+    os.makedirs(os.path.join(out_dir, "tables"), exist_ok=True)
+    results = []
+    for n, mod in ((2, m7_check_rates), (3, m8_second_hand), (4, m9_who_checks)):
+        print(f"[{n}/4] {mod.__name__}")
+        r = mod.run(df, B=boot) if mod is not m9_who_checks else mod.run(df, B=max(500, boot // 2))
+        results.append(r)
+        for name, tbl in r["tables"].items():
+            tbl.to_csv(os.path.join(out_dir, "tables", f"{name}.csv"), index=False)
+    return results
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", nargs="+", required=True, help="folder(s) of run directories")
@@ -37,13 +50,7 @@ def main():
     df = read_listeners(a.data, a.out, refresh=a.refresh)
     print(f"      {len(df):,} listener rows, {df.run_id.nunique():,} towns ({time.time() - t0:.0f}s)")
 
-    results = []
-    for n, mod in ((2, m7_check_rates), (3, m8_second_hand), (4, m9_who_checks)):
-        print(f"[{n}/4] {mod.__name__}")
-        r = mod.run(df, B=a.boot) if mod is not m9_who_checks else mod.run(df, B=max(500, a.boot // 2))
-        results.append(r)
-        for name, t in r["tables"].items():
-            t.to_csv(os.path.join(a.out, "tables", f"{name}.csv"), index=False)
+    results = run_metrics(df, a.boot, a.out)
 
     out = os.path.join(a.out, "tier2_report.html")
     build_report.build(results, df, ", ".join(os.path.abspath(d) for d in a.data), out)

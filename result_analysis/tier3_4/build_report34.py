@@ -53,6 +53,21 @@ def render_blocks(blocks):
     return "\n".join(out)
 
 
+def caveats(judge_name, skipped, synthetic=False):
+    """Reading guide for the belief-based (Tier 3/4) metrics."""
+    cav = [
+        f"Belief labels come from <b>{escape(judge_name)}</b>, a single LLM judge. Judge error is not propagated into the confidence intervals; the intervals reflect sampling variation over twin pairs only.",
+        "Belief scores: FACT and CHECKED_TRUE = 1, UNCERTAIN = 0.5, SKEPTICAL and CHECKED_FALSE = 0. NOT_MENTIONED is excluded from the primary mean; NOT_MENTIONED = 0 and = 0.5 are reported as sensitivity bounds. Missing or invalid labels stay missing.",
+        "Truth discount (TD) = mean belief in the truth twin minus mean belief in the rumor twin, computed per twin pair; the pair is the independent unit. Intervals are percentile bootstraps over pairs (2,000 resamples by default, set with --boot) unless stated.",
+        "First-hand listeners choose GO/SKIP before seeing any poster, so TD among first-hand non-checkers is a built-in noise floor (expected near 0).",
+        "Exploratory analysis until a dated analysis specification exists; the ten planned contrasts here use Holm correction, but this report is not the confirmatory test.",
+        f"Not computed here (need LLM calls or probabilities): {escape('; '.join(skipped))}.",
+    ]
+    if synthetic:
+        cav.insert(0, "<b>SYNTHETIC PLACEHOLDER LABELS.</b> These labels are random and exist only to test the code. Nothing below is a result.")
+    return cav
+
+
 def build(results, d, data_dirs, label_files, judge_name, out_path, skipped, synthetic=False):
     n_lab = int(d.labeled.sum())
     kpis = [("Towns", f"{d.run_id.nunique():,}"), ("Twin pairs", f"{d.pair_id.nunique():,}"), ("Listeners", f"{len(d):,}"),
@@ -64,16 +79,7 @@ def build(results, d, data_dirs, label_files, judge_name, out_path, skipped, syn
     for r in results:
         take = "".join(f"<li>{escape(s)}</li>" for s in r["summary"])
         secs.append(f'<h2 id="{r["id"]}">{escape(r["title"])}</h2><div class="card"><b>Key takeaways</b><ul class="take">{take}</ul></div>' + render_blocks(r["blocks"]))
-    cav = [
-        f"Belief labels come from <b>{escape(judge_name)}</b>, a single LLM judge. Judge error is not propagated into the confidence intervals; the intervals reflect sampling variation over twin pairs only.",
-        "Belief scores: FACT and CHECKED_TRUE = 1, UNCERTAIN = 0.5, SKEPTICAL and CHECKED_FALSE = 0. NOT_MENTIONED is excluded from the primary mean; NOT_MENTIONED = 0 and = 0.5 are reported as sensitivity bounds. Missing or invalid labels stay missing.",
-        "Truth discount (TD) = mean belief in the truth twin minus mean belief in the rumor twin, computed per twin pair; the pair is the independent unit. Intervals are percentile bootstraps over pairs (2,000 resamples by default, set with --boot) unless stated.",
-        "First-hand listeners choose GO/SKIP before seeing any poster, so TD among first-hand non-checkers is a built-in noise floor (expected near 0).",
-        "Exploratory analysis of development data until a dated analysis specification exists; the ten planned contrasts here use Holm correction, but this report is not the confirmatory test.",
-        f"Not computed here (need LLM calls or probabilities): {escape('; '.join(skipped))}.",
-    ]
-    if synthetic:
-        cav.insert(0, "<b>SYNTHETIC PLACEHOLDER LABELS.</b> These labels are random and exist only to test the code. Nothing below is a result.")
+    cav = caveats(judge_name, skipped, synthetic)
     cav_html = "".join(f"<li>{c}</li>" for c in cav)
     html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tier 3 and 4 Truth Discount</title><style>{CSS}</style></head><body><div class="wrap">

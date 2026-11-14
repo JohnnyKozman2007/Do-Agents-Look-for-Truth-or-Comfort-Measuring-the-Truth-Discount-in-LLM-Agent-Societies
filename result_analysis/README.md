@@ -2,7 +2,7 @@
 
 Analysis code for the simulation output: how often listeners check the noticeboard (Tier 2), how much they believe the truth versus the rumor (Tier 3), and how robust and mechanistic those results are (Tier 4). Every metric reads saved run folders and, for the belief metrics, a file of belief labels. **Nothing here makes a model call.**
 
-Each run produces one self-contained HTML report (inline SVG charts, light and dark theme, no external assets) plus a CSV for every table.
+Each run produces a self-contained HTML report (inline SVG charts, light and dark theme, no external assets) plus a CSV for every table. `run_all.py` runs all tiers and writes **one combined report**; the per-tier scripts write separate reports.
 
 | Tier | Needs labels? | Metrics | Entry point |
 |---|---|---|---|
@@ -10,7 +10,7 @@ Each run produces one self-contained HTML report (inline SVG charts, light and d
 | 3: truth discount | Yes | 10 primary truth discount, 11 checkers vs non-checkers, 12 ten planned contrasts, 13 asymmetry, 14 override and cell map, 15 second-hand truth discount | `tier3_4/run_tier34.py` |
 | 4: robustness and mechanism | Mostly | 16 model comparison, 17 variance and seed planning, 18 keyword transcript pass, 20 top-10 DNA rule | `tier3_4/run_tier34.py` |
 
-Metric numbers follow the analysis plan. Metrics 1-6 (data audit and judge validation), 19, 21 and 22 are not part of this folder.
+All tiers in one report: `run_all.py`. Metric numbers follow the analysis plan. Metrics 1-6 (data audit and judge validation), 19, 21 and 22 are not part of this folder.
 
 ## Contents
 
@@ -40,6 +40,14 @@ pip install -r result_analysis/requirements.txt
 Run from anywhere; paths below are examples.
 
 ```bash
+# Everything in one combined report (omit --labels to run Tier 2 only)
+python3 result_analysis/run_all.py \
+  --data /path/to/shard-0/outputs/main-owner-0 /path/to/shard-1/outputs/main-owner-1 \
+  --labels labels_shard0.csv labels_shard1.csv \
+  --judge-name "Gemini 3.7 Flash" \
+  --out ./analysis_out/all
+
+# Or one tier at a time, each with its own report.
 # Tier 2: behavioral, no labels
 python3 result_analysis/tier2/run_tier2.py \
   --data /path/to/shard-0/outputs/main-owner-0 /path/to/shard-1/outputs/main-owner-1 \
@@ -53,18 +61,18 @@ python3 result_analysis/tier3_4/run_tier34.py \
   --out ./analysis_out/tier34
 ```
 
-Open `tier2_report.html` or `tier34_report.html` in a browser. On a single 1,664-town shard, Tier 2 takes about 15 seconds, and Tier 3/4 about 25 seconds on a first run (7 seconds once the listener and text tables are cached).
+Open `result_analysis_report.html` (combined), `tier2_report.html` or `tier34_report.html` in a browser. On a single 1,664-town shard, Tier 2 takes about 15 seconds, and Tier 3/4 about 25 seconds on a first run (7 seconds once the listener and text tables are cached).
 
 | Option | Applies to | Meaning |
 |---|---|---|
 | `--data DIR [DIR ...]` | both | Folders that hold the run directories. Pass several to pool shards; the code stops if a `(run_id, seat)` appears twice. |
 | `--out DIR` | both | Output folder (created if needed). |
-| `--labels FILE [FILE ...]` | 3/4 | Belief label files, see [labels](#belief-labels). |
-| `--judge-name TEXT` | 3/4 | Judge name shown in the report header. |
+| `--labels FILE [FILE ...]` | all, 3/4 | Belief label files, see [labels](#belief-labels). Optional for `run_all.py` (omitted = Tier 2 only). |
+| `--judge-name TEXT` | all, 3/4 | Judge name shown in the report header. |
 | `--boot N` | both | Bootstrap resamples (default 2000). |
 | `--refresh` | both | Rebuild the cached listener and text tables. |
-| `--only m10,m12` | 3/4 | Run only these metrics. |
-| `--no-text` | 3/4 | Skip the keyword pass (metric 18), which re-reads every `town.json`. |
+| `--only m10,m12` | `run_tier34.py` | Run only these metrics. |
+| `--no-text` | all, 3/4 | Skip the keyword pass (metric 18), which re-reads every `town.json`. |
 
 The listener table is cached in the output folder as `listeners_<hash>.csv`, keyed by the set of `--data` folders. Rerun with `--refresh` if the underlying runs change. A console line reports label coverage; under 95% labeled triggers a warning and pairs missing a twin's labels are dropped and counted.
 
@@ -244,7 +252,7 @@ Tables: `m20_ranking_<model>`, `m20_split_sample`.
 
 Each run writes to `--out`:
 
-- `tier2_report.html` or `tier34_report.html`: charts, tables, a "Key takeaways" box per metric and a "Read this first" box of caveats.
+- `result_analysis_report.html` (from `run_all.py`), `tier2_report.html` or `tier34_report.html`: charts, tables, a "Key takeaways" box per metric and a "Read this first" box of caveats.
 - `tables/*.csv`: one file per table, named as listed under each metric. Tier 3/4 also writes `label_coverage.csv`.
 - Cached inputs: `listeners_<hash>.csv` and, for metric 18, `text_flags_<hash>.csv`.
 
@@ -283,6 +291,7 @@ The placeholder labels are random (apart from a crude GO to CHECKED link), and t
 result_analysis/
   README.md
   requirements.txt
+  run_all.py              all tiers, one combined report
   common/                 shared by both tiers
     t2lib.py              run loading, bootstrap, logistic regression, Wald tests
     charts.py             dependency-free inline-SVG charts
@@ -296,4 +305,4 @@ result_analysis/
     build_report34.py  run_tier34.py  make_fixture.py  test_t3lib.py
 ```
 
-A metric module exposes `run(...)` returning `dict(id, title, summary, blocks, tables)`: `summary` is a list of takeaway sentences, `blocks` is a list of `("h3" | "h4" | "p" | "svg" | "table" | "grid", ...)` items rendered in order, and `tables` maps a CSV name to a DataFrame. Register a new module in the runner's `mods` dictionary.
+A metric module exposes `run(...)` returning `dict(id, title, summary, blocks, tables)`: `summary` is a list of takeaway sentences, `blocks` is a list of `("h3" | "h4" | "p" | "svg" | "table" | "grid", ...)` items rendered in order, and `tables` maps a CSV name to a DataFrame. Register a new module in `run_metrics` of the matching runner (`tier2/run_tier2.py` or `tier3_4/run_tier34.py`); `run_all.py` picks it up automatically. Reading-guide caveats live in `caveats()` of `tier2/build_report.py` and `tier3_4/build_report34.py`.

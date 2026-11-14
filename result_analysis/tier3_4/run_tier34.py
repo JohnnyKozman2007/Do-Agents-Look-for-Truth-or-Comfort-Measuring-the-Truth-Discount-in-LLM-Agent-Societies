@@ -32,6 +32,54 @@ SKIPPED = [
 ]
 
 
+def run_metrics(d, data_dirs, out_dir, boot, only=None, refresh=False, no_text=False):
+    """Run metrics 10-18 and 20 on a listener table with labels attached. Writes CSV tables to out_dir/tables; returns the result dicts."""
+    os.makedirs(os.path.join(out_dir, "tables"), exist_ok=True)
+    mods = {"m10": lambda: m10_primary_td.run(d, B=boot), "m11": lambda: m11_checkers.run(d, B=boot),
+            "m12": lambda: m12_contrasts.run(d, B=boot), "m13": lambda: m13_asymmetry.run(d, B=boot),
+            "m14": lambda: m14_cell_map.run(d, B=min(500, boot)), "m15": lambda: m15_second_hand_td.run(d, B=boot),
+            "m16": lambda: m16_model_comparison.run(d, B=boot), "m17": lambda: m17_variance.run(d, B=min(300, boot)),
+            "m18": lambda: m18_keywords.run(d, m18_keywords.read_text_flags(data_dirs, out_dir, refresh=refresh), B=min(500, boot)),
+            "m20": lambda: m20_dna_ranking.run(d, B=500, splits=500)}
+    wanted = [m.strip() for m in only.split(",")] if only else list(mods)
+    if no_text and "m18" in wanted:
+        wanted.remove("m18")
+    results = []
+    print(f"[3/4] metrics: {', '.join(wanted)}")
+    for m in wanted:
+        t1 = time.time()
+        try:
+            r = mods[m]()
+        except Exception:
+            traceback.print_exc()
+            r = dict(id=m, title=f"{m} - FAILED", summary=["This metric raised an error; see the console output."], blocks=[], tables={})
+        results.append(r)
+        for name, tbl in r["tables"].items():
+            tbl.to_csv(os.path.join(out_dir, "tables", f"{name}.csv"), index=False)
+        print(f"      {m} done ({time.time() - t1:.0f}s)")
+    return results
+
+
+def load_labeled(data_dirs, label_files, out_dir, refresh=False):
+    """Listener table with belief labels and scores attached; prints and saves label coverage."""
+    os.makedirs(os.path.join(out_dir, "tables"), exist_ok=True)
+    print("[1/4] listeners")
+    df = t3lib.read_listeners(data_dirs, out_dir, refresh=refresh)
+    print(f"      {len(df):,} listeners, {df.run_id.nunique():,} towns, {df.pair_id.nunique():,} pairs")
+    print("[2/4] labels")
+    labels = t3lib.read_labels(label_files)
+    d = t3lib.attach_scores(df, labels)
+    t3lib.coverage_table(d).to_csv(os.path.join(out_dir, "tables", "label_coverage.csv"), index=False)
+    share = d.labeled.mean()
+    print(f"      {int(d.labeled.sum()):,} of {len(d):,} listeners labeled ({100 * share:.1f}%); {int(d.omitted.sum()):,} NOT_MENTIONED")
+    extra = len(labels) - int(d.labeled.sum())
+    if extra:
+        print(f"      note: {extra:,} label rows did not match any listener (wrong run_id/seat or a shard that was not passed to --data)")
+    if share < 0.95:
+        print("      WARNING: under 95% of listeners are labeled; estimates use only the labeled listeners and pairs missing a twin are dropped")
+    return d
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", nargs="+", required=True)
@@ -46,45 +94,8 @@ def main():
     os.makedirs(os.path.join(a.out, "tables"), exist_ok=True)
     t0 = time.time()
 
-    print("[1/4] listeners")
-    df = t3lib.read_listeners(a.data, a.out, refresh=a.refresh)
-    print(f"      {len(df):,} listeners, {df.run_id.nunique():,} towns, {df.pair_id.nunique():,} pairs")
-
-    print("[2/4] labels")
-    labels = t3lib.read_labels(a.labels)
-    d = t3lib.attach_scores(df, labels)
-    cov = t3lib.coverage_table(d)
-    cov.to_csv(os.path.join(a.out, "tables", "label_coverage.csv"), index=False)
-    share = d.labeled.mean()
-    print(f"      {int(d.labeled.sum()):,} of {len(d):,} listeners labeled ({100 * share:.1f}%); {int(d.omitted.sum()):,} NOT_MENTIONED")
-    extra = len(labels) - int(d.labeled.sum())
-    if extra:
-        print(f"      note: {extra:,} label rows did not match any listener (wrong run_id/seat or a shard that was not passed to --data)")
-    if share < 0.95:
-        print("      WARNING: under 95% of listeners are labeled; estimates use only the labeled listeners and pairs missing a twin are dropped")
-
-    mods = {"m10": lambda: m10_primary_td.run(d, B=a.boot), "m11": lambda: m11_checkers.run(d, B=a.boot),
-            "m12": lambda: m12_contrasts.run(d, B=a.boot), "m13": lambda: m13_asymmetry.run(d, B=a.boot),
-            "m14": lambda: m14_cell_map.run(d, B=min(500, a.boot)), "m15": lambda: m15_second_hand_td.run(d, B=a.boot),
-            "m16": lambda: m16_model_comparison.run(d, B=a.boot), "m17": lambda: m17_variance.run(d, B=min(300, a.boot)),
-            "m18": lambda: m18_keywords.run(d, m18_keywords.read_text_flags(a.data, a.out, refresh=a.refresh), B=min(500, a.boot)),
-            "m20": lambda: m20_dna_ranking.run(d, B=500, splits=500)}
-    wanted = [m.strip() for m in a.only.split(",")] if a.only else list(mods)
-    if a.no_text and "m18" in wanted:
-        wanted.remove("m18")
-    results = []
-    print(f"[3/4] metrics: {', '.join(wanted)}")
-    for m in wanted:
-        t1 = time.time()
-        try:
-            r = mods[m]()
-        except Exception:
-            traceback.print_exc()
-            r = dict(id=m, title=f"{m} - FAILED", summary=["This metric raised an error; see the console output."], blocks=[], tables={})
-        results.append(r)
-        for name, t in r["tables"].items():
-            t.to_csv(os.path.join(a.out, "tables", f"{name}.csv"), index=False)
-        print(f"      {m} done ({time.time() - t1:.0f}s)")
+    d = load_labeled(a.data, a.labels, a.out, a.refresh)
+    results = run_metrics(d, a.data, a.out, a.boot, a.only, a.refresh, a.no_text)
 
     print("[4/4] report")
     out = os.path.join(a.out, "tier34_report.html")

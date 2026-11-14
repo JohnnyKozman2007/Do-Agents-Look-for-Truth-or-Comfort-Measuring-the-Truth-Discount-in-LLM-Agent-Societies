@@ -49,6 +49,20 @@ def render_blocks(blocks):
     return "\n".join(out)
 
 
+def caveats(df):
+    """Reading guide for the behavioral (Tier 2) metrics; coverage figures are computed from the data."""
+    pairs = df.drop_duplicates("pair_id").groupby(["model", "cell_id"]).size()
+    lay = df.drop_duplicates("pair_id").groupby("model").layout_id.nunique()
+    cov = f"{pairs.mean():.1f} twin pairs per cell per model on average (the full plan is 39); layouts covered per model: " + ", ".join(f"{m} {n}" for m, n in lay.items())
+    return [
+        "Exploratory. Check each run's <code>evidence_kind</code> and <code>study_eligible</code> fields (in <code>town.json</code>) before treating numbers as study results.",
+        f"Design coverage in this data: {cov}. Single cells are noisy, and if a model covers only some layouts, model and source persona are partly confounded.",
+        "First-hand listeners decide to check before seeing any poster, so truth cannot affect their check decision by design.",
+        "Confidence intervals are cluster-bootstrap (cluster = twin pair, 2,000 resamples by default); regressions use cluster-robust standard errors. Listeners in one town share a source interaction and are not independent.",
+        "These metrics are behavioral (GO/SKIP) and need no LLM judge. Belief-based metrics (truth discount) are a separate step.",
+    ]
+
+
 def build(results, df, data_dir, out_path):
     towns = df.run_id.nunique()
     kpis = [("Towns", f"{towns:,}"), ("Twin pairs", f"{df.pair_id.nunique():,}"),
@@ -61,14 +75,7 @@ def build(results, df, data_dir, out_path):
         take = "".join(f"<li>{escape(s)}</li>" for s in r["summary"])
         sections.append(f'<h2 id="{r["id"]}">{escape(r["title"])}</h2><div class="card"><b>Key takeaways</b><ul class="take">{take}</ul></div>'
                         + render_blocks(r["blocks"]))
-    caveats = [
-        "Development pilot data: <code>evidence_kind = development_pilot</code>, <code>study_eligible = false</code>. Treat numbers as exploratory.",
-        "Partial design: each model ran about 6-7 twin pairs per cell (the full plan is 39). The two models ran different layouts, so model, source persona and layout are partly confounded.",
-        "First-hand listeners decide to check before seeing any poster, so truth cannot affect their check decision by design.",
-        "Confidence intervals are cluster-bootstrap (cluster = twin pair, 2,000 resamples); regressions use cluster-robust standard errors. Listeners in one town share a source interaction and are not independent.",
-        "These metrics are behavioral (GO/SKIP) and need no LLM judge. Belief-based metrics (truth discount) are a separate step.",
-    ]
-    cav = "".join(f"<li>{c}</li>" for c in caveats)
+    cav = "".join(f"<li>{c}</li>" for c in caveats(df))
     html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tier 2 Check Behavior</title><style>{CSS}</style></head><body><div class="wrap">
 <h1>Tier 2: Who Checks the Noticeboard?</h1>
