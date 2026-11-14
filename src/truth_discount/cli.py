@@ -123,6 +123,8 @@ def _parser() -> argparse.ArgumentParser:
     judging.add_argument("--resume", action="store_true")
     judging.add_argument("--retry-invalid", action="store_true", help="explicit repair; first and latest results stay separate")
     judging.add_argument("--retry-failed", action="store_true", help="retry only after original unknown costs are reconciled")
+    judging.add_argument("--max-concurrent-judgments", type=int, default=1,
+                         help="bounded judge workers (1-32), also limited by the frozen route cap")
     judging.add_argument("--execute", action="store_true")
     judging.add_argument("--spending-authorized", action="store_true")
     judge_status = commands.add_parser("judge-status", help="read-only source-bound scoring replay")
@@ -142,6 +144,21 @@ def _parser() -> argparse.ArgumentParser:
     panel.add_argument("--source-format", choices=("simulation", "legacy_pilot"))
     panel.add_argument("--population", choices=("historical_funnel", "all_phones"))
     panel.add_argument("--out", type=Path, required=True, help="new local candidate JSON; approval remains false")
+    scored = commands.add_parser("analyze-scored", help="read-only analysis of sealed actors and separate judge outputs")
+    scored.add_argument("source_roots", type=Path, nargs="+")
+    scored.add_argument("--profile", type=Path, required=True)
+    scored.add_argument("--judge-output", type=Path, required=True)
+    scored.add_argument("--out", type=Path, required=True)
+    scored.add_argument("--attempt-policy", choices=("first_only", "latest_sensitivity"), default="first_only")
+    scored.add_argument("--analysis-policy", type=Path,
+                        help="approved, source/profile-bound model and multiplicity policy; no inferred defaults")
+    scored.add_argument("--outcomes-authorized", action="store_true",
+                        help="only after the frozen judge/analysis policy permits main outcome access")
+    policy = commands.add_parser("analysis-policy", help="write an unapproved model-policy proposal without viewing outcomes")
+    policy.add_argument("--config", type=Path, required=True)
+    policy.add_argument("--profile-sha256", required=True)
+    policy.add_argument("--source-sha256", required=True)
+    policy.add_argument("--out", type=Path, required=True)
     # Accept --config before or after a planning/demo subcommand without resetting
     # a global value when the subcommand option is absent.
     for command in (validate, manifest, demo, live, simulation, simulation_demo):
@@ -205,6 +222,25 @@ def main(argv: list[str] | None = None) -> int:
                         for output, profile in zip(args.judge_output, args.profile)]
             _print_json(compare_judgments(args.source_roots, selected))
             return 0
+        if args.command == "analysis-policy":
+            from .confirmatory_analysis import analysis_policy_template
+            candidate = analysis_policy_template(load_config(args.config), args.profile_sha256,
+                                                 args.source_sha256)
+            with args.out.open("xb") as stream:
+                stream.write(canonical_bytes(candidate))
+            _print_json({"out": str(args.out), "approved": False, "provider_api_calls": 0})
+            return 0
+        if args.command == "analyze-scored":
+            from .deferred_judging import load_judge_profile
+            from .scored_analysis import analyze_scored
+            policy = json.loads(args.analysis_policy.read_bytes()) if args.analysis_policy else None
+            report = analyze_scored(args.source_roots, args.judge_output, load_judge_profile(args.profile), args.out,
+                                    attempt_policy=args.attempt_policy, analysis_policy=policy,
+                                    outcomes_authorized=args.outcomes_authorized)
+            _print_json({key: report[key] for key in ("evidence_kind", "towns", "pairs", "full_config_coverage",
+                                                     "missing_judgments", "invalid_judgments", "study_eligible")}
+                        | {"models": report["models"]["status"], "report": str(args.out / "report.md")})
+            return 0
         if args.command in {"judge-saved", "judge-status"}:
             from .deferred_judging import (load_judge_profile, plan_judging,
                                            judge_collection, replay_judging)
@@ -212,7 +248,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "judge-status":
                 _print_json(replay_judging(args.source_roots, args.output, profile))
                 return 0
-            info = plan_judging(args.source_roots, profile)
+            info = plan_judging(args.source_roots, profile,
+                                max_concurrent_judgments=args.max_concurrent_judgments)
             if not args.execute:
                 _print_json(info)
                 return 0
@@ -227,6 +264,7 @@ def main(argv: list[str] | None = None) -> int:
                 result = asyncio.run(judge_collection(
                     args.source_roots, args.output, profile, backend, resume=args.resume,
                     retry_invalid=args.retry_invalid, retry_failed=args.retry_failed,
+                    max_concurrent_judgments=args.max_concurrent_judgments,
                     execution_authorized=True, spending_authorized=True))
                 _print_json({**result, "budget": ledger.summary()})
             return 0

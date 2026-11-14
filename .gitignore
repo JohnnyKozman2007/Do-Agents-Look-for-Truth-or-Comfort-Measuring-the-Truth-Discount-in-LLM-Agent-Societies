@@ -222,6 +222,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Historical study data
+/docs/human_labels_100.csv
+
 # Generated offline plans and synthetic fixture bundles
 /outputs/
 /pilot-manifest.jsonl
