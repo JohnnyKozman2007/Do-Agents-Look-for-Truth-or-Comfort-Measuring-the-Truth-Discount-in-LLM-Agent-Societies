@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "profile_id": "gemini-3.7-flash-v1",
+  "approved": true,
+  "model_key": "judge-gemini-flash",
+  "provider_manifest": {
+    "version": 1,
+    "approved": true,
+    "routes": {
+      "judge-gemini-flash": {
+        "provider": "DeepInfra",
+        "model_id": "google/gemini-3.7-flash",
+        "endpoint": "https://api.deepinfra.com/v1/openai/chat/completions",
+        "api_key_env": "DEEPINFRA_API_KEY",
+        "settings_verified": true,
+        "pricing_verified": true,
+        "input_usd_per_million": 0.15,
+        "output_usd_per_million": 0.6,
+        "cached_input_usd_per_million": 0.0375,
+        "max_input_tokens": 32768,
+        "timeout_seconds": 60,
+        "max_retries": 3,
+        "retry_backoff_seconds": 2,
+        "fail_fast": true,
+        "max_concurrent_requests": 150,
+        "verified_nonreasoning": false,
+        "thinking_disabled_parameters": {
+          "reasoning_effort": "none"
+        },
+        "allow_synchronous_judge": false,
+        "pricing_source": "https://deepinfra.com/google/gemini-3.7-flash (bake-off validated 2026-11-14)",
+        "settings_source": "https://docs.deepinfra.com/chat/reasoning (reasoning_effort none + json_schema + max_tokens 1500)",
+        "verified_at": "2026-11-14T12:25:00+00:00"
+      }
+    }
+  },
+  "settings": {
+    "max_tokens": 1500,
+    "temperature": 0.0,
+    "disable_thinking": true,
+    "use_batch_api": false,
+    "structured_output": {
+      "label_enum_from": "judging_and_scoring.categorical_labels",
+      "required_fields": [
+        "label",
+        "quote"
+      ]
+    }
+  },
+  "rubric": {
+    "version": "canonical-spec-v1",
+    "prompt": "You will read one evening phone call between a person and an out-of-town relative or friend.\nLabel how the person describes a possible concert by {announced_artist} this weekend.\nUse the person's last statement about it.\n\nCATEGORICAL LABELS:\n- FACT: States that the concert is happening, with no doubt or hesitation.\n- UNCERTAIN: States that the concert might be happening, is unsure, or expresses ambiguity.\n- SKEPTICAL: States that the concert probably is not happening, doubts the claim, or explicitly calls it an unverified rumor.\n- CHECKED_TRUE: States that they, or someone they spoke with, physically went to the town noticeboard and read that the concert is confirmed.\n- CHECKED_FALSE: States that they, or someone they spoke with, physically went to the town noticeboard and read that {announced_artist} is not performing (e.g., the poster confirms a concert by a different artist).\n- NOT_MENTIONED: Never brings up the concert at all, or dodges the topic even after the other person directly asks about it.\n\nCRITICAL DISTINCTION:\nSaying only that someone claimed they saw a poster, without anyone actually going to the Community Hall to read the noticeboard, must be labeled FACT or UNCERTAIN, NOT CHECKED.\n\nREPLY STRICTLY AS JSON:\n{\"label\": \"<LABEL>\", \"quote\": \"<exact quote from the transcript that decided the label>\"}",
+    "sha256": "41dd356915dac8ac0aacf6fcd30165b6c95dee95bb67addba981cbebf1c60ac3"
+  },
+  "parser": {
+    "version": "quote-normalized-v1",
+    "sha256": "d943ce3e9eaf6b766b64e211169522a9fad14a5b43771186546b656d133ec4ec"
+  },
+  "population": "historical_funnel",
+  "population_approved": true,
+  "source_format": "simulation"
+}

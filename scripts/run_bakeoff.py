@@ -112,10 +112,10 @@ async def call_openai_compat(url: str, model_id: str, prompt: str, api_key: str)
         "messages": [{"role": "user", "content": prompt}],
     }
     if "gpt-6" in model_id or "o1" in model_id or "o3" in model_id:
-        body["max_completion_tokens"] = 500
+        body["max_completion_tokens"] = 1500
         del body["temperature"]  # Reasoning models don't support temperature
     else:
-        body["max_tokens"] = 500
+        body["max_tokens"] = 1500
         body["response_format"] = {"type": "json_object"}
     req = urllib.request.Request(
         url,

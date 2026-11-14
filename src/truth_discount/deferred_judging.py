@@ -64,9 +64,16 @@ def _parse_quote_normalized(text: str, phone_transcript: list[dict]) -> dict:
 
     if not isinstance(text, str):
         return malformed("response must be text")
+    cleaned = text.strip()
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[len("```json"):].strip()
+    elif cleaned.startswith("```"):
+        cleaned = cleaned[len("```"):].strip()
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-len("```")].strip()
     try:
         value = json.loads(
-            text, object_pairs_hook=_unique, parse_constant=scoring._reject_constant
+            cleaned, object_pairs_hook=_unique, parse_constant=scoring._reject_constant
         )
     except (ValueError, RecursionError):
         return malformed("response must be one strict JSON object")

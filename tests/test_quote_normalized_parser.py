@@ -87,6 +87,12 @@ class QuoteNormalizedParserTests(unittest.TestCase):
         self.assertEqual(res_norm["status"], "valid")
         self.assertEqual(res_norm["label"], "UNCERTAIN")
 
+    def test_normalized_parser_strips_markdown_fences(self):
+        judge_output = '```json\n{"label": "UNCERTAIN", "quote": "I didn’t hear about any concert tonight."}\n```'
+        normalized_result = _parse_quote_normalized(judge_output, self.phone_transcript)
+        self.assertEqual(normalized_result["status"], "valid")
+        self.assertEqual(normalized_result["label"], "UNCERTAIN")
+
 
 if __name__ == "__main__":
     unittest.main()
