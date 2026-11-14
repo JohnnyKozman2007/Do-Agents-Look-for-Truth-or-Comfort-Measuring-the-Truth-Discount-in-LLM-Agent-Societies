@@ -45,6 +45,7 @@ def load_listeners(data_dir, progress=True):
         fh_of = {p["second_hand_seat"]: p["first_hand_seat"] for p in t["catch_up_pairs"]}
         ev = {e["second_hand_seat"]: e for e in t["scene_3_poster_evidence_passed"]}
         fh_dec = {x["seat_id"]: x for x in t["scene_2_first_hand_decisions"]}
+        funnel = {int(k): v for k, v in (t.get("scene_5_funnel_step_mentioned") or {}).items()}  # step 1-4 where the keyword rule saw a mention; None = no mention
         for layer, key in (("first_hand", "scene_2_first_hand_decisions"), ("second_hand", "scene_4_second_hand_decisions")):
             for x in t[key]:
                 seat = x["seat_id"]
@@ -52,7 +53,8 @@ def load_listeners(data_dir, progress=True):
                 r = dict(base, layer=layer, seat=seat, persona_id=pid, persona=personas[pid]["name"],
                          occupation=personas[pid]["occupation"], style=personas[pid]["conversational_style"],
                          decision=x["decision"], go=int(x["decision"] == "GO"), parse_status=x["parse_status"],
-                         malformed=int(x["parse_status"] != "valid"))
+                         malformed=int(x["parse_status"] != "valid"),
+                         funnel_step=np.nan if funnel.get(seat) is None else float(funnel[seat]))
                 if layer == "second_hand":
                     ps = fh_of[seat]
                     r.update(partner_seat=ps, partner_persona=personas[seat_persona[ps]]["name"],
@@ -72,7 +74,11 @@ def read_listeners(data_dirs, out_dir, refresh=False, progress=True):
     if os.path.exists(cache) and not refresh:
         print(f"  using cached {cache}")
         df = pd.read_csv(cache)
+        if "funnel_step" not in df.columns:  # cache written by an older version
+            df = None
     else:
+        df = None
+    if df is None:
         df = pd.concat([load_listeners(d, progress=progress) for d in dirs], ignore_index=True)
         df.to_csv(cache, index=False)
     dup = df.duplicated(["run_id", "seat"]).sum()

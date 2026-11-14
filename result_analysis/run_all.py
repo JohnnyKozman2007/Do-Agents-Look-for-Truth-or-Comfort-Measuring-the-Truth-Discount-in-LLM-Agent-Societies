@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Run every metric (Tier 2, 3 and 4) and write ONE combined HTML report.
+"""Run every metric (Tiers 1, 2, 3 and 4) and write ONE combined HTML report.
 
 Usage:
     python3 run_all.py --data SHARD_DIR [SHARD_DIR ...] --labels LABELS_FILE [LABELS_FILE ...] --out OUT_DIR
-                       [--judge-name "Gemini 3.7 Flash"] [--boot 2000] [--refresh] [--no-text]
+                       [--reference-labels REF_FILE [REF_FILE ...]] [--judge-name "Gemini 3.7 Flash"] [--boot 2000] [--refresh] [--no-text]
 
-Without --labels only the behavioral Tier 2 metrics run. Output: OUT_DIR/result_analysis_report.html and OUT_DIR/tables/*.csv.
-The per-tier scripts (tier2/run_tier2.py, tier3_4/run_tier34.py) still produce their own separate reports.
+Without --labels only the behavioral Tier 2 metrics run. --reference-labels (optional) adds judge-agreement statistics to metric 4.
+Output: OUT_DIR/result_analysis_report.html and OUT_DIR/tables/*.csv. The per-tier scripts (tier1/run_tier1.py, tier2/run_tier2.py,
+tier3_4/run_tier34.py) still produce their own separate reports.
 Requires only numpy and pandas.
 """
 import argparse
@@ -17,17 +18,20 @@ from datetime import datetime
 from html import escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-for sub in ("tier2", "tier3_4", "common"):
+for sub in ("tier1", "tier2", "tier3_4", "common"):
     sys.path.insert(0, os.path.join(HERE, sub))
 import build_report  # noqa: E402  (Tier 2 report parts)
+import build_report1  # noqa: E402  (Tier 1 report parts)
 import build_report34  # noqa: E402  (Tier 3/4 report parts)
+import run_tier1  # noqa: E402
 import run_tier2  # noqa: E402
 import run_tier34  # noqa: E402
 from styles import CSS  # noqa: E402
 from t2lib import read_listeners  # noqa: E402
+from t3lib import read_labels  # noqa: E402
 
 
-def build_combined(res2, res34, df, data_dirs, label_files, judge_name, out_path, skipped, synthetic=False):
+def build_combined(res1, res2, res34, df, data_dirs, label_files, judge_name, out_path, skipped, synthetic=False, has_reference=False):
     has_labels = res34 is not None
     kpis = [("Towns", f"{df.run_id.nunique():,}"), ("Twin pairs", f"{df.pair_id.nunique():,}"), ("Listeners", f"{len(df):,}"),
             ("Models", str(df.model.nunique())), ("Cells", str(df.cell_id.nunique()))]
@@ -45,10 +49,18 @@ def build_combined(res2, res34, df, data_dirs, label_files, judge_name, out_path
             out.append(f'<h2 id="{r["id"]}">{escape(r["title"])}</h2><div class="card"><b>Key takeaways</b><ul class="take">{take}</ul></div>' + render(r["blocks"]))
         return "".join(out)
 
+    cav_html = ""
+    nav_html = ""
+    body = ""
+    if has_labels:
+        cav1 = "".join(f"<li>{c}</li>" for c in build_report1.caveats(judge_name, has_reference, synthetic))
+        cav_html += f'<div class="card warn"><b>Read this first: judge and label quality (Tier 1)</b><ul class="take">{cav1}</ul></div>'
+        nav_html += nav(res1)
+        body += '<div class="card"><b>Tier 1: judge validation and label quality</b> (checks on the labels before any truth-discount claim).</div>' + sections(res1, build_report34.render_blocks)
     cav2 = "".join(f"<li>{c}</li>" for c in build_report.caveats(df))
-    cav_html = f'<div class="card warn"><b>Read this first: behavioral metrics (Tier 2)</b><ul class="take">{cav2}</ul></div>'
-    nav_html = f"{nav(res2)}"
-    body = '<div class="card"><b>Tier 2: behavioral outcomes</b> (no labels needed): who pays to check the noticeboard.</div>' + sections(res2, build_report.render_blocks)
+    cav_html += f'<div class="card warn"><b>Read this first: behavioral metrics (Tier 2)</b><ul class="take">{cav2}</ul></div>'
+    nav_html += nav(res2)
+    body += '<div class="card"><b>Tier 2: behavioral outcomes</b> (no labels needed): who pays to check the noticeboard.</div>' + sections(res2, build_report.render_blocks)
     if has_labels:
         cav34 = "".join(f"<li>{c}</li>" for c in build_report34.caveats(judge_name, skipped, synthetic))
         cav_html += f'<div class="card warn"><b>Read this first: belief metrics (Tiers 3 and 4)</b><ul class="take">{cav34}</ul></div>'
@@ -59,7 +71,7 @@ def build_combined(res2, res34, df, data_dirs, label_files, judge_name, out_path
     labels_txt = f" Labels: <code>{escape(', '.join(str(x) for x in label_files))}</code>." if has_labels else ""
     html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Result Analysis</title><style>{CSS}</style></head><body><div class="wrap">
-<h1>Result analysis: Tiers 2 to 4</h1>
+<h1>Result analysis: Tiers 1 to 4</h1>
 <p class="sub">AgentTruth main-study simulation. Generated {datetime.now():%Y-%m-%d %H:%M}. Data: <code>{escape(", ".join(str(x) for x in data_dirs))}</code>.{labels_txt}</p>
 <nav>{nav_html}</nav><div class="kpis">{kpi_html}</div>
 {cav_html}
@@ -74,6 +86,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", nargs="+", required=True, help="folder(s) of run directories (shards must not overlap)")
     ap.add_argument("--labels", nargs="+", help="belief label files (.csv/.jsonl with run_id, seat, label); omit to run Tier 2 only")
+    ap.add_argument("--reference-labels", nargs="+", help="optional reference label set (human audit or another judge) for agreement in metric 4")
     ap.add_argument("--out", required=True)
     ap.add_argument("--judge-name", default="the LLM judge")
     ap.add_argument("--boot", type=int, default=2000)
@@ -88,13 +101,14 @@ def main():
     else:
         print("[1/4] listeners (no --labels: Tier 2 only)")
         df = read_listeners(a.data, a.out, refresh=a.refresh)
+    res1 = run_tier1.run_metrics(df, read_labels(a.reference_labels) if a.reference_labels else None, min(a.boot, 1000), a.out) if a.labels else None
     res2 = run_tier2.run_metrics(df, a.boot, a.out)
     res34 = run_tier34.run_metrics(df, a.data, a.out, a.boot, None, a.refresh, a.no_text) if a.labels else None
 
     out = os.path.join(a.out, "result_analysis_report.html")
     syn = bool(a.labels) and any("SYNTHETIC" in os.path.basename(p).upper() for p in a.labels)
     skipped = run_tier34.SKIPPED + (["metric 18 (--no-text)"] if a.no_text else [])
-    build_combined(res2, res34, df, a.data, a.labels or [], a.judge_name, out, skipped, synthetic=syn)
+    build_combined(res1, res2, res34, df, a.data, a.labels or [], a.judge_name, out, skipped, synthetic=syn, has_reference=bool(a.reference_labels))
     print(f"[done] {out} ({time.time() - t0:.0f}s)")
 
 

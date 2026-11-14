@@ -6,7 +6,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "common"))
 import t3lib  # noqa: E402
 
 
@@ -80,6 +80,29 @@ def test_read_labels_tolerates_torn_jsonl(tmp="/tmp/_t3_labels.jsonl"):
     lab = t3lib.read_labels([tmp])
     assert len(lab) == 1 and lab.label.iloc[0] == "FACT" and lab.seat.iloc[0] == 1
     os.remove(tmp)
+
+
+def test_kappa_known_table():
+    # textbook 2x2: [[20, 5], [10, 15]] -> po = 0.70, pe = 0.50, kappa = 0.40
+    a = np.array([0] * 25 + [1] * 25)
+    b = np.array([0] * 20 + [1] * 5 + [0] * 10 + [1] * 15)
+    k, _, _, agree, n = t3lib.kappa_stats(a, b)
+    assert abs(k - 0.4) < 1e-9 and abs(agree - 0.7) < 1e-9 and n == 50
+    assert t3lib.kappa_stats(a, a)[0] == 1.0
+
+
+def test_swap_test_calibration():
+    rng = np.random.default_rng(5)
+    rej_null = sum(t3lib.swap_test(rng.multinomial(10, [.3, .3, .4], size=150), rng.multinomial(10, [.3, .3, .4], size=150), B=400, seed=s)[1] < 0.05 for s in range(60))
+    rej_alt = sum(t3lib.swap_test(rng.multinomial(10, [.3, .3, .4], size=150), rng.multinomial(10, [.2, .3, .5], size=150), B=400, seed=s)[1] < 0.05 for s in range(20))
+    assert rej_null <= 9, rej_null      # nominal 5% of 60 = 3
+    assert rej_alt >= 19, rej_alt       # real difference is detected
+
+
+def test_flag_rate_ci_handles_empty_subset():
+    df = pd.DataFrame({"pair_id": [1, 2], "go": [0, 1], "f": [0, 1]})
+    assert np.isnan(t3lib.flag_rate_ci(df, "f", np.array([False, False]))[0])
+    assert t3lib.SCHEMES["primary (1 / 0.5 / 0)"] == t3lib.SCORE
 
 
 if __name__ == "__main__":

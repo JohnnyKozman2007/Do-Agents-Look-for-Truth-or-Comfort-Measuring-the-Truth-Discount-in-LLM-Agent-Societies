@@ -9,13 +9,10 @@ Truth discount (TD) = belief(truth twin) - belief(rumor twin), computed per twin
 import json
 import math
 import os
-import sys
 
 import numpy as np
 import pandas as pd
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "common"))
 from t2lib import MODEL_NAMES, chi2_sf, design, dummies, load_listeners, norm_sf2, pct, read_listeners  # noqa: E402,F401
 
 LABELS = ["FACT", "UNCERTAIN", "SKEPTICAL", "CHECKED_TRUE", "CHECKED_FALSE", "NOT_MENTIONED"]
@@ -88,6 +85,26 @@ def coverage_table(d):
     t["omission_rate"] = t.omitted / t.labeled.clip(lower=1)
     t["model"] = t.model.map(lambda m: MODEL_NAMES.get(m, m))
     return t
+
+
+def load_labeled(data_dirs, label_files, out_dir, refresh=False):
+    """Listener table with belief labels and scores attached; prints and saves label coverage."""
+    os.makedirs(os.path.join(out_dir, "tables"), exist_ok=True)
+    print("[1/4] listeners")
+    df = read_listeners(data_dirs, out_dir, refresh=refresh)
+    print(f"      {len(df):,} listeners, {df.run_id.nunique():,} towns, {df.pair_id.nunique():,} pairs")
+    print("[2/4] labels")
+    labels = read_labels(label_files)
+    d = attach_scores(df, labels)
+    coverage_table(d).to_csv(os.path.join(out_dir, "tables", "label_coverage.csv"), index=False)
+    share = d.labeled.mean()
+    print(f"      {int(d.labeled.sum()):,} of {len(d):,} listeners labeled ({100 * share:.1f}%); {int(d.omitted.sum()):,} NOT_MENTIONED")
+    extra = len(labels) - int(d.labeled.sum())
+    if extra:
+        print(f"      note: {extra:,} label rows did not match any listener (wrong run_id/seat or a shard that was not passed to --data)")
+    if share < 0.95:
+        print("      WARNING: under 95% of listeners are labeled; estimates use only the labeled listeners and pairs missing a twin are dropped")
+    return d
 
 
 # --------------------------------------------------------------------------- pair table
@@ -299,3 +316,75 @@ def spearman(a, b):
 def dna_name(r):
     return " / ".join([str(r["closeness"]).replace("_", " "), str(r["authority"]), str(r["reliability"]).replace("_", " "),
                        str(r["wealth"]), str(r["identity"]).replace("_", " ")])
+
+
+# --------------------------------------------------------------------------- Tier 1 helpers
+SCHEMES = {  # alternative belief scorings; NOT_MENTIONED is always excluded here (its imputations are separate columns)
+    "primary (1 / 0.5 / 0)": SCORE,
+    "strict (UNCERTAIN = 0)": {"FACT": 1.0, "CHECKED_TRUE": 1.0, "UNCERTAIN": 0.0, "SKEPTICAL": 0.0, "CHECKED_FALSE": 0.0},
+    "lenient (UNCERTAIN = 1)": {"FACT": 1.0, "CHECKED_TRUE": 1.0, "UNCERTAIN": 1.0, "SKEPTICAL": 0.0, "CHECKED_FALSE": 0.0},
+    "graded (5 levels)": {"CHECKED_TRUE": 1.0, "FACT": 0.75, "UNCERTAIN": 0.5, "SKEPTICAL": 0.25, "CHECKED_FALSE": 0.0},
+}
+
+
+def flag_rate_ci(df, flag, mask=None, B=1000, seed=0):
+    """Cluster-bootstrap (by twin pair) rate of a 0/1 column over the rows in mask. Returns (rate, lo, hi, n)."""
+    from t2lib import rate_ci
+    s = df if mask is None else df[np.asarray(mask)]
+    if len(s) == 0:
+        return np.nan, np.nan, np.nan, 0
+    return rate_ci(s.assign(go=s[flag].astype(float)), B=B, seed=seed)
+
+
+def kappa_stats(a, b, cluster=None, B=0, seed=0):
+    """Cohen's kappa between two label vectors, with a cluster-bootstrap CI when B > 0.
+
+    Returns (kappa, lo, hi, agreement, n).
+    """
+    a, b = np.asarray(a), np.asarray(b)
+    cats = sorted(set(a) | set(b))
+    ia = pd.Categorical(a, categories=cats).codes
+    ib = pd.Categorical(b, categories=cats).codes
+    L = len(cats)
+    M = np.zeros((L, L))
+    np.add.at(M, (ia, ib), 1)
+    N = M.sum()
+    po = np.trace(M) / N
+    pe = float((M.sum(1) * M.sum(0)).sum()) / N ** 2
+    k = (po - pe) / (1 - pe) if pe < 1 else np.nan
+    lo = hi = np.nan
+    if B and cluster is not None:
+        _, cidx = np.unique(cluster, return_inverse=True)
+        C = cidx.max() + 1
+        cnt = np.zeros((C, L * L))
+        np.add.at(cnt, (cidx, ia * L + ib), 1)
+        W = np.random.default_rng(seed).multinomial(C, np.full(C, 1.0 / C), size=B).astype(float)
+        T = (W @ cnt).reshape(B, L, L)
+        n = T.sum((1, 2))
+        p_o = np.trace(T, axis1=1, axis2=2) / n
+        p_e = (T.sum(2) * T.sum(1)).sum(1) / n ** 2
+        with np.errstate(invalid="ignore", divide="ignore"):
+            ks = (p_o - p_e) / (1 - p_e)
+        ks = ks[np.isfinite(ks)]
+        if len(ks) > 20:
+            lo, hi = float(np.percentile(ks, 2.5)), float(np.percentile(ks, 97.5))
+    return float(k), lo, hi, float(po), int(N)
+
+
+def swap_test(counts_a, counts_b, B=5000, seed=0):
+    """Paired-twin permutation test for a difference in label distributions.
+
+    counts_a, counts_b: (pairs x labels) arrays of label counts for the two twins of each pair. Under the null the twins are
+    exchangeable within a pair, so twin identities are swapped at random per pair. The statistic is the squared distance between
+    the two pooled label-share vectors. Returns (statistic, p_value).
+    """
+    A = np.asarray(counts_a, float)
+    Bm = np.asarray(counts_b, float)
+    if A.sum() == 0 or Bm.sum() == 0:
+        return np.nan, np.nan
+    obs = float(((A.sum(0) / A.sum() - Bm.sum(0) / Bm.sum()) ** 2).sum())
+    s = np.random.default_rng(seed).integers(0, 2, size=(B, len(A))).astype(float)
+    ta, tb = (1 - s) @ A + s @ Bm, s @ A + (1 - s) @ Bm
+    ta, tb = ta / ta.sum(1, keepdims=True), tb / tb.sum(1, keepdims=True)
+    sim = ((ta - tb) ** 2).sum(1)
+    return obs, float((1 + (sim >= obs - 1e-12).sum()) / (B + 1))

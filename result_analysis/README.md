@@ -1,16 +1,17 @@
 # Result analysis
 
-Analysis code for the simulation output: how often listeners check the noticeboard (Tier 2), how much they believe the truth versus the rumor (Tier 3), and how robust and mechanistic those results are (Tier 4). Every metric reads saved run folders and, for the belief metrics, a file of belief labels. **Nothing here makes a model call.**
+Analysis code for the simulation output: how trustworthy the belief labels are (Tier 1), how often listeners check the noticeboard (Tier 2), how much they believe the truth versus the rumor (Tier 3), and how robust and mechanistic those results are (Tier 4). Every metric reads saved run folders and, for the belief metrics, a file of belief labels that a separate judging workflow produces. **Nothing here makes a model call.**
 
 Each run produces a self-contained HTML report (inline SVG charts, light and dark theme, no external assets) plus a CSV for every table. `run_all.py` runs all tiers and writes **one combined report**; the per-tier scripts write separate reports.
 
 | Tier | Needs labels? | Metrics | Entry point |
 |---|---|---|---|
+| 1: judge and label quality | Yes | 4 judge validation, 5 label and omission analysis, 6 scoring sensitivity | `tier1/run_tier1.py` |
 | 2: behavioral outcomes | No | 7 first-hand check rates, 8 second-hand behavior, 9 who checks | `tier2/run_tier2.py` |
 | 3: truth discount | Yes | 10 primary truth discount, 11 checkers vs non-checkers, 12 ten planned contrasts, 13 asymmetry, 14 override and cell map, 15 second-hand truth discount | `tier3_4/run_tier34.py` |
 | 4: robustness and mechanism | Mostly | 16 model comparison, 17 variance and seed planning, 18 keyword transcript pass, 20 top-10 DNA rule | `tier3_4/run_tier34.py` |
 
-All tiers in one report: `run_all.py`. Metric numbers follow the analysis plan. Metrics 1-6 (data audit and judge validation), 19, 21 and 22 are not part of this folder.
+All tiers in one report: `run_all.py`. Metric numbers follow the analysis plan. Metrics 1-3 (data audit), 19, 21 and 22 are not part of this folder.
 
 ## Contents
 
@@ -18,6 +19,7 @@ All tiers in one report: `run_all.py`. Metric numbers follow the analysis plan. 
 - [Quick start](#quick-start)
 - [Inputs](#inputs)
 - [Core definitions](#core-definitions)
+- [Tier 1 metrics](#tier-1-metrics-judge-and-label-quality)
 - [Tier 2 metrics](#tier-2-metrics-no-labels-needed)
 - [Tier 3 metrics](#tier-3-metrics-truth-discount)
 - [Tier 4 metrics](#tier-4-metrics-robustness-and-mechanism)
@@ -40,14 +42,20 @@ pip install -r result_analysis/requirements.txt
 Run from anywhere; paths below are examples.
 
 ```bash
-# Everything in one combined report (omit --labels to run Tier 2 only)
+# Everything in one combined report (omit --labels to run Tier 2 only;
+# --reference-labels is optional and adds judge-agreement statistics to metric 4)
 python3 result_analysis/run_all.py \
   --data /path/to/shard-0/outputs/main-owner-0 /path/to/shard-1/outputs/main-owner-1 \
   --labels labels_shard0.csv labels_shard1.csv \
+  --reference-labels human_audit_labels.csv \
   --judge-name "Gemini 3.7 Flash" \
   --out ./analysis_out/all
 
 # Or one tier at a time, each with its own report.
+# Tier 1: judge and label quality, needs labels
+python3 result_analysis/tier1/run_tier1.py \
+  --data /path/to/shard-0/outputs/main-owner-0 --labels labels_shard0.csv --out ./analysis_out/tier1
+
 # Tier 2: behavioral, no labels
 python3 result_analysis/tier2/run_tier2.py \
   --data /path/to/shard-0/outputs/main-owner-0 /path/to/shard-1/outputs/main-owner-1 \
@@ -61,14 +69,15 @@ python3 result_analysis/tier3_4/run_tier34.py \
   --out ./analysis_out/tier34
 ```
 
-Open `result_analysis_report.html` (combined), `tier2_report.html` or `tier34_report.html` in a browser. On a single 1,664-town shard, Tier 2 takes about 15 seconds, and Tier 3/4 about 25 seconds on a first run (7 seconds once the listener and text tables are cached).
+Open `result_analysis_report.html` (combined), `tier1_report.html`, `tier2_report.html` or `tier34_report.html` in a browser. On a single 1,664-town shard, Tier 2 takes about 15 seconds, and Tier 3/4 about 25 seconds on a first run (7 seconds once the listener and text tables are cached).
 
 | Option | Applies to | Meaning |
 |---|---|---|
 | `--data DIR [DIR ...]` | both | Folders that hold the run directories. Pass several to pool shards; the code stops if a `(run_id, seat)` appears twice. |
 | `--out DIR` | both | Output folder (created if needed). |
-| `--labels FILE [FILE ...]` | all, 3/4 | Belief label files, see [labels](#belief-labels). Optional for `run_all.py` (omitted = Tier 2 only). |
-| `--judge-name TEXT` | all, 3/4 | Judge name shown in the report header. |
+| `--labels FILE [FILE ...]` | all, 1, 3/4 | Belief label files, see [labels](#belief-labels). Optional for `run_all.py` (omitted = Tier 2 only). |
+| `--reference-labels FILE [FILE ...]` | all, 1 | Optional second label set (a human audit or another judge, same format) for the agreement statistics in metric 4. |
+| `--judge-name TEXT` | all, 3/4, 1 | Judge name shown in the report header. |
 | `--boot N` | both | Bootstrap resamples (default 2000). |
 | `--refresh` | both | Rebuild the cached listener and text tables. |
 | `--only m10,m12` | `run_tier34.py` | Run only these metrics. |
@@ -84,7 +93,7 @@ The listener table is cached in the output folder as `listeners_<hash>.csv`, key
 
 | File | Fields used |
 |---|---|
-| `town.json` | `run_id`, `pair_id`, `model_key`, `condition_type`, `cell_id`, `layout_id`, `repetition_id`, `announced_artist`, `real_artist`, `source_persona_id`, `knobs`, `seating_assignment`, `catch_up_pairs`, `scene_2_first_hand_decisions`, `scene_3_poster_evidence_passed`, `scene_4_second_hand_decisions`, and for metric 18 only `scene_3_catch_up_transcripts` and `scene_5_phone_transcripts` |
+| `town.json` | `run_id`, `pair_id`, `model_key`, `condition_type`, `cell_id`, `layout_id`, `repetition_id`, `announced_artist`, `real_artist`, `source_persona_id`, `knobs`, `seating_assignment`, `catch_up_pairs`, `scene_2_first_hand_decisions`, `scene_3_poster_evidence_passed`, `scene_4_second_hand_decisions`, `scene_5_funnel_step_mentioned` (the step at which the runner's keyword rule saw a mention; used by metric 5), and for metric 18 only `scene_3_catch_up_transcripts` and `scene_5_phone_transcripts` |
 | `config.json` | the persona table (id, name, occupation, conversational style); read once from the first run |
 
 Twin towns of one pair share `pair_id`. Each town has 12 listeners: seats 1-6 hear the source first-hand and decide GO/SKIP before seeing any poster; seats 7-12 each hear from one first-hand partner at the afternoon catch-up and then decide.
@@ -99,7 +108,7 @@ Tier 3/4 needs one label per listener phone call, as a `.csv` or `.jsonl` file w
 | `seat` | 1-12 (`seat_id` and `seat_id_private` are also accepted) |
 | `label` | one of `FACT`, `UNCERTAIN`, `SKEPTICAL`, `CHECKED_TRUE`, `CHECKED_FALSE`, `NOT_MENTIONED` (`choice` is also accepted) |
 
-Other columns are ignored. Torn `.jsonl` lines are skipped, labels outside the rubric are dropped with a warning, and duplicates keep the last row. Unlabeled listeners stay missing in every estimate; they are never imputed.
+The labels file comes from a separate judging workflow, one row per listener phone call. Other columns (probabilities, rationales) are ignored. A second file in the same format can be passed as `--reference-labels`. Torn `.jsonl` lines are skipped, labels outside the rubric are dropped with a warning, and duplicates keep the last row. Unlabeled listeners stay missing in every estimate; they are never imputed.
 
 ## Core definitions
 
@@ -109,6 +118,36 @@ Other columns are ignored. Torn `.jsonl` lines are skipped, labels outside the r
 - **Truth discount (TD).** Mean belief in the truth twin minus mean belief in the rumor twin, computed per twin pair from the listeners with a valid score. A pair is usable when both twins have at least one valid score. A smaller TD means the rumor is believed relatively more.
 - **Independent unit.** The twin pair. Listeners in a town share one source interaction, so they are not treated as independent.
 - **Placebo.** First-hand listeners choose GO/SKIP before seeing any poster, so rumor and truth twins differ at that choice only by sampling noise. This is used as a built-in noise floor in metrics 7 and 11.
+
+## Tier 1 metrics (judge and label quality)
+
+These checks decide how far the belief labels can be trusted before any truth-discount claim. They use the labels from the separate judging workflow plus the GO/SKIP log; no model is called.
+
+### Metric 4: judge validation (`m4_judge_validation`)
+
+- **Coverage and mix.** Listeners with a valid label, omissions, and label shares by model, layer and twin (table and heatmap).
+- **Ground truth from the GO/SKIP log.** A listener who paid to check read the board, so their call should be labeled `CHECKED_TRUE` (truth twin) or `CHECKED_FALSE` (rumor twin). Reports recall (real checkers labeled CHECKED), precision (CHECKED labels that were real checks), false-alarm rate and **direction accuracy** (right CHECKED label for the twin), with cluster-bootstrap CIs. Second-hand listeners may legitimately report that their *partner* checked, so they are scored two ways: own GO only, and own or partner GO.
+- **Placebo (leakage) test.** Listeners who saw no poster and heard of none (first-hand skippers; second-hand listeners with no check by them or their partner) cannot know whether the claim is true, so their label distributions must match across twins. A **paired-twin permutation test** (twin identities swapped within each pair, 5,000 permutations) tests this; a small p-value means something other than what listeners said separates the twins.
+- **Agreement with a reference label set** (optional `--reference-labels`, e.g. a human audit or a second judge): Cohen's kappa with a cluster bootstrap on the overlap, for 6 labels, 3 classes plus not-mentioned, and checked-vs-not, overall and by layer, twin and model; a confusion matrix and judge precision and recall per label. The target line is kappa 0.85, the spec's diagnostic benchmark (`docs/08_analysis_and_audit.md`).
+
+Tables: `m4_label_coverage`, `m4_label_mix`, `m4_checked_vs_go_log`, `m4_placebo_tests`, `m4_placebo_label_shares`, and with a reference `m4_reference_agreement`, `m4_reference_confusion`, `m4_reference_per_label`.
+
+### Metric 5: label and omission analysis (`m5_omissions`)
+
+*Is silence real behavior or a judge artifact?*
+
+- Omission (`NOT_MENTIONED`) rate by model, layer and twin, and the **truth-minus-rumor omission difference**: if the twins are silent at different rates, the conditional truth discount compares different kinds of listeners.
+- Omission differences by source cue, and omission rate by listener persona with a joint Wald test (knobs adjusted, cluster-robust by pair; skipped with fewer than 30 omissions).
+- **Runner rule vs judge.** The runner marks a mention when a keyword rule fires at funnel steps 1-4 and rule-codes the rest as omissions. The table shows judge `NOT_MENTIONED` rates by what the rule found, so keyword false positives or judge artifacts show up, as do rule-coded omissions that received a mention label.
+- **How far omissions can move the truth discount:** conditional, omissions = 0, omissions = 0.5 (the spec's bounds), and worst-case bounds (omitted truth-twin listeners as 0 and omitted rumor-twin listeners as 1, and the reverse).
+
+Tables: `m5_omission_rates`, `m5_omission_twin_difference`, `m5_omission_by_knob`, `m5_omission_by_persona`, `m5_omission_persona_tests`, `m5_runner_rule_vs_judge`, `m5_td_under_omission_bounds`.
+
+### Metric 6: scoring sensitivity (`m6_scoring_sensitivity`)
+
+The same labels recoded under alternative scorings; the headline truth discount and the ten planned contrasts are recomputed under each: primary (1 / 0.5 / 0), strict (`UNCERTAIN` = 0), lenient (`UNCERTAIN` = 1), graded (five levels: CHECKED_TRUE 1, FACT 0.75, UNCERTAIN 0.5, SKEPTICAL 0.25, CHECKED_FALSE 0), and the primary score with omissions at 0 and at 0.5. Scales differ between schemes, so read signs, significance and the count of contrasts that keep their Holm verdict, not raw magnitudes. A contrast matrix marks each estimate with `*` when it survives Holm at 0.05.
+
+Tables: `m6_td_by_scheme`, `m6_contrasts_by_scheme`.
 
 ## Tier 2 metrics (no labels needed)
 
@@ -247,12 +286,14 @@ Tables: `m20_ranking_<model>`, `m20_split_sample`.
 | OLS with HC1-robust SEs, effect coding | planned contrasts (metrics 12, 16, 17) |
 | Holm-Bonferroni step-down | the ten planned contrasts |
 | ANOVA-estimator ICC with group bootstrap | clustering of belief (metric 17) |
+| Cohen's kappa with cluster bootstrap | judge agreement with a reference (metric 4) |
+| Paired-twin permutation test | label placebo test (metric 4) |
 
 ## Outputs
 
 Each run writes to `--out`:
 
-- `result_analysis_report.html` (from `run_all.py`), `tier2_report.html` or `tier34_report.html`: charts, tables, a "Key takeaways" box per metric and a "Read this first" box of caveats.
+- `result_analysis_report.html` (from `run_all.py`), `tier1_report.html`, `tier2_report.html` or `tier34_report.html`: charts, tables, a "Key takeaways" box per metric and a "Read this first" box of caveats.
 - `tables/*.csv`: one file per table, named as listed under each metric. Tier 3/4 also writes `label_coverage.csv`.
 - Cached inputs: `listeners_<hash>.csv` and, for metric 18, `text_flags_<hash>.csv`.
 
@@ -264,6 +305,7 @@ Generated folders (`output/`) are git-ignored.
 - **Partial design.** Runs may cover only part of the planned design (a handful of twin pairs per cell versus 39 planned). Single cells are noisy; shards pooled with `--data` increase pairs per cell.
 - **Confounding.** If a model ran only some layouts, model and source persona are partly confounded; metric 16 prints the design balance.
 - **Judge error.** Belief labels come from a single LLM judge, and judge error is not propagated into the confidence intervals. Intervals reflect sampling variation over twin pairs only. Use metric 11's label-vs-GO check and metric 18's label-language check as validity probes.
+- **Ground truth is partial.** The GO/SKIP log validates the CHECKED labels, but nothing in the data validates the soft belief labels (FACT, UNCERTAIN, SKEPTICAL); only a reference label set (`--reference-labels`) can, and the reference itself is not necessarily correct.
 - **No probabilities.** The metrics use only the label, so any judge works. Analyses that need label probabilities or margins are not included.
 - **Keyword rules.** `evidence_passed` (runner) and metric 18 are keyword proxies, not semantic coding.
 - **Post-treatment strata.** GO/SKIP strata (metrics 11, 15) and partner-state strata are consequences of the experiment, not randomized, so they are descriptive.
@@ -274,13 +316,13 @@ Generated folders (`output/`) are git-ignored.
 python3 result_analysis/tier3_4/test_t3lib.py
 ```
 
-Checks Holm correction, the normal quantile, pair construction, recovery of planted contrast effects, ICC recovery, bootstrap coverage and the label reader, all on simulated data with known answers (under a few seconds).
+Checks Holm correction, the normal quantile, pair construction, recovery of planted contrast effects, ICC recovery, bootstrap coverage, the label reader, Cohen's kappa against a textbook table, calibration and power of the permutation test, and the empty-subset case, all on simulated data with known answers (under a few seconds).
 
 To exercise the whole Tier 3/4 pipeline before real labels exist, generate random placeholder labels and run into a scratch folder:
 
 ```bash
 python3 result_analysis/tier3_4/make_fixture.py --data /path/to/outputs/main-owner-0 --out /tmp/labels_SYNTHETIC.csv
-python3 result_analysis/tier3_4/run_tier34.py --data /path/to/outputs/main-owner-0 --labels /tmp/labels_SYNTHETIC.csv --out /tmp/t34_test --boot 200
+python3 result_analysis/run_all.py --data /path/to/outputs/main-owner-0 --labels /tmp/labels_SYNTHETIC.csv --out /tmp/all_test --boot 200
 ```
 
 The placeholder labels are random (apart from a crude GO to CHECKED link), and the report prints a banner when the label file name contains `SYNTHETIC`. Never use them for results.
@@ -292,17 +334,21 @@ result_analysis/
   README.md
   requirements.txt
   run_all.py              all tiers, one combined report
-  common/                 shared by both tiers
+  common/                 shared by all tiers
     t2lib.py              run loading, bootstrap, logistic regression, Wald tests
+    t3lib.py              labels, scores, pair table, OLS, Holm, ICC, kappa, permutation test
     charts.py             dependency-free inline-SVG charts
+    report_blocks.py      HTML block and table rendering
     styles.py             report CSS
+  tier1/
+    m4_judge_validation.py  m5_omissions.py  m6_scoring_sensitivity.py
+    build_report1.py  run_tier1.py
   tier2/
     m7_check_rates.py  m8_second_hand.py  m9_who_checks.py
     build_report.py  run_tier2.py
   tier3_4/
-    t3lib.py              labels, scores, pair table, OLS, Holm, ICC
     m10_primary_td.py ... m20_dna_ranking.py   one module per metric
     build_report34.py  run_tier34.py  make_fixture.py  test_t3lib.py
 ```
 
-A metric module exposes `run(...)` returning `dict(id, title, summary, blocks, tables)`: `summary` is a list of takeaway sentences, `blocks` is a list of `("h3" | "h4" | "p" | "svg" | "table" | "grid", ...)` items rendered in order, and `tables` maps a CSV name to a DataFrame. Register a new module in `run_metrics` of the matching runner (`tier2/run_tier2.py` or `tier3_4/run_tier34.py`); `run_all.py` picks it up automatically. Reading-guide caveats live in `caveats()` of `tier2/build_report.py` and `tier3_4/build_report34.py`.
+A metric module exposes `run(...)` returning `dict(id, title, summary, blocks, tables)`: `summary` is a list of takeaway sentences, `blocks` is a list of `("h3" | "h4" | "p" | "svg" | "table" | "grid", ...)` items rendered in order, and `tables` maps a CSV name to a DataFrame. Register a new module in `run_metrics` of the matching runner (`tier1/run_tier1.py`, `tier2/run_tier2.py` or `tier3_4/run_tier34.py`); `run_all.py` picks it up automatically. Reading-guide caveats live in `caveats()` of `tier1/build_report1.py`, `tier2/build_report.py` and `tier3_4/build_report34.py`.

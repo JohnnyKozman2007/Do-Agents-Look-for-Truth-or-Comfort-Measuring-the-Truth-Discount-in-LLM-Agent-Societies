@@ -18,11 +18,14 @@ import traceback
 
 import pandas as pd
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, "..", "common"))
 import build_report34  # noqa: E402
 import m10_primary_td, m11_checkers, m12_contrasts, m13_asymmetry, m14_cell_map, m15_second_hand_td  # noqa: E401,E402
 import m16_model_comparison, m17_variance, m18_keywords, m20_dna_ranking  # noqa: E401,E402
 import t3lib  # noqa: E402
+from t3lib import load_labeled  # noqa: E402,F401
 
 SKIPPED = [
     "metric 19 (judge sensitivity: needs labels from several judges on the full set)",
@@ -58,26 +61,6 @@ def run_metrics(d, data_dirs, out_dir, boot, only=None, refresh=False, no_text=F
             tbl.to_csv(os.path.join(out_dir, "tables", f"{name}.csv"), index=False)
         print(f"      {m} done ({time.time() - t1:.0f}s)")
     return results
-
-
-def load_labeled(data_dirs, label_files, out_dir, refresh=False):
-    """Listener table with belief labels and scores attached; prints and saves label coverage."""
-    os.makedirs(os.path.join(out_dir, "tables"), exist_ok=True)
-    print("[1/4] listeners")
-    df = t3lib.read_listeners(data_dirs, out_dir, refresh=refresh)
-    print(f"      {len(df):,} listeners, {df.run_id.nunique():,} towns, {df.pair_id.nunique():,} pairs")
-    print("[2/4] labels")
-    labels = t3lib.read_labels(label_files)
-    d = t3lib.attach_scores(df, labels)
-    t3lib.coverage_table(d).to_csv(os.path.join(out_dir, "tables", "label_coverage.csv"), index=False)
-    share = d.labeled.mean()
-    print(f"      {int(d.labeled.sum()):,} of {len(d):,} listeners labeled ({100 * share:.1f}%); {int(d.omitted.sum()):,} NOT_MENTIONED")
-    extra = len(labels) - int(d.labeled.sum())
-    if extra:
-        print(f"      note: {extra:,} label rows did not match any listener (wrong run_id/seat or a shard that was not passed to --data)")
-    if share < 0.95:
-        print("      WARNING: under 95% of listeners are labeled; estimates use only the labeled listeners and pairs missing a twin are dropped")
-    return d
 
 
 def main():
