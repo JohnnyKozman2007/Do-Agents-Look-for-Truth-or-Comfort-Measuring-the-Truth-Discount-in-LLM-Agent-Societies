@@ -1,0 +1,138 @@
+{
+  "actor_model_keys": [
+    "deepseek_v4_flash",
+    "qwen_3_8_flash"
+  ],
+  "approval_is_not_preregistration_or_outcome_access_authority": true,
+  "approved": true,
+  "attempt_policy": "first_only",
+  "confidence_level": 0.95,
+  "config_sha256": "a8c34bdcd80fca13a60621640f46a121ab75177d7d7b45293c976760ef3efe9b",
+  "contrast_direction": "config_level_0_minus_level_1; interactions_difference_of_these_differences",
+  "contrasts": [
+    {
+      "factors": [
+        "closeness"
+      ],
+      "id": "closeness"
+    },
+    {
+      "factors": [
+        "authority"
+      ],
+      "id": "authority"
+    },
+    {
+      "factors": [
+        "wealth"
+      ],
+      "id": "wealth"
+    },
+    {
+      "factors": [
+        "reliability"
+      ],
+      "id": "reliability"
+    },
+    {
+      "factors": [
+        "closeness",
+        "reliability"
+      ],
+      "id": "closeness_by_reliability"
+    },
+    {
+      "factors": [
+        "authority",
+        "reliability"
+      ],
+      "id": "authority_by_reliability"
+    },
+    {
+      "factors": [
+        "wealth",
+        "reliability"
+      ],
+      "id": "wealth_by_reliability"
+    },
+    {
+      "factors": [
+        "closeness",
+        "authority"
+      ],
+      "id": "closeness_by_authority"
+    },
+    {
+      "factors": [
+        "gender"
+      ],
+      "id": "gender"
+    },
+    {
+      "factors": [
+        "age"
+      ],
+      "id": "age"
+    }
+  ],
+  "dependence_limitation": "Town intercepts do not model dependence between matched twins.",
+  "estimand": "available_valid_mentioning_listener_conditional_model",
+  "factor_levels": {
+    "age": [
+      "old",
+      "young"
+    ],
+    "authority": [
+      "mayor",
+      "citizen"
+    ],
+    "closeness": [
+      "close_friend",
+      "stranger"
+    ],
+    "gender": [
+      "woman",
+      "man"
+    ],
+    "reliability": [
+      "good_record",
+      "poor_record"
+    ],
+    "wealth": [
+      "rich",
+      "poor"
+    ]
+  },
+  "fit": {
+    "covariance": "model_based_fixed_effects",
+    "method": "reml",
+    "optimizer": "lbfgs",
+    "singular_variance_threshold": 1e-10,
+    "test": "two_sided_wald_normal"
+  },
+  "formula": "belief ~ truth * (C(closeness) + C(authority) + C(reliability) + C(wealth) + C(gender) + C(age) + C(closeness):C(reliability) + C(authority):C(reliability) + C(wealth):C(reliability) + C(closeness):C(authority)) + C(real_artist)",
+  "judge_profile_sha256": "efd4dadd116ea4292865657923853cf1c626aaa7d217a66fa01a0a89fbaabf61",
+  "marginal_grid": "uniform_64_factor_cells_and_two_configured_artists_fixed_effects_only",
+  "missing_policy": {
+    "generation_failures": "retain_report_no_automatic_regeneration",
+    "invalid_or_missing": "exclude_remain_missing",
+    "paired_town_td": "separate_matched_truth_rumor_town_estimator",
+    "valid_not_mentioned": "exclude_from_conditional_model"
+  },
+  "multiplicity": {
+    "alpha": 0.05,
+    "family_scope": "ten_per_model",
+    "method": "holm",
+    "planned_per_model": 10,
+    "planned_total": 20,
+    "unavailable_tests": "retain_planned_family_size_keep_p_null"
+  },
+  "random_intercept_group": "run_id",
+  "real_artist_levels": [
+    "Vesper Vance",
+    "Kaelen Cross"
+  ],
+  "source_sha256": "30c4b6ebaec0c925cd06a285403874e96e98f46e2594d9583d96189ea81c94f7",
+  "unresolved_policy": [],
+  "version": "truth-discount-planned-contrasts-0.1"
+}
