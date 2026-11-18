@@ -1,0 +1,41 @@
+{
+  "seed": 2027,
+  "raters": 5,
+  "overlap": 0.2,
+  "priority_share": 0.5,
+  "quotas": {
+    "UNPARSED_OR_RETRIED": 30,
+    "NOT_MENTIONED_RULE": 20,
+    "NOT_MENTIONED_JUDGE": 60,
+    "FACT": 50,
+    "UNCERTAIN": 80,
+    "CHECKED_FALSE": 40,
+    "CHECKED_TRUE": 40,
+    "SKEPTICAL": 40
+  },
+  "population_by_stratum": {
+    "CHECKED_TRUE": 38938,
+    "CHECKED_FALSE": 40699,
+    "SKEPTICAL": 23815,
+    "UNCERTAIN": 9586,
+    "FACT": 3930,
+    "NOT_MENTIONED_JUDGE": 1770,
+    "NOT_MENTIONED_RULE": 638,
+    "UNPARSED_OR_RETRIED": 432
+  },
+  "pool_size": 119808,
+  "sample_size": 360,
+  "sample_by_stratum": {
+    "NOT_MENTIONED_JUDGE": 60,
+    "CHECKED_TRUE": 40,
+    "UNCERTAIN": 80,
+    "FACT": 50,
+    "SKEPTICAL": 40,
+    "UNPARSED_OR_RETRIED": 30,
+    "CHECKED_FALSE": 40,
+    "NOT_MENTIONED_RULE": 20
+  },
+  "judged_dir": "C:\\Users\\Sidho\\OneDrive\\Desktop\\RESEARCH\\Do Agents Look for Truth or Comfort Measuring the Truth Discount in LLM Agent Societies\\outputs\\judged-main\\gemini-3.7-flash-v2",
+  "attempts_sha256_first_1mb": "4dbb07affde7499bd2d0324c55cd3b2235d101c386804e1359d08927c07ad38b",
+  "note": "Raters get only sheets/rater-N.csv and labeling_instructions.md. Do not open PRIVATE/."
+}
