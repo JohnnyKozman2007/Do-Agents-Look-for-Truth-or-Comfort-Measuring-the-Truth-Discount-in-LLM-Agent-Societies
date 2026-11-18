@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Run the Tier 3 / Tier 4 belief-based analyses and write one HTML report plus a CSV per table.
+
+Usage:
+  python3 run_tier34.py --data SHARD_DIR [SHARD_DIR ...] --labels LABELS_FILE [LABELS_FILE ...] --out OUT_DIR
+                        [--judge-name "Gemini 3.7 Flash"] [--boot 2000] [--refresh] [--only m10,m12] [--no-text]
+
+  --data    folders that hold the run directories (e.g. .../outputs/main-owner-0); pass several to pool shards
+  --labels  .csv or .jsonl files with columns run_id, seat (or seat_id) and label (FACT, UNCERTAIN, SKEPTICAL, CHECKED_TRUE,
+            CHECKED_FALSE, NOT_MENTIONED); extra columns are ignored
+Requires only numpy and pandas. Metrics: 10-17, 18 (keyword pass) and 20. Skipped: 19, 21, 22.
+"""
+import argparse
+import os
+import sys
+import time
+import traceback
+
+import pandas as pd
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, "..", "common"))
+import build_report34  # noqa: E402
+import m10_primary_td, m11_checkers, m12_contrasts, m13_asymmetry, m14_cell_map, m15_second_hand_td  # noqa: E401,E402
+import m16_model_comparison, m17_variance, m18_keywords, m20_dna_ranking  # noqa: E401,E402
+import t3lib  # noqa: E402
+from t3lib import load_labeled  # noqa: E402,F401
+
+SKIPPED = [
+    "metric 19 (judge sensitivity: needs labels from several judges on the full set)",
+    "metrics 21 and 22 (excluded by request)",
+    "margin- or probability-based analyses (the Gemini labels carry no probabilities)",
+    "LLM coding of agent reasoning (metric 18 is a keyword-only pass)",
+]
+
+
+def run_metrics(d, data_dirs, out_dir, boot, only=None, refresh=False, no_text=False):
+    """Run metrics 10-18 and 20 on a listener table with labels attached. Writes CSV tables to out_dir/tables; returns the result dicts."""
+    os.makedirs(os.path.join(out_dir, "tables"), exist_ok=True)
+    mods = {"m10": lambda: m10_primary_td.run(d, B=boot), "m11": lambda: m11_checkers.run(d, B=boot),
+            "m12": lambda: m12_contrasts.run(d, B=boot), "m13": lambda: m13_asymmetry.run(d, B=boot),
+            "m14": lambda: m14_cell_map.run(d, B=min(500, boot)), "m15": lambda: m15_second_hand_td.run(d, B=boot),
+            "m16": lambda: m16_model_comparison.run(d, B=boot), "m17": lambda: m17_variance.run(d, B=min(300, boot)),
+            "m18": lambda: m18_keywords.run(d, m18_keywords.read_text_flags(data_dirs, out_dir, refresh=refresh), B=min(500, boot)),
+            "m20": lambda: m20_dna_ranking.run(d, B=500, splits=500)}
+    wanted = [m.strip() for m in only.split(",")] if only else list(mods)
+    if no_text and "m18" in wanted:
+        wanted.remove("m18")
+    results = []
+    print(f"[3/4] metrics: {', '.join(wanted)}")
+    for m in wanted:
+        t1 = time.time()
+        try:
+            r = mods[m]()
+        except Exception:
+            traceback.print_exc()
+            r = dict(id=m, title=f"{m} - FAILED", summary=["This metric raised an error; see the console output."], blocks=[], tables={})
+        results.append(r)
+        for name, tbl in r["tables"].items():
+            tbl.to_csv(os.path.join(out_dir, "tables", f"{name}.csv"), index=False)
+        print(f"      {m} done ({time.time() - t1:.0f}s)")
+    return results
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data", nargs="+", required=True)
+    ap.add_argument("--labels", nargs="+", required=True)
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--judge-name", default="the LLM judge")
+    ap.add_argument("--boot", type=int, default=2000)
+    ap.add_argument("--refresh", action="store_true", help="rebuild cached listener and text tables")
+    ap.add_argument("--only", help="comma-separated metric ids to run, e.g. m10,m12")
+    ap.add_argument("--no-text", action="store_true", help="skip the keyword pass (metric 18)")
+    a = ap.parse_args()
+    os.makedirs(os.path.join(a.out, "tables"), exist_ok=True)
+    t0 = time.time()
+
+    d = load_labeled(a.data, a.labels, a.out, a.refresh)
+    results = run_metrics(d, a.data, a.out, a.boot, a.only, a.refresh, a.no_text)
+
+    print("[4/4] report")
+    out = os.path.join(a.out, "tier34_report.html")
+    syn = any("SYNTHETIC" in os.path.basename(p).upper() for p in a.labels)
+    build_report34.build(results, d, a.data, a.labels, a.judge_name, out, SKIPPED + ([] if not a.no_text else ["metric 18 (--no-text)"]), synthetic=syn)
+    print(f"[done] {out} ({time.time() - t0:.0f}s)")
+
+
+if __name__ == "__main__":
+    main()
