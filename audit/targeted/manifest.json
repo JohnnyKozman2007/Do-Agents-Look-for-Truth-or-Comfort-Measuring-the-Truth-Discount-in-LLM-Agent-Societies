@@ -3,6 +3,7 @@
   "raters": 5,
   "overlap": 0.2,
   "priority_share": 0.5,
+  "excluded_bakeoff_calls": 100,
   "quotas": {
     "UNPARSED_OR_RETRIED": 30,
     "NOT_MENTIONED_RULE": 20,

@@ -31,6 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_JUDGED = ROOT / "outputs" / "judged-main" / "gemini-3.7-flash-v2"
 DEFAULT_AUDIT = ROOT / "audit" / "targeted"
+DEFAULT_EXCLUDE = ROOT / "audit" / "bakeoff_human_labels_100.csv"
 LABELS = ["FACT", "UNCERTAIN", "SKEPTICAL", "CHECKED_TRUE", "CHECKED_FALSE", "NOT_MENTIONED"]
 KEYS = {str(i + 1): label for i, label in enumerate(LABELS)}
 ARTISTS = ("Vesper Vance", "Kaelen Cross")
@@ -193,11 +194,29 @@ def allocate(total: int, sizes: dict) -> dict:
     return out
 
 
-def draw(pool: list[dict], quotas: dict, seed: int, priority_share: float) -> list[dict]:
+def load_excluded_keys(path: Path) -> set[tuple[str, int]]:
+    if not path or not path.exists():
+        return set()
+    excluded: set[tuple[str, int]] = set()
+    with path.open(encoding="utf-8-sig", newline="") as stream:
+        for row in csv.DictReader(stream):
+            if "run_id" in row and "seat_id" in row and row["run_id"] and row["seat_id"]:
+                excluded.add((row["run_id"], int(row["seat_id"])))
+            elif "item_id" in row and "_seat_" in row["item_id"]:
+                run_id, seat = row["item_id"].rsplit("_seat_", 1)
+                excluded.add((run_id, int(seat)))
+    return excluded
+
+
+def draw(pool: list[dict], quotas: dict, seed: int, priority_share: float,
+         excluded: set[tuple[str, int]] | None = None) -> list[dict]:
+    excluded = excluded or set()
     rng = random.Random(seed)
     sample = []
     for name, _ in STRATA:
-        members = sorted((p for p in pool if p["stratum"] == name), key=lambda p: p["item_id"])
+        members = sorted((p for p in pool if p["stratum"] == name and (p["run_id"], int(p["seat_id"])) not in excluded),
+                         key=lambda p: p["item_id"])
+        pop_count = sum(1 for p in pool if p["stratum"] == name)
         cells = defaultdict(list)
         for p in members:
             cells[(p["model_key"], p["layer"], p["condition_type"])].append(p)
@@ -212,7 +231,7 @@ def draw(pool: list[dict], quotas: dict, seed: int, priority_share: float) -> li
             chosen = first[:take_first] + rest[:want - take_first]
             if len(chosen) < want:
                 chosen += first[take_first:take_first + want - len(chosen)]
-            sample += [{**p, "stratum_population": len(members), "stratum_n": 0} for p in chosen]
+            sample += [{**p, "stratum_population": pop_count, "stratum_n": 0} for p in chosen]
     counts = Counter(p["stratum"] for p in sample)
     for p in sample:
         p["stratum_n"] = counts[p["stratum"]]
@@ -256,7 +275,8 @@ def cmd_build(args) -> None:
     plan = load_plan(Path(args.judged) / "judging_plan.json")
     attempts = load_attempts(Path(args.judged) / "attempts.jsonl")
     pool = build_pool(plan, attempts)
-    sample = draw(pool, quotas, args.seed, args.priority_share)
+    excluded = load_excluded_keys(Path(args.exclude)) if args.exclude else set()
+    sample = draw(pool, quotas, args.seed, args.priority_share, excluded)
     assign_raters(sample, args.raters, args.overlap, args.seed)
     pop = Counter(p["stratum"] for p in pool)
     for rater in range(args.raters):
@@ -268,6 +288,7 @@ def cmd_build(args) -> None:
     write_csv(out / "PRIVATE" / "key.csv", key, KEY_FIELDS)
     (out / "labeling_instructions.md").write_text(RUBRIC, encoding="utf-8")
     manifest = {"seed": args.seed, "raters": args.raters, "overlap": args.overlap, "priority_share": args.priority_share,
+                "excluded_bakeoff_calls": len(excluded),
                 "quotas": quotas, "population_by_stratum": dict(pop), "pool_size": len(pool),
                 "sample_size": len(sample), "sample_by_stratum": dict(Counter(p["stratum"] for p in sample)),
                 "judged_dir": str(args.judged),
@@ -493,6 +514,7 @@ def main() -> None:
     b = sub.add_parser("build", help="draw the targeted sample and write rater sheets")
     b.add_argument("--judged", default=str(DEFAULT_JUDGED), help="dir with judging_plan.json and attempts.jsonl")
     b.add_argument("--out", default=str(DEFAULT_AUDIT))
+    b.add_argument("--exclude", default=str(DEFAULT_EXCLUDE), help="CSV of previously human-labeled calls to exclude")
     b.add_argument("--raters", type=int, default=5)
     b.add_argument("--overlap", type=float, default=0.2, help="share of items given to a second rater (inter-rater kappa)")
     b.add_argument("--scale", type=float, default=1.0, help="multiply every default quota (360 total at 1.0)")
