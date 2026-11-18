@@ -35,7 +35,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import build_condition_reports as bcr
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RESULTS = ROOT / "results" / "main-gemini-3.7-flash"
 DEFAULT_OUT = ROOT / "reports" / "truth_discount_comparison"
 

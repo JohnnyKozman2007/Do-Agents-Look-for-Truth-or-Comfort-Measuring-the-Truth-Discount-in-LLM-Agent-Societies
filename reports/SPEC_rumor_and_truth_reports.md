@@ -101,7 +101,7 @@ For each of the 4 interaction pairs (`closeness × reliability`, `authority × r
 
 ## 4. Deliverables
 
-- `scripts/build_condition_reports.py`: Reproducible builder script reading `results/main-gemini-3.7-flash/` (no LLM calls).
+- `result_analysis/pov_and_comparison/build_condition_reports.py`: Reproducible builder script reading `results/main-gemini-3.7-flash/` (no LLM calls).
 - `tests/test_condition_reports.py`: Automated tests validating zero-exclusion of `INVALID` rows, tie-breaking rules, controlled means/10-test Holm adjustments, 4-combo interaction tests, and dyadic pairing logic.
 - `reports/rumor_towns/`:
   - `report.html` (interactive Model / POV / Metric-Label tabs + 10-contrast & 4-combo interaction explorer)

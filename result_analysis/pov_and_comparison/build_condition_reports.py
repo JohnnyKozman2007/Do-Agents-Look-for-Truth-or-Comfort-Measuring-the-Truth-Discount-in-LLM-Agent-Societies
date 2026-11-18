@@ -31,7 +31,7 @@ import patsy
 from scipy.stats import norm
 import statsmodels.formula.api as smf
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RESULTS = ROOT / "results" / "main-gemini-3.7-flash"
 DEFAULT_OUT = ROOT / "reports"
 
