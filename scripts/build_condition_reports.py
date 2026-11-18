@@ -174,7 +174,9 @@ def _aggregate_listener_slice(sub: pd.DataFrame, cond_slice: pd.DataFrame | None
     valid_n = int(sub["is_valid"].sum())
     invalid_n = int(sub["is_invalid"].sum())
     mentioned_n = int(sub["belief"].notna().sum())
+    go_obs_n = int(sub["is_go"].notna().sum())
     go_n = int(sub["is_go"].sum())
+    n_towns = int(sub["run_id"].nunique()) if "run_id" in sub.columns else 0
 
     trans_pct = float("nan")
     ev_pct = float("nan")
@@ -191,11 +193,13 @@ def _aggregate_listener_slice(sub: pd.DataFrame, cond_slice: pd.DataFrame | None
         fallback_sh = int(cond_slice["go_second_hand_fallback_skip_count"].sum())
 
     row = {
+        "n_towns": n_towns,
         "expected_n": expected_n,
         "valid_n": valid_n,
         "invalid_n": invalid_n,
         "invalid_pct": (invalid_n / expected_n * 100.0) if expected_n else float("nan"),
         "mentioned_n": mentioned_n,
+        "go_obs_n": go_obs_n,
         "belief": _mean_or_nan(sub["belief"]),
         "belief_sil0": _mean_or_nan(sub["belief_sil0"]),
         "belief_sil05": _mean_or_nan(sub["belief_sil05"]),
@@ -260,6 +264,7 @@ def compute_dyadic_gatekeeper(dyadic: pd.DataFrame, cond: pd.DataFrame) -> pd.Da
                 "n_pairs": int(len(sub)),
                 "share_of_pairs_pct": float(len(sub) / len(sub_m) * 100.0) if len(sub_m) else float("nan"),
                 "sh_valid_n": int(len(valid_sh)),
+                "sh_mentioned_n": int(sub["sh_belief"].notna().sum()),
                 "sh_go_pct": _pct(sub["sh_is_go"]),
                 "sh_skip_pct": 100.0 - _pct(sub["sh_is_go"]),
                 "sh_belief": _mean_or_nan(sub["sh_belief"]),
@@ -513,11 +518,16 @@ def compute_knob_effects(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, 
                     pair_id = f"{fa}_x_{fb}"
                     pair_label = f"{fa} x {fb}"
                     vecs = {}
+                    combo_counts = {}
                     for va in (a1, a0):
                         for vb in (b1, b0):
                             mask = ((grid_df[fa] == va) & (grid_df[fb] == vb)).to_numpy()
                             v = grid_mat[mask].mean(axis=0)
                             vecs[(va, vb)] = v
+                            w_mask = ((work[fa] == va) & (work[fb] == vb)).to_numpy()
+                            c_n_obs = int(w_mask.sum())
+                            c_n_towns = int(work.loc[w_mask, "run_id"].nunique())
+                            combo_counts[(va, vb)] = (c_n_obs, c_n_towns)
                             est, se, ci_lo, ci_hi, _ = _contrast_stats(v, beta, cov, crit)
                             combo_rows.append({
                                 **base_meta,
@@ -528,6 +538,8 @@ def compute_knob_effects(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, 
                                 "level_a": va,
                                 "level_b": vb,
                                 "combo_label": f"{va} + {vb}",
+                                "combo_n_obs": c_n_obs,
+                                "combo_n_towns": c_n_towns,
                                 "mean": est,
                                 "se_clustered": se,
                                 "ci_low": ci_lo,
@@ -547,14 +559,17 @@ def compute_knob_effects(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, 
                         diff_given_b0,
                     )
 
-                    # Conditional simple effects within the 2x2 (each uses a 4-test Holm / raw comparison)
+                    # Conditional simple effects within the 2x2 (each uses town-clustered Wald z-test)
                     simple_specs = [
-                        (f"{fa} effect | {fb}={b0}", vecs[(a1, b0)], vecs[(a0, b0)], f"{a1}+{b0} vs {a0}+{b0}"),
-                        (f"{fa} effect | {fb}={b1}", vecs[(a1, b1)], vecs[(a0, b1)], f"{a1}+{b1} vs {a0}+{b1}"),
-                        (f"{fb} effect | {fa}={a0}", vecs[(a0, b1)], vecs[(a0, b0)], f"{a0}+{b1} vs {a0}+{b0}"),
-                        (f"{fb} effect | {fa}={a1}", vecs[(a1, b1)], vecs[(a1, b0)], f"{a1}+{b1} vs {a1}+{b0}"),
+                        (f"{fa} effect | {fb}={b0}", (a1, b0), (a0, b0), f"{a1}+{b0} vs {a0}+{b0}"),
+                        (f"{fa} effect | {fb}={b1}", (a1, b1), (a0, b1), f"{a1}+{b1} vs {a0}+{b1}"),
+                        (f"{fb} effect | {fa}={a0}", (a0, b1), (a0, b0), f"{a0}+{b1} vs {a0}+{b0}"),
+                        (f"{fb} effect | {fa}={a1}", (a1, b1), (a1, b0), f"{a1}+{b1} vs {a1}+{b0}"),
                     ]
-                    for desc, v_hi, v_lo, cmp_lbl in simple_specs:
+                    for desc, k_hi, k_lo, cmp_lbl in simple_specs:
+                        v_hi, v_lo = vecs[k_hi], vecs[k_lo]
+                        n_obs_hi, n_towns_hi = combo_counts[k_hi]
+                        n_obs_lo, n_towns_lo = combo_counts[k_lo]
                         eff, se, ci_lo, ci_hi, p_val = _contrast_stats(v_hi - v_lo, beta, cov, crit)
                         simple_rows.append({
                             **base_meta,
@@ -562,6 +577,10 @@ def compute_knob_effects(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, 
                             "pair_label": pair_label,
                             "comparison": desc,
                             "combo_contrast": cmp_lbl,
+                            "n_obs_hi": n_obs_hi,
+                            "n_towns_hi": n_towns_hi,
+                            "n_obs_lo": n_obs_lo,
+                            "n_towns_lo": n_towns_lo,
                             "mean_hi": float(v_hi @ beta),
                             "mean_lo": float(v_lo @ beta),
                             "effect": eff,
@@ -620,35 +639,41 @@ def render_markdown(
     simple_df: pd.DataFrame,
 ) -> str:
     title = "Rumor Towns Report (False Claims)" if condition_type == "rumor" else "Truth Towns Report (True Claims)"
+    total_towns = int(table_b.loc[table_b["layer"] == "overall", "n_towns"].iloc[0])
+    per_model_towns = int(table_a.loc[table_a["layer"] == "overall", "n_towns"].iloc[0])
     total_fallback_fh = int(table_b.loc[table_b["layer"] == "overall", "fallback_skip_fh"].iloc[0])
     total_fallback_sh = int(table_b.loc[table_b["layer"] == "overall", "fallback_skip_sh"].iloc[0])
     total_invalid = int(table_b.loc[table_b["layer"] == "overall", "invalid_n"].iloc[0])
     total_expected = int(table_b.loc[table_b["layer"] == "overall", "expected_n"].iloc[0])
 
+    total_towns = int(table_b.loc[table_b["layer"] == "overall", "n_towns"].iloc[0])
+    per_model_towns = int(table_a.loc[table_a["layer"] == "overall", "n_towns"].iloc[0])
+
     lines = [
         f"# {title}",
         "",
-        f"**Judge:** Gemini 3.7 Flash (`results/main-gemini-3.7-flash`) | **Condition:** `{condition_type}` | **Towns:** 4,992 (2,496 per model) | **Expected Listeners:** {total_expected:,}",
+        f"**Judge:** Gemini 3.7 Flash (`results/main-gemini-3.7-flash`) | **Condition:** `{condition_type}` | **Towns:** {total_towns:,} ({per_model_towns:,} per model) | **Expected Listeners:** {total_expected:,}",
         "",
         "### Methodological & Missingness Disclosure",
         f"- **Excluded Invalid Judgments:** {total_invalid:,} / {total_expected:,} ({total_invalid / total_expected * 100:.2f}%) had `judgment_status = invalid`. They are **completely excluded** (`NaN`), never turned into zeros.",
-        "- **Label % Denominator:** Valid judgments (`FACT + UNCERTAIN + SKEPTICAL + CHECKED_TRUE + CHECKED_FALSE + NOT_MENTIONED = 100%`).",
-        "- **Primary Belief Denominator:** Valid mentioning listeners (excluding `NOT_MENTIONED` and `INVALID`). Sensitivity checks (`Silence=0.0`, `Silence=0.5`) impute *only* valid `NOT_MENTIONED` rows.",
+        "- **Three Dynamic Denominators (Never Hardcoded):** `Expected N` = all listeners in slice (used for `GO %`/`SKIP %`); `Valid N` = `Expected N - Invalid` (used for all 6 label `%` and `Silence=0.0/0.5`); `Mentioned N` = `Valid N - NOT_MENTIONED` (used for primary conditional `Belief`).",
         f"- **Verification (`GO`/`SKIP`):** 0 missing or invalid decisions. {total_fallback_fh + total_fallback_sh} simulation decisions ({total_fallback_fh} first-hand, {total_fallback_sh} second-hand; {(total_fallback_fh + total_fallback_sh) / total_expected * 100:.2f}%) were `malformed_fallback_skip` in the simulation runner and appear as `SKIP`.",
-        "- **Statistical Model:** 10-term planned specification controlling simultaneously for all 6 knobs (`closeness`, `authority`, `reliability`, `wealth`, `gender`, `age`), the 4 planned interactions (`closeness × reliability`, `authority × reliability`, `wealth × reliability`, `closeness × authority`), and `real_artist`, with standard errors clustered by town (`run_id`) and Holm adjustment across all 10 planned contrasts per outcome. `Belief` also reports the spec's town-random-intercept LMM (`mixedlm`) check.",
+        "- **Statistical Model (Section 3):** 10-term OLS / Linear Probability Model (`6 main knobs + 4 interactions + real_artist`) with standard errors clustered by town (`run_id`), two-sided Wald z-tests, and Holm adjustment across all 10 planned contrasts per outcome. `Belief` also reports the spec's REML LMM (`1 | run_id`) companion check.",
         "",
         "---",
         "",
         "## 1. Overall Categorical & Behavioral Summary",
         "",
+        "*Estimator: Descriptive Means (`Belief` over `Mentioned N`; `Silence=0.0/0.5` over `Valid N`) & Shares (`GO/SKIP` over `Expected N`; 6 Labels over `Valid N`).*",
+        "",
         "### Table A: Per-Model Summary (First-Hand, Second-Hand, and Overall)",
         "",
-        "| Model | Layer | Valid N | Invalid (n / %) | Belief | Sil=0.0 | Sil=0.5 | GO % | SKIP % | FACT % | UNCERTAIN % | SKEPTICAL % | CHECKED_TRUE % | CHECKED_FALSE % | NOT_MENTIONED % | Trans % | Evid Trans % |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Model | Layer | Towns | Expected N | Valid N | Invalid (n / %) | Mentioned N | Belief (0-1 Mean) | Sil=0.0 | Sil=0.5 | GO % | SKIP % | FACT % | UNCERTAIN % | SKEPTICAL % | CHECKED_TRUE % | CHECKED_FALSE % | NOT_MENTIONED % | Trans % | Evid Trans % |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for _, r in table_a.iterrows():
         lines.append(
-            f"| {r['model_name']} | {r['layer_label']} | {r['valid_n']:,} | {r['invalid_n']} ({_f1(r['invalid_pct'])}) | "
+            f"| {r['model_name']} | {r['layer_label']} | {r['n_towns']:,} | {r['expected_n']:,} | {r['valid_n']:,} | {r['invalid_n']} ({_f1(r['invalid_pct'])}) | {r['mentioned_n']:,} | "
             f"{_f3(r['belief'])} | {_f3(r['belief_sil0'])} | {_f3(r['belief_sil05'])} | {_f1(r['go_pct'])} | {_f1(r['skip_pct'])} | "
             f"{_f1(r['FACT_pct'])} | {_f1(r['UNCERTAIN_pct'])} | {_f1(r['SKEPTICAL_pct'])} | "
             f"{_f1(r['CHECKED_TRUE_pct'])} | {_f1(r['CHECKED_FALSE_pct'])} | {_f1(r['NOT_MENTIONED_pct'])} | "
@@ -659,12 +684,12 @@ def render_markdown(
         "",
         "### Table B: Entire Experiment Average (Both Models Combined)",
         "",
-        "| Scope | Layer | Valid N | Invalid (n / %) | Belief | Sil=0.0 | Sil=0.5 | GO % | SKIP % | FACT % | UNCERTAIN % | SKEPTICAL % | CHECKED_TRUE % | CHECKED_FALSE % | NOT_MENTIONED % | Trans % | Evid Trans % |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Scope | Layer | Towns | Expected N | Valid N | Invalid (n / %) | Mentioned N | Belief (0-1 Mean) | Sil=0.0 | Sil=0.5 | GO % | SKIP % | FACT % | UNCERTAIN % | SKEPTICAL % | CHECKED_TRUE % | CHECKED_FALSE % | NOT_MENTIONED % | Trans % | Evid Trans % |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for _, r in table_b.iterrows():
         lines.append(
-            f"| {r['scope']} | {r['layer_label']} | {r['valid_n']:,} | {r['invalid_n']} ({_f1(r['invalid_pct'])}) | "
+            f"| {r['scope']} | {r['layer_label']} | {r['n_towns']:,} | {r['expected_n']:,} | {r['valid_n']:,} | {r['invalid_n']} ({_f1(r['invalid_pct'])}) | {r['mentioned_n']:,} | "
             f"{_f3(r['belief'])} | {_f3(r['belief_sil0'])} | {_f3(r['belief_sil05'])} | {_f1(r['go_pct'])} | {_f1(r['skip_pct'])} | "
             f"{_f1(r['FACT_pct'])} | {_f1(r['UNCERTAIN_pct'])} | {_f1(r['SKEPTICAL_pct'])} | "
             f"{_f1(r['CHECKED_TRUE_pct'])} | {_f1(r['CHECKED_FALSE_pct'])} | {_f1(r['NOT_MENTIONED_pct'])} | "
@@ -677,14 +702,14 @@ def render_markdown(
         "",
         "## 2. Gatekeeper & Downstream Susceptibility (`Seat i <-> Seat i+6`)",
         "",
-        "Shows what happened to **Second-Hand Listeners (Seats 7-12)** depending on whether their paired **First-Hand Partner (Seats 1-6)** checked the noticeboard (`GO`) or did not (`SKIP`).",
+        "*Estimator: Descriptive Means & Shares of Second-Hand Listeners (Seats 7-12) grouped by paired First-Hand Partner decision (`GO` vs `SKIP`). No hypothesis test.*",
         "",
-        "| Model | First-Hand Partner | Pairs (n / share) | SH GO % | SH Belief | SH FACT % | SH UNCERTAIN % | SH SKEPTICAL % | SH CHECKED_TRUE % | SH CHECKED_FALSE % | SH NOT_MENTIONED % |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Model | First-Hand Partner | Pairs (n / share) | SH Valid N | SH Mentioned N | SH GO % | SH Belief | SH FACT % | SH UNCERTAIN % | SH SKEPTICAL % | SH CHECKED_TRUE % | SH CHECKED_FALSE % | SH NOT_MENTIONED % |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for _, r in dyadic_df.iterrows():
         lines.append(
-            f"| {r['model_name']} | {r['fh_partner_decision']} | {r['n_pairs']:,} ({_f1(r['share_of_pairs_pct'])}) | "
+            f"| {r['model_name']} | {r['fh_partner_decision']} | {r['n_pairs']:,} ({_f1(r['share_of_pairs_pct'])}) | {r['sh_valid_n']:,} | {r['sh_mentioned_n']:,} | "
             f"{_f1(r['sh_go_pct'])} | {_f3(r['sh_belief'])} | {_f1(r['sh_FACT_pct'])} | {_f1(r['sh_UNCERTAIN_pct'])} | "
             f"{_f1(r['sh_SKEPTICAL_pct'])} | {_f1(r['sh_CHECKED_TRUE_pct'])} | {_f1(r['sh_CHECKED_FALSE_pct'])} | "
             f"{_f1(r['sh_NOT_MENTIONED_pct'])} |"
@@ -727,7 +752,7 @@ def render_markdown(
                     lines.append(row_str)
 
                 if outcome_col not in ("belief_sil0", "belief_sil05"):
-                    lines += ["", f"*4 Planned Interaction Pairs — 16-DNA Combo Means & Simple Comparisons ({outcome_label}):*", ""]
+                    lines += ["", f"*4 Planned Interaction Pairs — 16-DNA Combo Adjusted Means (OLS marginal predictions) & Conditional Wald z-Tests (`groups=run_id`, {outcome_label}):*", ""]
                     for fa, fb in INTERACTIONS:
                         pair_id = f"{fa}_x_{fb}"
                         oc = sub_c[(sub_c["outcome"] == outcome_col) & (sub_c["pair_id"] == pair_id)]
@@ -736,21 +761,22 @@ def render_markdown(
                         fe = (lambda x: f"{x:+.2f} pp") if is_pct else (lambda x: f"{x:+.4f}")
                         lines += [
                             f"- **`{fa} × {fb}` — Controlled Combos:** " + " | ".join(
-                                f"`{cr['combo_label']}` = **{fv(cr['mean'])}** [{fv(cr['ci_low']).replace('%','')}, {fv(cr['ci_high'])}]"
+                                f"`{cr['combo_label']}` (n={int(cr['combo_n_obs']):,}, {int(cr['combo_n_towns'])} towns) = **{fv(cr['mean'])}** [{fv(cr['ci_low']).replace('%','')}, {fv(cr['ci_high'])}]"
                                 for _, cr in oc.iterrows()
                             ),
                             "",
-                            "| Conditional Comparison | Diff | 95% CI | p (clustered) |",
-                            "|---|---:|---:|---:|",
+                            "| Conditional Comparison | N (Hi / Lo) | Diff | 95% CI | p (clustered) |",
+                            "|---|---:|---:|---:|---:|",
                         ]
                         for _, sr in os_df.iterrows():
                             sci = f"[{fe(sr['ci_low']).replace(' pp','')}, {fe(sr['ci_high'])}]"
+                            n_pair = f"{int(sr['n_obs_hi']):,} / {int(sr['n_obs_lo']):,}"
                             lines.append(
-                                f"| `{sr['comparison']}` | {fe(sr['effect'])}{_stars(sr['p_clustered'])} | {sci} | {_fp(sr['p_clustered'])} |"
+                                f"| `{sr['comparison']}` | {n_pair} | {fe(sr['effect'])}{_stars(sr['p_clustered'])} | {sci} | {_fp(sr['p_clustered'])} |"
                             )
                         lines.append("")
 
-    lines += ["", "---", "", "## 4. Top 10 Strongest & Bottom 10 Weakest Source DNAs (All Labels & Metrics)"]
+    lines += ["", "---", "", "## 4. Top 10 Strongest & Bottom 10 Weakest Source DNAs (Descriptive Per-Cell Means & Shares; No Hypothesis Test)"]
     for model_key, model_name in MODEL_NAMES.items():
         lines += ["", f"### Model: {model_name}"]
         for pov_key, pov_title, _ in POV_DEFS:
@@ -766,13 +792,13 @@ def render_markdown(
                     lines += [
                         f"*{heading}:*",
                         "",
-                        "| Rank | Cell | DNA (Closeness / Authority / Reliability / Wealth / Identity) | Target | Belief | GO % | SKIP % | FACT % | UNCERTAIN % | SKEPTICAL % | CHECKED_TRUE % | CHECKED_FALSE % | NOT_MENTIONED % |",
-                        "|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+                        "| Rank | Cell | DNA (Closeness / Authority / Reliability / Wealth / Identity) | Towns | Valid N | Ment. N | Target | Belief | GO % | SKIP % | FACT % | UNCERTAIN % | SKEPTICAL % | CHECKED_TRUE % | CHECKED_FALSE % | NOT_MENTIONED % |",
+                        "|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
                     ]
                     for idx, dr in tbl.iterrows():
                         targ = f"{dr[col]:.1f}%" if is_pct else f"{dr[col]:.4f}"
                         lines.append(
-                            f"| {idx + 1} | {dr['cell_id']} | {dr['cell_name']} | **{targ}** | {_f3(dr['belief'])} | "
+                            f"| {idx + 1} | {dr['cell_id']} | {dr['cell_name']} | {int(dr['n_towns'])} | {int(dr['valid_n'])} | {int(dr['mentioned_n'])} | **{targ}** | {_f3(dr['belief'])} | "
                             f"{_f1(dr['go_pct'])} | {_f1(dr['skip_pct'])} | {_f1(dr['FACT_pct'])} | {_f1(dr['UNCERTAIN_pct'])} | "
                             f"{_f1(dr['SKEPTICAL_pct'])} | {_f1(dr['CHECKED_TRUE_pct'])} | {_f1(dr['CHECKED_FALSE_pct'])} | "
                             f"{_f1(dr['NOT_MENTIONED_pct'])} |"
@@ -798,6 +824,8 @@ def render_html(
     badge = "FALSE CLAIMS (RUMOR)" if is_rumor else "TRUE CLAIMS (TRUTH TWIN)"
     accent = "#c0392b" if is_rumor else "#1e8449"
 
+    total_towns = int(table_b.loc[table_b["layer"] == "overall", "n_towns"].iloc[0])
+    per_model_towns = int(table_a.loc[table_a["layer"] == "overall", "n_towns"].iloc[0])
     total_fallback_fh = int(table_b.loc[table_b["layer"] == "overall", "fallback_skip_fh"].iloc[0])
     total_fallback_sh = int(table_b.loc[table_b["layer"] == "overall", "fallback_skip_sh"].iloc[0])
     total_invalid = int(table_b.loc[table_b["layer"] == "overall", "invalid_n"].iloc[0])
@@ -823,8 +851,11 @@ def render_html(
                 f"<tr class='{cls}'>"
                 f"<td><b>{html.escape(str(r[first_col]))}</b></td>"
                 f"<td>{html.escape(str(r['layer_label']))}</td>"
-                f"<td>{r['valid_n']:,}</td>"
-                f"<td>{r['invalid_n']} ({_f1(r['invalid_pct'])})</td>"
+                f"<td class='num'>{r['n_towns']:,}</td>"
+                f"<td class='num'>{r['expected_n']:,}</td>"
+                f"<td class='num'>{r['valid_n']:,}</td>"
+                f"<td class='num'>{r['invalid_n']} ({_f1(r['invalid_pct'])})</td>"
+                f"<td class='num'>{r['mentioned_n']:,}</td>"
                 f"<td class='num strong'>{_f3(r['belief'])}</td>"
                 f"<td class='num'>{_f3(r['belief_sil0'])}</td>"
                 f"<td class='num'>{_f3(r['belief_sil05'])}</td>"
@@ -850,6 +881,8 @@ def render_html(
             f"<td><b>{html.escape(str(r['model_name']))}</b></td>"
             f"<td><span class='pill'>{html.escape(str(r['fh_partner_decision']))}</span></td>"
             f"<td class='num'>{r['n_pairs']:,} ({_f1(r['share_of_pairs_pct'])})</td>"
+            f"<td class='num'>{r['sh_valid_n']:,}</td>"
+            f"<td class='num'>{r['sh_mentioned_n']:,}</td>"
             f"<td class='num'>{_f1(r['sh_go_pct'])}</td>"
             f"<td class='num strong'>{_f3(r['sh_belief'])}</td>"
             f"<td class='num'>{_f1(r['sh_FACT_pct'])}</td>"
@@ -905,21 +938,22 @@ def render_html(
   <header>
     <div class="badge">{badge}</div>
     <h1>{html.escape(title)}</h1>
-    <div class="meta">4,992 towns (2,496 per agent model) &bull; {total_expected:,} expected listeners &bull; Single Judge: Gemini 3.7 Flash &bull; Clustering: town (<code>run_id</code>)</div>
+    <div class="meta">{total_towns:,} towns ({per_model_towns:,} per agent model) &bull; {total_expected:,} expected listeners &bull; Single Judge: Gemini 3.7 Flash &bull; Clustering: town (<code>run_id</code>)</div>
     <div class="note">
-      <b>Honest Missingness &amp; Denominators:</b>
+      <b>Honest Missingness &amp; Three Dynamic Denominators (Never Hardcoded):</b>
       {total_invalid:,} / {total_expected:,} ({total_invalid / total_expected * 100:.2f}%) judge outputs were <code>invalid</code> and are <b>completely excluded</b> (never zero-imputed).
-      Label % shares sum to 100% over valid judgments. Conditional <code>Belief</code> excludes valid <code>NOT_MENTIONED</code> rows (also checked under <code>Silence=0.0</code> and <code>0.5</code>).
+      <code>Expected N</code> = all listeners (used for <code>GO</code>/<code>SKIP</code>); <code>Valid N</code> = <code>Expected N &minus; Invalid</code> (used for all 6 label % and <code>Sil=0.0/0.5</code>); <code>Mentioned N</code> = <code>Valid N &minus; NOT_MENTIONED</code> (used for conditional <code>Belief</code>).
       Runner verification decisions (<code>GO</code>/<code>SKIP</code>) have 0 missing values ({total_fallback_fh + total_fallback_sh} simulation <code>malformed_fallback_skip</code> rows = {(total_fallback_fh + total_fallback_sh) / total_expected * 100:.2f}% appear as <code>SKIP</code>).
     </div>
   </header>
 
   <div class="card">
     <h2>1A. Overall Categorical &amp; Belief Summary — Per Model (First-Hand, Second-Hand, Overall)</h2>
+    <div class="meta" style="margin-bottom:8px;"><b>Estimator:</b> Descriptive Means (<code>Belief</code> over <code>Mentioned N</code>; <code>Sil=0.0/0.5</code> over <code>Valid N</code>) &amp; Percentage Shares (<code>GO/SKIP</code> over <code>Expected N</code>; 6 Labels over <code>Valid N</code>).</div>
     <div class="scroll">
       <table>
         <thead>
-          <tr><th>Model</th><th>Layer</th><th>Valid N</th><th>Invalid</th><th class="num">Belief</th><th class="num">Sil=0.0</th><th class="num">Sil=0.5</th><th class="num">GO %</th><th class="num">SKIP %</th><th class="num">FACT %</th><th class="num">UNCERTAIN %</th><th class="num">SKEPTICAL %</th><th class="num">CHECKED_TRUE %</th><th class="num">CHECKED_FALSE %</th><th class="num">NOT_MENTIONED %</th><th class="num">Trans %</th><th class="num">Evid Trans %</th></tr>
+          <tr><th>Model</th><th>Layer</th><th class="num">Towns</th><th class="num">Expected N</th><th class="num">Valid N</th><th class="num">Invalid</th><th class="num">Mentioned N</th><th class="num">Belief (Mean)</th><th class="num">Sil=0.0</th><th class="num">Sil=0.5</th><th class="num">GO %</th><th class="num">SKIP %</th><th class="num">FACT %</th><th class="num">UNCERTAIN %</th><th class="num">SKEPTICAL %</th><th class="num">CHECKED_TRUE %</th><th class="num">CHECKED_FALSE %</th><th class="num">NOT_MENTIONED %</th><th class="num">Trans %</th><th class="num">Evid Trans %</th></tr>
         </thead>
         <tbody>{summary_rows_html(table_a, "model_name")}</tbody>
       </table>
@@ -928,7 +962,7 @@ def render_html(
     <div class="scroll">
       <table>
         <thead>
-          <tr><th>Scope</th><th>Layer</th><th>Valid N</th><th>Invalid</th><th class="num">Belief</th><th class="num">Sil=0.0</th><th class="num">Sil=0.5</th><th class="num">GO %</th><th class="num">SKIP %</th><th class="num">FACT %</th><th class="num">UNCERTAIN %</th><th class="num">SKEPTICAL %</th><th class="num">CHECKED_TRUE %</th><th class="num">CHECKED_FALSE %</th><th class="num">NOT_MENTIONED %</th><th class="num">Trans %</th><th class="num">Evid Trans %</th></tr>
+          <tr><th>Scope</th><th>Layer</th><th class="num">Towns</th><th class="num">Expected N</th><th class="num">Valid N</th><th class="num">Invalid</th><th class="num">Mentioned N</th><th class="num">Belief (Mean)</th><th class="num">Sil=0.0</th><th class="num">Sil=0.5</th><th class="num">GO %</th><th class="num">SKIP %</th><th class="num">FACT %</th><th class="num">UNCERTAIN %</th><th class="num">SKEPTICAL %</th><th class="num">CHECKED_TRUE %</th><th class="num">CHECKED_FALSE %</th><th class="num">NOT_MENTIONED %</th><th class="num">Trans %</th><th class="num">Evid Trans %</th></tr>
         </thead>
         <tbody>{summary_rows_html(table_b, "scope")}</tbody>
       </table>
@@ -937,10 +971,11 @@ def render_html(
 
   <div class="card">
     <h2>2. Gatekeeper &amp; Downstream Susceptibility (Seat i &harr; Seat i+6)</h2>
+    <div class="meta" style="margin-bottom:8px;"><b>Estimator:</b> Descriptive Means &amp; Shares of Second-Hand Listeners (Seats 7&ndash;12) grouped by paired First-Hand decision (<code>GO</code> vs. <code>SKIP</code>). No hypothesis test.</div>
     <div class="scroll">
       <table>
         <thead>
-          <tr><th>Model</th><th>First-Hand Decision</th><th class="num">Pairs (n / %)</th><th class="num">SH GO %</th><th class="num">SH Belief</th><th class="num">SH FACT %</th><th class="num">SH UNCERTAIN %</th><th class="num">SH SKEPTICAL %</th><th class="num">SH CHECKED_TRUE %</th><th class="num">SH CHECKED_FALSE %</th><th class="num">SH NOT_MENTIONED %</th></tr>
+          <tr><th>Model</th><th>First-Hand Decision</th><th class="num">Pairs (GO/SKIP N)</th><th class="num">SH Valid N</th><th class="num">SH Ment. N</th><th class="num">SH GO %</th><th class="num">SH Belief</th><th class="num">SH FACT %</th><th class="num">SH UNCERTAIN %</th><th class="num">SH SKEPTICAL %</th><th class="num">SH CHECKED_TRUE %</th><th class="num">SH CHECKED_FALSE %</th><th class="num">SH NOT_MENTIONED %</th></tr>
         </thead>
         <tbody>{"".join(dyadic_rows_html)}</tbody>
       </table>
@@ -976,14 +1011,14 @@ def render_html(
         <button class="btn" data-val="wealth_x_reliability">wealth &times; reliability</button>
         <button class="btn" data-val="closeness_x_authority">closeness &times; authority</button>
       </div>
-      <span class="meta">Controls for the other 4 knobs + artist; each combo pools all 16 matching DNAs (624 towns per model).</span>
+      <span class="meta"><b>Estimator:</b> Marginal Predictions &amp; Conditional Wald z-tests from Town-Clustered OLS (<code>groups=run_id</code>), controlling for the other 4 knobs + artist. Exact non-NaN <code>N</code> shown per combo.</span>
     </div>
     <div class="grid-2">
       <div><h4>4 Combo Controlled Means (95% CI)</h4><div class="scroll" id="combo-table"></div></div>
       <div><h4>Conditional Simple Comparisons Inside the 2&times;2</h4><div class="scroll" id="simple-table"></div></div>
     </div>
 
-    <h3>Part C: Top 10 Strongest &amp; Bottom 10 Weakest Source DNAs (Out of 64)</h3>
+    <h3>Part C: Top 10 Strongest &amp; Bottom 10 Weakest Source DNAs (Descriptive Per-Cell Means &amp; Shares)</h3>
     <div class="controls">
       <label>Rank by Metric / Categorical Label: <select id="rank-select"></select></label>
       <span class="meta" id="dna-note"></span>
@@ -1036,7 +1071,7 @@ function renderKnobs() {{
   if (!rows.length) return;
   const isPct = rows[0].unit === "pp";
   const isBelief = rows[0].outcome.startsWith("belief");
-  document.getElementById("knob-meta").textContent = `N = ${{rows[0].n_obs.toLocaleString()}} observations across ${{rows[0].n_towns.toLocaleString()}} towns (clustered by run_id)`;
+  document.getElementById("knob-meta").textContent = `Estimator: Town-Clustered OLS / LPM (cov_type='cluster', groups=run_id) + Wald z-test + Holm (10 tests) | N = ${{rows[0].n_obs.toLocaleString()}} non-NaN obs across ${{rows[0].n_towns.toLocaleString()}} towns`;
   const fv = v => v == null ? "—" : (isPct ? v.toFixed(2) + "%" : v.toFixed(4));
   const fe = v => v == null ? "—" : (isPct ? (v >= 0 ? "+" : "") + v.toFixed(2) + " pp" : (v >= 0 ? "+" : "") + v.toFixed(4));
   let h = `<table><thead><tr><th>Type</th><th>Contrast</th><th>Detail (A &minus; B)</th><th class="num">A</th><th class="num">B</th><th class="num">Controlled Effect</th><th class="num">95% CI</th><th class="num">p (Clustered)</th><th class="num">p (Holm 10)</th>`;
@@ -1068,30 +1103,31 @@ function renderInteractions() {{
   const fv = v => v == null ? "—" : (isPct ? v.toFixed(2) + "%" : v.toFixed(4));
   const fe = v => v == null ? "—" : (isPct ? (v >= 0 ? "+" : "") + v.toFixed(2) + " pp" : (v >= 0 ? "+" : "") + v.toFixed(4));
 
-  let ch = `<table><thead><tr><th>16-DNA Combo</th><th class="num">Controlled Mean</th><th class="num">95% CI</th><th class="num">Clustered SE</th></tr></thead><tbody>`;
+  let ch = `<table><thead><tr><th>16-DNA Combo</th><th class="num">Non-NaN N</th><th class="num">Towns</th><th class="num">Controlled Mean</th><th class="num">95% CI</th><th class="num">Clustered SE</th></tr></thead><tbody>`;
   cRows.forEach(r => {{
     const ci = `[${{fv(r.ci_low).replace("%","")}}, ${{fv(r.ci_high)}}]`;
-    ch += `<tr><td><b><code>${{r.combo_label}}</code></b></td><td class="num strong">${{fv(r.mean)}}</td><td class="num">${{ci}}</td><td class="num">${{fv(r.se_clustered)}}</td></tr>`;
+    ch += `<tr><td><b><code>${{r.combo_label}}</code></b></td><td class="num">${{r.combo_n_obs.toLocaleString()}}</td><td class="num">${{r.combo_n_towns.toLocaleString()}}</td><td class="num strong">${{fv(r.mean)}}</td><td class="num">${{ci}}</td><td class="num">${{fv(r.se_clustered)}}</td></tr>`;
   }});
   ch += `</tbody></table>`;
   document.getElementById("combo-table").innerHTML = ch;
 
-  let sh = `<table><thead><tr><th>Comparison</th><th>Combos Compared</th><th class="num">Hi Mean</th><th class="num">Lo Mean</th><th class="num">Diff</th><th class="num">95% CI</th><th class="num">p (Clustered)</th></tr></thead><tbody>`;
+  let sh = `<table><thead><tr><th>Comparison</th><th>Combos Compared</th><th class="num">N (Hi / Lo)</th><th class="num">Hi Mean</th><th class="num">Lo Mean</th><th class="num">Diff</th><th class="num">95% CI</th><th class="num">p (Clustered)</th></tr></thead><tbody>`;
   sRows.forEach(r => {{
     const sig = r.p_clustered < 0.05;
     const cls = !sig ? "ns" : (r.effect >= 0 ? "sig-pos" : "sig-neg");
     const ci = `[${{fe(r.ci_low).replace(" pp","")}}, ${{fe(r.ci_high)}}]`;
-    sh += `<tr><td><b>${{r.comparison}}</b></td><td><code>${{r.combo_contrast}}</code></td><td class="num">${{fv(r.mean_hi)}}</td><td class="num">${{fv(r.mean_lo)}}</td><td class="num ${{cls}}">${{fe(r.effect)}}${{stars(r.p_clustered)}}</td><td class="num">${{ci}}</td><td class="num ${{cls}}">${{fmtP(r.p_clustered)}}</td></tr>`;
+    const np = `${{r.n_obs_hi.toLocaleString()}} / ${{r.n_obs_lo.toLocaleString()}}`;
+    sh += `<tr><td><b>${{r.comparison}}</b></td><td><code>${{r.combo_contrast}}</code></td><td class="num">${{np}}</td><td class="num">${{fv(r.mean_hi)}}</td><td class="num">${{fv(r.mean_lo)}}</td><td class="num ${{cls}}">${{fe(r.effect)}}${{stars(r.p_clustered)}}</td><td class="num">${{ci}}</td><td class="num ${{cls}}">${{fmtP(r.p_clustered)}}</td></tr>`;
   }});
   sh += `</tbody></table>`;
   document.getElementById("simple-table").innerHTML = sh;
 }}
 
 function dnaTableHtml(list, col, isPct) {{
-  let h = `<table><thead><tr><th>#</th><th>Cell</th><th>Source DNA</th><th class="num">Target</th><th class="num">Belief</th><th class="num">GO %</th><th class="num">SKIP %</th><th class="num">FACT %</th><th class="num">UNCERTAIN %</th><th class="num">SKEPTICAL %</th><th class="num">CHECKED_TRUE %</th><th class="num">CHECKED_FALSE %</th><th class="num">NOT_MENTIONED %</th></tr></thead><tbody>`;
+  let h = `<table><thead><tr><th>#</th><th>Cell</th><th>Source DNA</th><th class="num">Towns</th><th class="num">Valid N</th><th class="num">Ment. N</th><th class="num">Target</th><th class="num">Belief</th><th class="num">GO %</th><th class="num">SKIP %</th><th class="num">FACT %</th><th class="num">UNCERTAIN %</th><th class="num">SKEPTICAL %</th><th class="num">CHECKED_TRUE %</th><th class="num">CHECKED_FALSE %</th><th class="num">NOT_MENTIONED %</th></tr></thead><tbody>`;
   list.forEach((r, i) => {{
     const t = r[col] == null ? "—" : (isPct ? r[col].toFixed(1) + "%" : r[col].toFixed(4));
-    h += `<tr><td>${{i+1}}</td><td>${{r.cell_id}}</td><td>${{r.cell_name}}</td><td class="num strong">${{t}}</td><td class="num">${{f3(r.belief)}}</td><td class="num">${{f1(r.go_pct)}}</td><td class="num">${{f1(r.skip_pct)}}</td><td class="num">${{f1(r.FACT_pct)}}</td><td class="num">${{f1(r.UNCERTAIN_pct)}}</td><td class="num">${{f1(r.SKEPTICAL_pct)}}</td><td class="num">${{f1(r.CHECKED_TRUE_pct)}}</td><td class="num">${{f1(r.CHECKED_FALSE_pct)}}</td><td class="num">${{f1(r.NOT_MENTIONED_pct)}}</td></tr>`;
+    h += `<tr><td>${{i+1}}</td><td>${{r.cell_id}}</td><td>${{r.cell_name}}</td><td class="num">${{r.n_towns}}</td><td class="num">${{r.valid_n}}</td><td class="num">${{r.mentioned_n}}</td><td class="num strong">${{t}}</td><td class="num">${{f3(r.belief)}}</td><td class="num">${{f1(r.go_pct)}}</td><td class="num">${{f1(r.skip_pct)}}</td><td class="num">${{f1(r.FACT_pct)}}</td><td class="num">${{f1(r.UNCERTAIN_pct)}}</td><td class="num">${{f1(r.SKEPTICAL_pct)}}</td><td class="num">${{f1(r.CHECKED_TRUE_pct)}}</td><td class="num">${{f1(r.CHECKED_FALSE_pct)}}</td><td class="num">${{f1(r.NOT_MENTIONED_pct)}}</td></tr>`;
   }});
   return h + `</tbody></table>`;
 }}

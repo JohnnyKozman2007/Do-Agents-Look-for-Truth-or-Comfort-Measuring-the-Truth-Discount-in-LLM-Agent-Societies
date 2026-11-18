@@ -113,14 +113,25 @@ def compute_comparison_summaries(df: pd.DataFrame, conditions: pd.DataFrame) -> 
         r_sub = sub[sub["truth"] == 0]
         t_sub = sub[sub["truth"] == 1]
         td, td_lo, td_hi, td_p, td_n = _paired_diff_summary(sub, "belief", 1.0)
-        td0, _, _, _, _ = _paired_diff_summary(sub, "belief_sil0", 1.0)
+        td0, _, _, _, td0_n = _paired_diff_summary(sub, "belief_sil0", 1.0)
         td05, _, _, _, _ = _paired_diff_summary(sub, "belief_sil05", 1.0)
-        d_go, _, _, _, _ = _paired_diff_summary(sub, "is_go", 100.0)
-        d_nm, _, _, _, _ = _paired_diff_summary(sub, "label_NOT_MENTIONED", 100.0)
+        d_go, _, _, _, d_go_n = _paired_diff_summary(sub, "is_go", 100.0)
+        d_nm, _, _, _, d_nm_n = _paired_diff_summary(sub, "label_NOT_MENTIONED", 100.0)
 
         row = {
             **label_meta,
+            "n_towns_rumor": int(r_sub["run_id"].nunique()),
+            "n_towns_truth": int(t_sub["run_id"].nunique()),
+            "rumor_expected_n": int(len(r_sub)),
+            "truth_expected_n": int(len(t_sub)),
+            "rumor_valid_n": int(r_sub["is_valid"].sum()),
+            "truth_valid_n": int(t_sub["is_valid"].sum()),
+            "rumor_mentioned_n": int(r_sub["belief"].notna().sum()),
+            "truth_mentioned_n": int(t_sub["belief"].notna().sum()),
             "n_pairs_used_belief": td_n,
+            "n_pairs_used_sil": td0_n,
+            "n_pairs_used_go": d_go_n,
+            "n_pairs_used_nm": d_nm_n,
             "rumor_belief": bcr._mean_or_nan(r_sub["belief"]),
             "truth_belief": bcr._mean_or_nan(t_sub["belief"]),
             "truth_discount": td,
@@ -186,9 +197,9 @@ def compute_paired_dna_truth_discount(df: pd.DataFrame) -> pd.DataFrame:
                 r_sub = csub[csub["truth"] == 0]
                 t_sub = csub[csub["truth"] == 1]
                 td, td_lo, td_hi, td_p, n_pairs = _paired_diff_summary(csub, "belief", 1.0)
-                td0, _, _, _, _ = _paired_diff_summary(csub, "belief_sil0", 1.0)
+                td0, _, _, _, n_pairs_sil = _paired_diff_summary(csub, "belief_sil0", 1.0)
                 td05, _, _, _, _ = _paired_diff_summary(csub, "belief_sil05", 1.0)
-                d_go, _, _, _, _ = _paired_diff_summary(csub, "is_go", 100.0)
+                d_go, _, _, _, n_pairs_go = _paired_diff_summary(csub, "is_go", 100.0)
                 r_bel = bcr._mean_or_nan(r_sub["belief"])
                 t_bel = bcr._mean_or_nan(t_sub["belief"])
                 r_go = bcr._pct(r_sub["is_go"])
@@ -200,6 +211,12 @@ def compute_paired_dna_truth_discount(df: pd.DataFrame) -> pd.DataFrame:
                     "cell_id": int(cell_id),
                     "cell_name": first["cell_name"],
                     "n_pairs_used": n_pairs,
+                    "n_pairs_used_go": n_pairs_go,
+                    "n_pairs_used_sil": n_pairs_sil,
+                    "rumor_valid_n": int(r_sub["is_valid"].sum()),
+                    "truth_valid_n": int(t_sub["is_valid"].sum()),
+                    "rumor_mentioned_n": int(r_sub["belief"].notna().sum()),
+                    "truth_mentioned_n": int(t_sub["belief"].notna().sum()),
                     "rumor_belief": r_bel,
                     "truth_belief": t_bel,
                     "truth_discount": td,
@@ -354,11 +371,17 @@ def compute_symmetry_and_td_tests(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
                     pair_id = f"{fa}_x_{fb}"
                     pair_label = f"{fa} x {fb}"
                     vecs_r, vecs_t = {}, {}
+                    combo_counts = {}
                     for va in (a1, a0):
                         for vb in (b1, b0):
                             vr_c = grid_mat[((grid_df["truth"] == 0) & (grid_df[fa] == va) & (grid_df[fb] == vb)).to_numpy()].mean(axis=0)
                             vt_c = grid_mat[((grid_df["truth"] == 1) & (grid_df[fa] == va) & (grid_df[fb] == vb)).to_numpy()].mean(axis=0)
                             vecs_r[(va, vb)], vecs_t[(va, vb)] = vr_c, vt_c
+                            w_combo = work[(work[fa] == va) & (work[fb] == vb)]
+                            r_n_c = int((w_combo["truth"] == 0).sum())
+                            t_n_c = int((w_combo["truth"] == 1).sum())
+                            p_n_c = int(w_combo["pair_id"].nunique())
+                            combo_counts[(va, vb)] = (r_n_c + t_n_c, p_n_c)
                             mr, _, _, _, _ = bcr._contrast_stats(vr_c, beta, cov, crit)
                             mt, _, _, _, _ = bcr._contrast_stats(vt_c, beta, cov, crit)
                             mtd, _, td_lo, td_hi, p_td = bcr._contrast_stats(vt_c - vr_c, beta, cov, crit)
@@ -367,6 +390,9 @@ def compute_symmetry_and_td_tests(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
                                 "pair_id": pair_id,
                                 "pair_label": pair_label,
                                 "combo_label": f"{va} + {vb}",
+                                "rumor_n_obs": r_n_c,
+                                "truth_n_obs": t_n_c,
+                                "n_pairs_combo": p_n_c,
                                 "rumor_mean": mr,
                                 "truth_mean": mt,
                                 "truth_discount": mtd,
@@ -380,12 +406,16 @@ def compute_symmetry_and_td_tests(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
                     add_contrast("interaction", f"{fa}_by_{fb}", f"({a1}-{a0} | {b1}) - ({a1}-{a0} | {b0})", vr_did, vt_did)
 
                     simple_specs = [
-                        (f"{fa} effect | {fb}={b0}", vecs_r[(a1, b0)] - vecs_r[(a0, b0)], vecs_t[(a1, b0)] - vecs_t[(a0, b0)], f"{a1}+{b0} vs {a0}+{b0}"),
-                        (f"{fa} effect | {fb}={b1}", vecs_r[(a1, b1)] - vecs_r[(a0, b1)], vecs_t[(a1, b1)] - vecs_t[(a0, b1)], f"{a1}+{b1} vs {a0}+{b1}"),
-                        (f"{fb} effect | {fa}={a0}", vecs_r[(a0, b1)] - vecs_r[(a0, b0)], vecs_t[(a0, b1)] - vecs_t[(a0, b0)], f"{a0}+{b1} vs {a0}+{b0}"),
-                        (f"{fb} effect | {fa}={a1}", vecs_r[(a1, b1)] - vecs_r[(a1, b0)], vecs_t[(a1, b1)] - vecs_t[(a1, b0)], f"{a1}+{b1} vs {a1}+{b0}"),
+                        (f"{fa} effect | {fb}={b0}", (a1, b0), (a0, b0), f"{a1}+{b0} vs {a0}+{b0}"),
+                        (f"{fa} effect | {fb}={b1}", (a1, b1), (a0, b1), f"{a1}+{b1} vs {a0}+{b1}"),
+                        (f"{fb} effect | {fa}={a0}", (a0, b1), (a0, b0), f"{a0}+{b1} vs {a0}+{b0}"),
+                        (f"{fb} effect | {fa}={a1}", (a1, b1), (a1, b0), f"{a1}+{b1} vs {a1}+{b0}"),
                     ]
-                    for desc, dr, dt, clbl in simple_specs:
+                    for desc, k_hi, k_lo, clbl in simple_specs:
+                        dr = vecs_r[k_hi] - vecs_r[k_lo]
+                        dt = vecs_t[k_hi] - vecs_t[k_lo]
+                        n_obs_hi, n_pairs_hi = combo_counts[k_hi]
+                        n_obs_lo, n_pairs_lo = combo_counts[k_lo]
                         er, _, _, _, pr = bcr._contrast_stats(dr, beta, cov, crit)
                         et, _, _, _, pt = bcr._contrast_stats(dt, beta, cov, crit)
                         ed, _, dlo, dhi, pd_val = bcr._contrast_stats(dt - dr, beta, cov, crit)
@@ -395,6 +425,10 @@ def compute_symmetry_and_td_tests(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
                             "pair_label": pair_label,
                             "comparison": desc,
                             "combo_contrast": clbl,
+                            "n_obs_hi": n_obs_hi,
+                            "n_pairs_hi": n_pairs_hi,
+                            "n_obs_lo": n_obs_lo,
+                            "n_pairs_lo": n_pairs_lo,
                             "effect_rumor": er,
                             "p_rumor": pr,
                             "effect_truth": et,
@@ -452,6 +486,9 @@ def compute_model_comparison(df: pd.DataFrame) -> pd.DataFrame:
                 "outcome": ocol,
                 "outcome_label": olabel,
                 "unit": "pp" if is_pct else "belief",
+                "n_obs_rumor": int((work["truth"] == 0).sum()),
+                "n_obs_truth": int((work["truth"] == 1).sum()),
+                "n_pairs_total": int(work["pair_cluster"].nunique()),
                 "deepseek_rumor": m_ds_r,
                 "qwen_rumor": m_qw_r,
                 "diff_rumor_ds_minus_qw": ds_r,
@@ -480,31 +517,39 @@ def render_markdown(
     simple_df: pd.DataFrame,
     model_cmp: pd.DataFrame,
 ) -> str:
+    ov_b = table_b.loc[table_b["layer"] == "overall"].iloc[0]
+    total_towns = int(ov_b["n_towns_rumor"] + ov_b["n_towns_truth"])
+    total_pairs_exp = int(ov_b["n_pairs_used_go"])
+
     lines = [
         "# Report 3: Truth Discount & Comparisons (Truth Twin − Rumor Twin)",
         "",
-        "**Judge:** Gemini 3.7 Flash (`results/main-gemini-3.7-flash`) | **Towns:** 9,984 (4,992 Rumor + 4,992 Truth) | **Clustering:** Twin Pair (`pair_id`)",
+        f"**Judge:** Gemini 3.7 Flash (`results/main-gemini-3.7-flash`) | **Towns:** {total_towns:,} ({int(ov_b['n_towns_rumor']):,} Rumor + {int(ov_b['n_towns_truth']):,} Truth) | **Twin Pairs:** {total_pairs_exp:,} | **Clustering:** Twin Pair (`pair_id`)",
         "",
-        "### Methodological Policy",
-        "- **Core Estimand:** $\\text{Truth Discount} = \\text{Belief}_{\\text{Truth Twin}} - \\text{Belief}_{\\text{Rumor Twin}}$, alongside $\\Delta\\text{GO}$, $\\Delta\\text{Omission}$, and categorical label shifts.",
-        "- **Invalid Exclusion:** Individual `judgment_status = invalid` rows stay `NaN` (never zero-imputed, and without discarding the other 11 valid listeners in a town).",
-        "- **Symmetry / Truth Discount Model:** Pooled `outcome ~ truth * (6 main knobs + 4 interactions) + C(real_artist)` with standard errors clustered by matched twin pair (`pair_id`), plus Holm adjustment across all 10 planned contrasts. `Belief` also reports the spec's town-random-intercept LMM check.",
+        "### Methodological Policy (Dynamic Denominators — Never Hardcoded)",
+        "- **Core Estimand:** $\\text{Truth Discount} = \\text{Belief}_{\\text{Truth Twin}} - \\text{Belief}_{\\text{Rumor Twin}}$ (`Matched-Pair Mean ± 1.96·SE`), alongside $\\Delta\\text{GO}$, $\\Delta\\text{Omission}$, and categorical label shifts.",
+        "- **Invalid Exclusion:** Individual `judgment_status = invalid` rows stay `NaN` (never zero-imputed, and without discarding valid listeners in the same town).",
+        "- **Dynamic Denominators:** `R/T Ment. N` = non-NaN mentioning listeners used for Rumor/Truth conditional `Belief`; `Belief Pairs` = complete twin pairs having valid mentioning listeners in both twins; `GO Pairs` = complete twin pairs with verification decisions.",
+        "- **Symmetry / Truth Discount Model:** Pooled `outcome ~ truth * (6 main knobs + 4 interactions) + C(real_artist)` OLS / LPM with Twin-Pair-Clustered SEs (`groups=pair_id`), two-sided Wald z-tests, and Holm adjustment across all 10 planned contrasts. `Belief` also reports the spec's REML LMM (`1 | run_id`).",
         "",
         "---",
         "",
         "## 1. Overall Truth vs. Rumor & Matched Truth Discount Summary",
         "",
+        "*Estimator: Matched-Pair Mean (`Truth − Rumor`), Normal 95% CI (`Mean ± 1.96·SE`); `GO %` over Expected N, `NM %` over Valid N.*",
+        "",
         "### Table 1A: Per Model × Layer",
         "",
-        "| Model | Layer | Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Sil=0.0 TD | Sil=0.5 TD | Rumor GO % | Truth GO % | Δ GO | Rumor NM % | Truth NM % | Δ NM |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Model | Layer | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Sil=0.0 TD | Sil=0.5 TD | GO Pairs | Rumor GO % | Truth GO % | Δ GO | Rumor NM % | Truth NM % | Δ NM |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for _, r in table_a.iterrows():
         ci = f"[{bcr._f3(r['td_ci_low'])}, {bcr._f3(r['td_ci_high'])}]"
+        n_rt = f"{int(r['rumor_mentioned_n']):,} / {int(r['truth_mentioned_n']):,}"
         lines.append(
-            f"| {r['model_name']} | {r['layer_label']} | {r['n_pairs_used_belief']:,} | "
+            f"| {r['model_name']} | {r['layer_label']} | {n_rt} | {int(r['n_pairs_used_belief']):,} | "
             f"{bcr._f3(r['rumor_belief'])} | {bcr._f3(r['truth_belief'])} | **{bcr._f3(r['truth_discount'])}** {ci} | "
-            f"{bcr._f3(r['td_sil0'])} | {bcr._f3(r['td_sil05'])} | "
+            f"{bcr._f3(r['td_sil0'])} | {bcr._f3(r['td_sil05'])} | {int(r['n_pairs_used_go']):,} | "
             f"{bcr._f1(r['rumor_go_pct'])} | {bcr._f1(r['truth_go_pct'])} | {r['diff_go_pp']:+.1f} pp | "
             f"{bcr._f1(r['rumor_nm_pct'])} | {bcr._f1(r['truth_nm_pct'])} | {r['diff_nm_pp']:+.1f} pp |"
         )
@@ -513,15 +558,16 @@ def render_markdown(
         "",
         "### Table 1B: Entire Experiment Average (Both Models Combined)",
         "",
-        "| Scope | Layer | Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Sil=0.0 TD | Sil=0.5 TD | Rumor GO % | Truth GO % | Δ GO | Rumor NM % | Truth NM % | Δ NM |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Scope | Layer | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Sil=0.0 TD | Sil=0.5 TD | GO Pairs | Rumor GO % | Truth GO % | Δ GO | Rumor NM % | Truth NM % | Δ NM |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for _, r in table_b.iterrows():
         ci = f"[{bcr._f3(r['td_ci_low'])}, {bcr._f3(r['td_ci_high'])}]"
+        n_rt = f"{int(r['rumor_mentioned_n']):,} / {int(r['truth_mentioned_n']):,}"
         lines.append(
-            f"| {r['scope']} | {r['layer_label']} | {r['n_pairs_used_belief']:,} | "
+            f"| {r['scope']} | {r['layer_label']} | {n_rt} | {int(r['n_pairs_used_belief']):,} | "
             f"{bcr._f3(r['rumor_belief'])} | {bcr._f3(r['truth_belief'])} | **{bcr._f3(r['truth_discount'])}** {ci} | "
-            f"{bcr._f3(r['td_sil0'])} | {bcr._f3(r['td_sil05'])} | "
+            f"{bcr._f3(r['td_sil0'])} | {bcr._f3(r['td_sil05'])} | {int(r['n_pairs_used_go']):,} | "
             f"{bcr._f1(r['rumor_go_pct'])} | {bcr._f1(r['truth_go_pct'])} | {r['diff_go_pp']:+.1f} pp | "
             f"{bcr._f1(r['rumor_nm_pct'])} | {bcr._f1(r['truth_nm_pct'])} | {r['diff_nm_pp']:+.1f} pp |"
         )
@@ -532,16 +578,19 @@ def render_markdown(
         "",
         "## 2. Model Comparison (`DeepSeek-V4-Flash − Qwen3.8-Flash`)",
         "",
-        "| POV | Outcome | DeepSeek Rumor | Qwen Rumor | Δ Rumor (p) | DeepSeek Truth | Qwen Truth | Δ Truth (p) | DeepSeek TD | Qwen TD | Δ TD (DS − Qwen) | 95% CI | p (clustered) |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "*Estimator: Pooled `outcome ~ truth * is_deepseek` OLS / LPM with Pair-Clustered SEs (`groups = model__pair_id`) & two-sided Wald z-test.*",
+        "",
+        "| POV | Outcome | Non-NaN N (R / T) | Pairs | DeepSeek Rumor | Qwen Rumor | Δ Rumor (p) | DeepSeek Truth | Qwen Truth | Δ Truth (p) | DeepSeek TD | Qwen TD | Δ TD (DS − Qwen) | 95% CI | p (clustered) |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for _, r in model_cmp.iterrows():
         is_pct = r["unit"] == "pp"
         fv = (lambda x: f"{x:.1f}%") if is_pct else (lambda x: f"{x:.3f}")
         fe = (lambda x: f"{x:+.1f} pp") if is_pct else (lambda x: f"{x:+.3f}")
         ci = f"[{fe(r['td_ci_low']).replace(' pp','')}, {fe(r['td_ci_high'])}]"
+        n_rt = f"{int(r['n_obs_rumor']):,} / {int(r['n_obs_truth']):,}"
         lines.append(
-            f"| {r['pov']} | {r['outcome_label']} | {fv(r['deepseek_rumor'])} | {fv(r['qwen_rumor'])} | {fe(r['diff_rumor_ds_minus_qw'])} ({bcr._fp(r['p_rumor'])}) | "
+            f"| {r['pov']} | {r['outcome_label']} | {n_rt} | {int(r['n_pairs_total']):,} | {fv(r['deepseek_rumor'])} | {fv(r['qwen_rumor'])} | {fe(r['diff_rumor_ds_minus_qw'])} ({bcr._fp(r['p_rumor'])}) | "
             f"{fv(r['deepseek_truth'])} | {fv(r['qwen_truth'])} | {fe(r['diff_truth_ds_minus_qw'])} ({bcr._fp(r['p_truth'])}) | "
             f"{fv(r['deepseek_td'])} | {fv(r['qwen_td'])} | **{fe(r['diff_td_ds_minus_qw'])}{bcr._stars(r['p_td'])}** | {ci} | {bcr._fp(r['p_td'])} |"
         )
@@ -577,7 +626,7 @@ def render_markdown(
                         row_s += f" {lmm_s} |"
                     lines.append(row_s)
 
-    lines += ["", "---", "", "## 4. Top 10 Largest & Bottom 10 Smallest Truth Discount DNAs (`Truth − Rumor`)"]
+    lines += ["", "---", "", "## 4. Top 10 Largest & Bottom 10 Smallest Truth Discount DNAs (`Truth − Rumor` — Matched-Pair Mean ± 1.96·SE)"]
     for model_key, model_name in bcr.MODEL_NAMES.items():
         lines += ["", f"### Model: {model_name}"]
         for pov_key, pov_title, _ in bcr.POV_DEFS:
@@ -591,13 +640,14 @@ def render_markdown(
                     "",
                     f"*{heading}:*",
                     "",
-                    "| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |",
-                    "|---:|---:|---|---:|---:|---:|---:|---:|---:|",
+                    "| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |",
+                    "|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|",
                 ]
                 for idx, (_, dr) in enumerate(tbl.iterrows(), start=1):
                     ci = f"[{bcr._f3(dr['td_ci_low'])}, {bcr._f3(dr['td_ci_high'])}]"
+                    n_rt = f"{int(dr['rumor_mentioned_n'])} / {int(dr['truth_mentioned_n'])}"
                     lines.append(
-                        f"| {idx} | {dr['cell_id']} | {dr['cell_name']} | {bcr._f3(dr['rumor_belief'])} | "
+                        f"| {idx} | {dr['cell_id']} | {dr['cell_name']} | {n_rt} | {int(dr['n_pairs_used'])} | {bcr._f3(dr['rumor_belief'])} | "
                         f"{bcr._f3(dr['truth_belief'])} | **{bcr._f3(dr['truth_discount'])}** {ci} | "
                         f"{bcr._f1(dr['rumor_go_pct'])} | {bcr._f1(dr['truth_go_pct'])} | {dr['diff_go_pp']:+.1f} pp |"
                     )
@@ -627,21 +677,28 @@ def render_html(
     }
     payload_json = json.dumps(payload).replace("</", "<\\/")
 
+    ov_b = table_b.loc[table_b["layer"] == "overall"].iloc[0]
+    total_towns = int(ov_b["n_towns_rumor"] + ov_b["n_towns_truth"])
+    total_pairs_exp = int(ov_b["n_pairs_used_go"])
+
     def sum_rows(df_in: pd.DataFrame, first_col: str) -> str:
         out = []
         for _, r in df_in.iterrows():
             cls = "row-overall" if r["layer"] == "overall" else ""
             ci = f"[{bcr._f3(r['td_ci_low'])}, {bcr._f3(r['td_ci_high'])}]"
+            n_rt = f"{int(r['rumor_mentioned_n']):,} / {int(r['truth_mentioned_n']):,}"
             out.append(
                 f"<tr class='{cls}'>"
                 f"<td><b>{html.escape(str(r[first_col]))}</b></td>"
                 f"<td>{html.escape(str(r['layer_label']))}</td>"
-                f"<td class='num'>{r['n_pairs_used_belief']:,}</td>"
+                f"<td class='num'>{n_rt}</td>"
+                f"<td class='num'>{int(r['n_pairs_used_belief']):,}</td>"
                 f"<td class='num rumor-col'>{bcr._f3(r['rumor_belief'])}</td>"
                 f"<td class='num truth-col'>{bcr._f3(r['truth_belief'])}</td>"
                 f"<td class='num strong'>{bcr._f3(r['truth_discount'])} <span class='muted-sm'>{ci}</span></td>"
                 f"<td class='num'>{bcr._f3(r['td_sil0'])}</td>"
                 f"<td class='num'>{bcr._f3(r['td_sil05'])}</td>"
+                f"<td class='num'>{int(r['n_pairs_used_go']):,}</td>"
                 f"<td class='num'>{bcr._f1(r['rumor_go_pct'])}</td>"
                 f"<td class='num'>{bcr._f1(r['truth_go_pct'])}</td>"
                 f"<td class='num'>{r['diff_go_pp']:+.1f} pp</td>"
@@ -659,8 +716,10 @@ def render_html(
         fe = (lambda x: f"{x:+.1f} pp") if is_pct else (lambda x: f"{x:+.3f}")
         ci = f"[{fe(r['td_ci_low']).replace(' pp','')}, {fe(r['td_ci_high'])}]"
         cls = "ns" if r["p_td"] >= 0.05 else ("sig-pos" if r["diff_td_ds_minus_qw"] >= 0 else "sig-neg")
+        n_rt = f"{int(r['n_obs_rumor']):,} / {int(r['n_obs_truth']):,}"
         mcmp_rows.append(
             f"<tr><td>{html.escape(r['pov'])}</td><td><b>{html.escape(r['outcome_label'])}</b></td>"
+            f"<td class='num'>{n_rt}</td><td class='num'>{int(r['n_pairs_total']):,}</td>"
             f"<td class='num'>{fv(r['deepseek_rumor'])}</td><td class='num'>{fv(r['qwen_rumor'])}</td>"
             f"<td class='num'>{fe(r['diff_rumor_ds_minus_qw'])} <span class='muted-sm'>({bcr._fp(r['p_rumor'])})</span></td>"
             f"<td class='num'>{fv(r['deepseek_truth'])}</td><td class='num'>{fv(r['qwen_truth'])}</td>"
@@ -720,27 +779,28 @@ def render_html(
   <header>
     <div class="badge">TRUTH DISCOUNT &amp; SYMMETRY COMPARISONS</div>
     <h1>Report 3: Truth Discount &amp; Comparisons (Truth Twin &minus; Rumor Twin)</h1>
-    <div class="meta">9,984 towns (4,992 matched twin pairs) &bull; Single Judge: Gemini 3.7 Flash &bull; Clustering: Matched Twin Pair (<code>pair_id</code>)</div>
+    <div class="meta">{total_towns:,} towns ({int(ov_b['n_towns_rumor']):,} Rumor + {int(ov_b['n_towns_truth']):,} Truth) &bull; {total_pairs_exp:,} matched twin pairs &bull; Single Judge: Gemini 3.7 Flash &bull; Clustering: Twin Pair (<code>pair_id</code>)</div>
     <div class="note">
-      <b>How to read this report:</b> <b>Truth Discount</b> = <code>Truth Belief &minus; Rumor Belief</code>.
-      Section 3 tests directly whether each of the <b>6 main knobs</b> and <b>4 planned interactions</b> affects Rumor Towns and Truth Towns <b>equally</b> (<code>&Delta;TD &approx; 0</code>) or asymmetrically (<code>&Delta;TD &ne; 0</code>).
-      Individual <code>invalid</code> judge rows stay <code>NaN</code> (never zero-imputed).
+      <b>Dynamic Denominators (Never Hardcoded):</b> <b>Truth Discount</b> = <code>Truth Belief &minus; Rumor Belief</code>.
+      Individual <code>invalid</code> judge rows stay <code>NaN</code> (never zero-imputed, and without dropping valid listeners in the same town).
+      Every table reports the exact non-NaN count (<code>Ment. N</code> for conditional <code>Belief</code>, <code>Valid N</code> for labels/silence, <code>Pairs</code> for matched-pair comparisons) and exact estimator.
     </div>
   </header>
 
   <div class="card">
     <h2>1. Overall Rumor vs. Truth &amp; Matched Truth Discount Summary</h2>
+    <div class="meta" style="margin-bottom:8px;"><b>Estimator:</b> Matched-Pair Mean (<code>Truth &minus; Rumor</code>), Normal 95% CI (<code>Mean &plusmn; 1.96&middot;SE</code>); <code>GO %</code> over Expected N, <code>NM %</code> over Valid N.</div>
     <h3>Table 1A: Per Model &times; Layer</h3>
     <div class="scroll">
       <table>
-        <thead><tr><th>Model</th><th>Layer</th><th class="num">Pairs</th><th class="num">Rumor Belief</th><th class="num">Truth Belief</th><th class="num">Truth Discount [95% CI]</th><th class="num">Sil=0.0 TD</th><th class="num">Sil=0.5 TD</th><th class="num">Rumor GO %</th><th class="num">Truth GO %</th><th class="num">&Delta; GO</th><th class="num">Rumor NM %</th><th class="num">Truth NM %</th><th class="num">&Delta; NM</th></tr></thead>
+        <thead><tr><th>Model</th><th>Layer</th><th class="num">Ment. N (R / T)</th><th class="num">Belief Pairs</th><th class="num">Rumor Belief</th><th class="num">Truth Belief</th><th class="num">Truth Discount [95% CI]</th><th class="num">Sil=0.0 TD</th><th class="num">Sil=0.5 TD</th><th class="num">GO Pairs</th><th class="num">Rumor GO %</th><th class="num">Truth GO %</th><th class="num">&Delta; GO</th><th class="num">Rumor NM %</th><th class="num">Truth NM %</th><th class="num">&Delta; NM</th></tr></thead>
         <tbody>{sum_rows(table_a, "model_name")}</tbody>
       </table>
     </div>
     <h3>Table 1B: Entire Experiment Average (Both Models Combined)</h3>
     <div class="scroll">
       <table>
-        <thead><tr><th>Scope</th><th>Layer</th><th class="num">Pairs</th><th class="num">Rumor Belief</th><th class="num">Truth Belief</th><th class="num">Truth Discount [95% CI]</th><th class="num">Sil=0.0 TD</th><th class="num">Sil=0.5 TD</th><th class="num">Rumor GO %</th><th class="num">Truth GO %</th><th class="num">&Delta; GO</th><th class="num">Rumor NM %</th><th class="num">Truth NM %</th><th class="num">&Delta; NM</th></tr></thead>
+        <thead><tr><th>Scope</th><th>Layer</th><th class="num">Ment. N (R / T)</th><th class="num">Belief Pairs</th><th class="num">Rumor Belief</th><th class="num">Truth Belief</th><th class="num">Truth Discount [95% CI]</th><th class="num">Sil=0.0 TD</th><th class="num">Sil=0.5 TD</th><th class="num">GO Pairs</th><th class="num">Rumor GO %</th><th class="num">Truth GO %</th><th class="num">&Delta; GO</th><th class="num">Rumor NM %</th><th class="num">Truth NM %</th><th class="num">&Delta; NM</th></tr></thead>
         <tbody>{sum_rows(table_b, "scope")}</tbody>
       </table>
     </div>
@@ -828,9 +888,10 @@ def render_html(
 
   <div class="card">
     <h2>4. Model Comparison: DeepSeek-V4-Flash &minus; Qwen3.8-Flash</h2>
+    <div class="meta" style="margin-bottom:8px;"><b>Estimator:</b> Pooled <code>outcome ~ truth * is_deepseek</code> OLS / LPM with Pair-Clustered SEs (<code>groups = model__pair_id</code>) &amp; two-sided Wald z-test.</div>
     <div class="scroll">
       <table>
-        <thead><tr><th>POV</th><th>Outcome</th><th class="num">DeepSeek Rumor</th><th class="num">Qwen Rumor</th><th class="num">&Delta; Rumor (p)</th><th class="num">DeepSeek Truth</th><th class="num">Qwen Truth</th><th class="num">&Delta; Truth (p)</th><th class="num">DeepSeek TD</th><th class="num">Qwen TD</th><th class="num">&Delta; TD (DS &minus; Qwen)</th><th class="num">95% CI</th><th class="num">p</th></tr></thead>
+        <thead><tr><th>POV</th><th>Outcome</th><th class="num">Non-NaN N (R / T)</th><th class="num">Pairs</th><th class="num">DeepSeek Rumor</th><th class="num">Qwen Rumor</th><th class="num">&Delta; Rumor (p)</th><th class="num">DeepSeek Truth</th><th class="num">Qwen Truth</th><th class="num">&Delta; Truth (p)</th><th class="num">DeepSeek TD</th><th class="num">Qwen TD</th><th class="num">&Delta; TD (DS &minus; Qwen)</th><th class="num">95% CI</th><th class="num">p</th></tr></thead>
         <tbody>{"".join(mcmp_rows)}</tbody>
       </table>
     </div>
@@ -995,7 +1056,7 @@ function renderExplorer() {{
     const isPct = rows[0].unit === "pp";
     const isBel = rows[0].outcome === "belief";
     const fe = v => v == null ? "—" : (isPct ? (v>=0?"+":"") + v.toFixed(2) + " pp" : (v>=0?"+":"") + v.toFixed(4));
-    document.getElementById("td-meta").textContent = `N = ${{rows[0].n_obs.toLocaleString()}} observations across ${{rows[0].n_pairs.toLocaleString()}} matched twin pairs`;
+    document.getElementById("td-meta").textContent = `Estimator: Pooled Truth × Contrast OLS / LPM (cov_type='cluster', groups=pair_id) + Wald z-test + Holm (10 tests) | N = ${{rows[0].n_obs.toLocaleString()}} non-NaN obs across ${{rows[0].n_pairs.toLocaleString()}} twin pairs`;
     let h = `<table><thead><tr><th>Type</th><th>Contrast</th><th>Detail</th><th class="num">Effect in Rumor</th><th class="num">Effect in Truth</th><th class="num">&Delta; Truth Discount</th><th class="num">95% CI (&Delta;TD)</th><th class="num">p (Clustered)</th><th class="num">p (Holm 10)</th>`;
     if (isBel) h += `<th class="num">Spec LMM Check</th>`;
     h += `</tr></thead><tbody>`;
@@ -1023,18 +1084,20 @@ function renderCombos() {{
   const isPct = cRows[0].unit === "pp";
   const fv = v => v == null ? "—" : (isPct ? v.toFixed(2) + "%" : v.toFixed(4));
   const fe = v => v == null ? "—" : (isPct ? (v>=0?"+":"") + v.toFixed(2) + " pp" : (v>=0?"+":"") + v.toFixed(4));
-  let ch = `<table><thead><tr><th>16-DNA Combo</th><th class="num">Rumor Mean</th><th class="num">Truth Mean</th><th class="num">Truth Discount (Truth &minus; Rumor)</th><th class="num">95% CI</th></tr></thead><tbody>`;
+  let ch = `<table><thead><tr><th>16-DNA Combo (Marginal Adj. Mean &amp; Pair-Clustered Wald CI)</th><th class="num">Obs (R / T)</th><th class="num">Pairs</th><th class="num">Rumor Mean</th><th class="num">Truth Mean</th><th class="num">Truth Discount (Truth &minus; Rumor)</th><th class="num">95% CI</th></tr></thead><tbody>`;
   cRows.forEach(r => {{
     const ci = `[${{fe(r.td_ci_low).replace(" pp","")}}, ${{fe(r.td_ci_high)}}]`;
-    ch += `<tr><td><b><code>${{r.combo_label}}</code></b></td><td class="num rumor-col">${{fv(r.rumor_mean)}}</td><td class="num truth-col">${{fv(r.truth_mean)}}</td><td class="num strong">${{fe(r.truth_discount)}}</td><td class="num">${{ci}}</td></tr>`;
+    const nrt = `${{r.rumor_n_obs.toLocaleString()}} / ${{r.truth_n_obs.toLocaleString()}}`;
+    ch += `<tr><td><b><code>${{r.combo_label}}</code></b></td><td class="num">${{nrt}}</td><td class="num">${{r.n_pairs_combo.toLocaleString()}}</td><td class="num rumor-col">${{fv(r.rumor_mean)}}</td><td class="num truth-col">${{fv(r.truth_mean)}}</td><td class="num strong">${{fe(r.truth_discount)}}</td><td class="num">${{ci}}</td></tr>`;
   }});
   document.getElementById("combo-table").innerHTML = ch + `</tbody></table>`;
 
-  let sh = `<table><thead><tr><th>Comparison</th><th class="num">Rumor Diff</th><th class="num">Truth Diff</th><th class="num">&Delta;TD (Truth &minus; Rumor)</th><th class="num">95% CI</th><th class="num">p (&Delta;TD)</th></tr></thead><tbody>`;
+  let sh = `<table><thead><tr><th>Comparison (Pair-Clustered Wald z-test)</th><th class="num">Pairs (Hi / Lo)</th><th class="num">Rumor Diff</th><th class="num">Truth Diff</th><th class="num">&Delta;TD (Truth &minus; Rumor)</th><th class="num">95% CI</th><th class="num">p (&Delta;TD)</th></tr></thead><tbody>`;
   sRows.forEach(r => {{
     const cls = r.p_td_clustered >= 0.05 ? "ns" : (r.effect_td >= 0 ? "sig-pos" : "sig-neg");
     const ci = `[${{fe(r.td_ci_low).replace(" pp","")}}, ${{fe(r.td_ci_high)}}]`;
-    sh += `<tr><td><b>${{r.comparison}}</b></td><td class="num rumor-col">${{fe(r.effect_rumor)}}</td><td class="num truth-col">${{fe(r.effect_truth)}}</td><td class="num ${{cls}}">${{fe(r.effect_td)}}${{stars(r.p_td_clustered)}}</td><td class="num">${{ci}}</td><td class="num ${{cls}}">${{fmtP(r.p_td_clustered)}}</td></tr>`;
+    const np = `${{r.n_pairs_hi.toLocaleString()}} / ${{r.n_pairs_lo.toLocaleString()}}`;
+    sh += `<tr><td><b>${{r.comparison}}</b></td><td class="num">${{np}}</td><td class="num rumor-col">${{fe(r.effect_rumor)}}</td><td class="num truth-col">${{fe(r.effect_truth)}}</td><td class="num ${{cls}}">${{fe(r.effect_td)}}${{stars(r.p_td_clustered)}}</td><td class="num">${{ci}}</td><td class="num ${{cls}}">${{fmtP(r.p_td_clustered)}}</td></tr>`;
   }});
   document.getElementById("simple-table").innerHTML = sh + `</tbody></table>`;
 }}
@@ -1044,10 +1107,11 @@ function renderTopBotDna() {{
   const top10 = [...rows].sort((a,b) => (b.truth_discount - a.truth_discount) || (b.truth_belief - a.truth_belief) || (a.cell_id - b.cell_id)).slice(0, 10);
   const bot10 = [...rows].sort((a,b) => (a.truth_discount - b.truth_discount) || (a.truth_belief - b.truth_belief) || (a.cell_id - b.cell_id)).slice(0, 10);
   const mk = list => {{
-    let h = `<table><thead><tr><th>#</th><th>Cell</th><th>Source DNA</th><th class="num">Rumor Belief</th><th class="num">Truth Belief</th><th class="num">Truth Discount</th><th class="num">95% CI</th><th class="num">Rumor GO %</th><th class="num">Truth GO %</th><th class="num">&Delta; GO</th></tr></thead><tbody>`;
+    let h = `<table><thead><tr><th>#</th><th>Cell</th><th>Source DNA</th><th class="num">Ment. N (R / T)</th><th class="num">Pairs</th><th class="num">Rumor Belief</th><th class="num">Truth Belief</th><th class="num">Truth Discount (Paired Mean)</th><th class="num">95% CI</th><th class="num">Rumor GO %</th><th class="num">Truth GO %</th><th class="num">&Delta; GO</th></tr></thead><tbody>`;
     list.forEach((r, i) => {{
       const ci = `[${{f3(r.td_ci_low)}}, ${{f3(r.td_ci_high)}}]`;
-      h += `<tr><td>${{i+1}}</td><td>${{r.cell_id}}</td><td>${{r.cell_name}}</td><td class="num rumor-col">${{f3(r.rumor_belief)}}</td><td class="num truth-col">${{f3(r.truth_belief)}}</td><td class="num strong">${{f3(r.truth_discount)}}</td><td class="num">${{ci}}</td><td class="num">${{f1(r.rumor_go_pct)}}</td><td class="num">${{f1(r.truth_go_pct)}}</td><td class="num">${{(r.diff_go_pp>=0?"+":"")+r.diff_go_pp.toFixed(1)}} pp</td></tr>`;
+      const nrt = `${{r.rumor_mentioned_n}} / ${{r.truth_mentioned_n}}`;
+      h += `<tr><td>${{i+1}}</td><td>${{r.cell_id}}</td><td>${{r.cell_name}}</td><td class="num">${{nrt}}</td><td class="num">${{r.n_pairs_used}}</td><td class="num rumor-col">${{f3(r.rumor_belief)}}</td><td class="num truth-col">${{f3(r.truth_belief)}}</td><td class="num strong">${{f3(r.truth_discount)}}</td><td class="num">${{ci}}</td><td class="num">${{f1(r.rumor_go_pct)}}</td><td class="num">${{f1(r.truth_go_pct)}}</td><td class="num">${{(r.diff_go_pp>=0?"+":"")+r.diff_go_pp.toFixed(1)}} pp</td></tr>`;
     }});
     return h + `</tbody></table>`;
   }};

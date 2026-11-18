@@ -1,59 +1,64 @@
 # Report 3: Truth Discount & Comparisons (Truth Twin − Rumor Twin)
 
-**Judge:** Gemini 3.7 Flash (`results/main-gemini-3.7-flash`) | **Towns:** 9,984 (4,992 Rumor + 4,992 Truth) | **Clustering:** Twin Pair (`pair_id`)
+**Judge:** Gemini 3.7 Flash (`results/main-gemini-3.7-flash`) | **Towns:** 9,984 (4,992 Rumor + 4,992 Truth) | **Twin Pairs:** 4,992 | **Clustering:** Twin Pair (`pair_id`)
 
-### Methodological Policy
-- **Core Estimand:** $\text{Truth Discount} = \text{Belief}_{\text{Truth Twin}} - \text{Belief}_{\text{Rumor Twin}}$, alongside $\Delta\text{GO}$, $\Delta\text{Omission}$, and categorical label shifts.
-- **Invalid Exclusion:** Individual `judgment_status = invalid` rows stay `NaN` (never zero-imputed, and without discarding the other 11 valid listeners in a town).
-- **Symmetry / Truth Discount Model:** Pooled `outcome ~ truth * (6 main knobs + 4 interactions) + C(real_artist)` with standard errors clustered by matched twin pair (`pair_id`), plus Holm adjustment across all 10 planned contrasts. `Belief` also reports the spec's town-random-intercept LMM check.
+### Methodological Policy (Dynamic Denominators — Never Hardcoded)
+- **Core Estimand:** $\text{Truth Discount} = \text{Belief}_{\text{Truth Twin}} - \text{Belief}_{\text{Rumor Twin}}$ (`Matched-Pair Mean ± 1.96·SE`), alongside $\Delta\text{GO}$, $\Delta\text{Omission}$, and categorical label shifts.
+- **Invalid Exclusion:** Individual `judgment_status = invalid` rows stay `NaN` (never zero-imputed, and without discarding valid listeners in the same town).
+- **Dynamic Denominators:** `R/T Ment. N` = non-NaN mentioning listeners used for Rumor/Truth conditional `Belief`; `Belief Pairs` = complete twin pairs having valid mentioning listeners in both twins; `GO Pairs` = complete twin pairs with verification decisions.
+- **Symmetry / Truth Discount Model:** Pooled `outcome ~ truth * (6 main knobs + 4 interactions) + C(real_artist)` OLS / LPM with Twin-Pair-Clustered SEs (`groups=pair_id`), two-sided Wald z-tests, and Holm adjustment across all 10 planned contrasts. `Belief` also reports the spec's REML LMM (`1 | run_id`).
 
 ---
 
 ## 1. Overall Truth vs. Rumor & Matched Truth Discount Summary
 
+*Estimator: Matched-Pair Mean (`Truth − Rumor`), Normal 95% CI (`Mean ± 1.96·SE`); `GO %` over Expected N, `NM %` over Valid N.*
+
 ### Table 1A: Per Model × Layer
 
-| Model | Layer | Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Sil=0.0 TD | Sil=0.5 TD | Rumor GO % | Truth GO % | Δ GO | Rumor NM % | Truth NM % | Δ NM |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| DeepSeek-V4-Flash | First-Hand (Seats 1-6) | 2,496 | 0.091 | 0.573 | **0.482** [0.469, 0.495] | 0.482 | 0.479 | 48.3% | 48.5% | +0.2 pp | 0.6% | 0.0% | -0.6 pp |
-| DeepSeek-V4-Flash | Second-Hand (Seats 7-12) | 2,496 | 0.023 | 0.789 | **0.765** [0.757, 0.773] | 0.767 | 0.724 | 62.0% | 67.9% | +5.8 pp | 8.7% | 0.1% | -8.7 pp |
-| DeepSeek-V4-Flash | Overall (All 12 Listeners) | 2,496 | 0.059 | 0.680 | **0.621** [0.611, 0.631] | 0.624 | 0.601 | 55.2% | 58.2% | +3.0 pp | 4.7% | 0.0% | -4.6 pp |
-| Qwen3.8-Flash | First-Hand (Seats 1-6) | 2,496 | 0.005 | 0.893 | **0.887** [0.881, 0.894] | 0.886 | 0.884 | 92.8% | 92.7% | -0.1 pp | 0.5% | 0.1% | -0.4 pp |
-| Qwen3.8-Flash | Second-Hand (Seats 7-12) | 2,496 | 0.036 | 0.797 | **0.761** [0.755, 0.768] | 0.757 | 0.734 | 28.6% | 23.9% | -4.7 pp | 5.4% | 0.8% | -4.6 pp |
-| Qwen3.8-Flash | Overall (All 12 Listeners) | 2,496 | 0.020 | 0.845 | **0.825** [0.819, 0.830] | 0.822 | 0.809 | 60.7% | 58.3% | -2.4 pp | 2.9% | 0.4% | -2.5 pp |
+| Model | Layer | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Sil=0.0 TD | Sil=0.5 TD | GO Pairs | Rumor GO % | Truth GO % | Δ GO | Rumor NM % | Truth NM % | Δ NM |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| DeepSeek-V4-Flash | First-Hand (Seats 1-6) | 14,836 / 14,922 | 2,496 | 0.091 | 0.573 | **0.482** [0.469, 0.495] | 0.482 | 0.479 | 2,496 | 48.3% | 48.5% | +0.2 pp | 0.6% | 0.0% | -0.6 pp |
+| DeepSeek-V4-Flash | Second-Hand (Seats 7-12) | 13,620 / 14,828 | 2,496 | 0.023 | 0.789 | **0.765** [0.757, 0.773] | 0.767 | 0.724 | 2,496 | 62.0% | 67.9% | +5.8 pp | 8.7% | 0.1% | -8.7 pp |
+| DeepSeek-V4-Flash | Overall (All 12 Listeners) | 28,456 / 29,750 | 2,496 | 0.059 | 0.680 | **0.621** [0.611, 0.631] | 0.624 | 0.601 | 2,496 | 55.2% | 58.2% | +3.0 pp | 4.7% | 0.0% | -4.6 pp |
+| Qwen3.8-Flash | First-Hand (Seats 1-6) | 14,894 / 14,946 | 2,496 | 0.005 | 0.893 | **0.887** [0.881, 0.894] | 0.886 | 0.884 | 2,496 | 92.8% | 92.7% | -0.1 pp | 0.5% | 0.1% | -0.4 pp |
+| Qwen3.8-Flash | Second-Hand (Seats 7-12) | 14,101 / 14,849 | 2,496 | 0.036 | 0.797 | **0.761** [0.755, 0.768] | 0.757 | 0.734 | 2,496 | 28.6% | 23.9% | -4.7 pp | 5.4% | 0.8% | -4.6 pp |
+| Qwen3.8-Flash | Overall (All 12 Listeners) | 28,995 / 29,795 | 2,496 | 0.020 | 0.845 | **0.825** [0.819, 0.830] | 0.822 | 0.809 | 2,496 | 60.7% | 58.3% | -2.4 pp | 2.9% | 0.4% | -2.5 pp |
 
 ### Table 1B: Entire Experiment Average (Both Models Combined)
 
-| Scope | Layer | Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Sil=0.0 TD | Sil=0.5 TD | Rumor GO % | Truth GO % | Δ GO | Rumor NM % | Truth NM % | Δ NM |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Both Models Combined | First-Hand (Seats 1-6) | 4,992 | 0.048 | 0.733 | **0.684** [0.675, 0.694] | 0.684 | 0.682 | 70.5% | 70.6% | +0.1 pp | 0.6% | 0.1% | -0.5 pp |
-| Both Models Combined | Second-Hand (Seats 7-12) | 4,992 | 0.030 | 0.793 | **0.763** [0.758, 0.768] | 0.762 | 0.729 | 45.3% | 45.9% | +0.6 pp | 7.0% | 0.4% | -6.6 pp |
-| Both Models Combined | Overall (All 12 Listeners) | 4,992 | 0.039 | 0.763 | **0.723** [0.717, 0.729] | 0.723 | 0.705 | 57.9% | 58.2% | +0.3 pp | 3.8% | 0.2% | -3.5 pp |
+| Scope | Layer | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Sil=0.0 TD | Sil=0.5 TD | GO Pairs | Rumor GO % | Truth GO % | Δ GO | Rumor NM % | Truth NM % | Δ NM |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Both Models Combined | First-Hand (Seats 1-6) | 29,730 / 29,868 | 4,992 | 0.048 | 0.733 | **0.684** [0.675, 0.694] | 0.684 | 0.682 | 4,992 | 70.5% | 70.6% | +0.1 pp | 0.6% | 0.1% | -0.5 pp |
+| Both Models Combined | Second-Hand (Seats 7-12) | 27,721 / 29,677 | 4,992 | 0.030 | 0.793 | **0.763** [0.758, 0.768] | 0.762 | 0.729 | 4,992 | 45.3% | 45.9% | +0.6 pp | 7.0% | 0.4% | -6.6 pp |
+| Both Models Combined | Overall (All 12 Listeners) | 57,451 / 59,545 | 4,992 | 0.039 | 0.763 | **0.723** [0.717, 0.729] | 0.723 | 0.705 | 4,992 | 57.9% | 58.2% | +0.3 pp | 3.8% | 0.2% | -3.5 pp |
 
 ---
 
 ## 2. Model Comparison (`DeepSeek-V4-Flash − Qwen3.8-Flash`)
 
-| POV | Outcome | DeepSeek Rumor | Qwen Rumor | Δ Rumor (p) | DeepSeek Truth | Qwen Truth | Δ Truth (p) | DeepSeek TD | Qwen TD | Δ TD (DS − Qwen) | 95% CI | p (clustered) |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| source | Belief Score | 0.059 | 0.020 | +0.039 (<0.0001) | 0.680 | 0.845 | -0.165 (<0.0001) | 0.621 | 0.825 | **-0.203***** | [-0.214, -0.192] | <0.0001 |
-| source | GO Rate (%) | 55.2% | 60.7% | -5.5 pp (<0.0001) | 58.2% | 58.3% | -0.1 pp (0.7919) | 3.0% | -2.4% | **+5.4 pp***** | [+4.6, +6.2 pp] | <0.0001 |
-| source | NOT_MENTIONED (%) | 4.7% | 2.9% | +1.7 pp (<0.0001) | 0.0% | 0.4% | -0.4 pp (<0.0001) | -4.6% | -2.5% | **-2.1 pp***** | [-2.5, -1.8 pp] | <0.0001 |
-| source | FACT (%) | 0.3% | 0.5% | -0.2 pp (<0.0001) | 4.9% | 7.5% | -2.6 pp (<0.0001) | 4.7% | 7.1% | **-2.4 pp***** | [-2.8, -2.0 pp] | <0.0001 |
-| source | UNCERTAIN (%) | 9.9% | 2.8% | +7.1 pp (<0.0001) | 11.6% | 7.8% | +3.8 pp (<0.0001) | 1.7% | 5.0% | **-3.3 pp***** | [-3.9, -2.8 pp] | <0.0001 |
-| source | SKEPTICAL (%) | 28.9% | 13.8% | +15.1 pp (<0.0001) | 25.9% | 11.1% | +14.8 pp (<0.0001) | -3.0% | -2.7% | **-0.3 pp** | [-1.1, +0.5 pp] | 0.4499 |
-| first_hand | Belief Score | 0.091 | 0.005 | +0.086 (<0.0001) | 0.573 | 0.893 | -0.320 (<0.0001) | 0.481 | 0.887 | **-0.406***** | [-0.420, -0.391] | <0.0001 |
-| first_hand | GO Rate (%) | 48.3% | 92.8% | -44.5 pp (<0.0001) | 48.5% | 92.7% | -44.3 pp (<0.0001) | 0.2% | -0.1% | **+0.3 pp** | [-0.6, +1.1 pp] | 0.5638 |
-| first_hand | NOT_MENTIONED (%) | 0.6% | 0.5% | +0.1 pp (0.0871) | 0.0% | 0.1% | -0.1 pp (0.0027) | -0.6% | -0.4% | **-0.2 pp**** | [-0.4, -0.1 pp] | 0.0077 |
-| first_hand | FACT (%) | 0.3% | 0.0% | +0.3 pp (<0.0001) | 2.0% | 4.0% | -2.0 pp (<0.0001) | 1.7% | 4.0% | **-2.3 pp***** | [-2.7, -1.9 pp] | <0.0001 |
-| first_hand | UNCERTAIN (%) | 16.0% | 0.9% | +15.1 pp (<0.0001) | 16.3% | 3.6% | +12.7 pp (<0.0001) | 0.3% | 2.7% | **-2.4 pp***** | [-3.2, -1.6 pp] | <0.0001 |
-| first_hand | SKEPTICAL (%) | 35.4% | 8.5% | +26.8 pp (<0.0001) | 34.3% | 8.7% | +25.6 pp (<0.0001) | -1.1% | 0.1% | **-1.2 pp*** | [-2.1, -0.2 pp] | 0.0138 |
-| second_hand | Belief Score | 0.023 | 0.036 | -0.012 (<0.0001) | 0.789 | 0.797 | -0.009 (0.1074) | 0.765 | 0.761 | **+0.004** | [-0.007, +0.014] | 0.4889 |
-| second_hand | GO Rate (%) | 62.0% | 28.6% | +33.5 pp (<0.0001) | 67.9% | 23.9% | +44.0 pp (<0.0001) | 5.8% | -4.7% | **+10.5 pp***** | [+9.1, +12.0 pp] | <0.0001 |
-| second_hand | NOT_MENTIONED (%) | 8.7% | 5.4% | +3.3 pp (<0.0001) | 0.1% | 0.8% | -0.7 pp (<0.0001) | -8.6% | -4.6% | **-4.0 pp***** | [-4.7, -3.4 pp] | <0.0001 |
-| second_hand | FACT (%) | 0.2% | 0.9% | -0.7 pp (<0.0001) | 7.9% | 11.0% | -3.2 pp (<0.0001) | 7.7% | 10.1% | **-2.5 pp***** | [-3.2, -1.8 pp] | <0.0001 |
-| second_hand | UNCERTAIN (%) | 3.8% | 4.7% | -0.9 pp (0.0001) | 6.9% | 12.1% | -5.2 pp (<0.0001) | 3.1% | 7.3% | **-4.3 pp***** | [-5.1, -3.5 pp] | <0.0001 |
-| second_hand | SKEPTICAL (%) | 22.5% | 19.1% | +3.4 pp (<0.0001) | 17.5% | 13.6% | +3.9 pp (<0.0001) | -5.0% | -5.5% | **+0.6 pp** | [-0.6, +1.7 pp] | 0.3476 |
+*Estimator: Pooled `outcome ~ truth * is_deepseek` OLS / LPM with Pair-Clustered SEs (`groups = model__pair_id`) & two-sided Wald z-test.*
+
+| POV | Outcome | Non-NaN N (R / T) | Pairs | DeepSeek Rumor | Qwen Rumor | Δ Rumor (p) | DeepSeek Truth | Qwen Truth | Δ Truth (p) | DeepSeek TD | Qwen TD | Δ TD (DS − Qwen) | 95% CI | p (clustered) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| source | Belief Score | 57,451 / 59,545 | 4,992 | 0.059 | 0.020 | +0.039 (<0.0001) | 0.680 | 0.845 | -0.165 (<0.0001) | 0.621 | 0.825 | **-0.203***** | [-0.214, -0.192] | <0.0001 |
+| source | GO Rate (%) | 59,904 / 59,904 | 4,992 | 55.2% | 60.7% | -5.5 pp (<0.0001) | 58.2% | 58.3% | -0.1 pp (0.7919) | 3.0% | -2.4% | **+5.4 pp***** | [+4.6, +6.2 pp] | <0.0001 |
+| source | NOT_MENTIONED (%) | 59,715 / 59,691 | 4,992 | 4.7% | 2.9% | +1.7 pp (<0.0001) | 0.0% | 0.4% | -0.4 pp (<0.0001) | -4.6% | -2.5% | **-2.1 pp***** | [-2.5, -1.8 pp] | <0.0001 |
+| source | FACT (%) | 59,715 / 59,691 | 4,992 | 0.3% | 0.5% | -0.2 pp (<0.0001) | 4.9% | 7.5% | -2.6 pp (<0.0001) | 4.7% | 7.1% | **-2.4 pp***** | [-2.8, -2.0 pp] | <0.0001 |
+| source | UNCERTAIN (%) | 59,715 / 59,691 | 4,992 | 9.9% | 2.8% | +7.1 pp (<0.0001) | 11.6% | 7.8% | +3.8 pp (<0.0001) | 1.7% | 5.0% | **-3.3 pp***** | [-3.9, -2.8 pp] | <0.0001 |
+| source | SKEPTICAL (%) | 59,715 / 59,691 | 4,992 | 28.9% | 13.8% | +15.1 pp (<0.0001) | 25.9% | 11.1% | +14.8 pp (<0.0001) | -3.0% | -2.7% | **-0.3 pp** | [-1.1, +0.5 pp] | 0.4499 |
+| first_hand | Belief Score | 29,730 / 29,868 | 4,992 | 0.091 | 0.005 | +0.086 (<0.0001) | 0.573 | 0.893 | -0.320 (<0.0001) | 0.481 | 0.887 | **-0.406***** | [-0.420, -0.391] | <0.0001 |
+| first_hand | GO Rate (%) | 29,952 / 29,952 | 4,992 | 48.3% | 92.8% | -44.5 pp (<0.0001) | 48.5% | 92.7% | -44.3 pp (<0.0001) | 0.2% | -0.1% | **+0.3 pp** | [-0.6, +1.1 pp] | 0.5638 |
+| first_hand | NOT_MENTIONED (%) | 29,898 / 29,893 | 4,992 | 0.6% | 0.5% | +0.1 pp (0.0871) | 0.0% | 0.1% | -0.1 pp (0.0027) | -0.6% | -0.4% | **-0.2 pp**** | [-0.4, -0.1 pp] | 0.0077 |
+| first_hand | FACT (%) | 29,898 / 29,893 | 4,992 | 0.3% | 0.0% | +0.3 pp (<0.0001) | 2.0% | 4.0% | -2.0 pp (<0.0001) | 1.7% | 4.0% | **-2.3 pp***** | [-2.7, -1.9 pp] | <0.0001 |
+| first_hand | UNCERTAIN (%) | 29,898 / 29,893 | 4,992 | 16.0% | 0.9% | +15.1 pp (<0.0001) | 16.3% | 3.6% | +12.7 pp (<0.0001) | 0.3% | 2.7% | **-2.4 pp***** | [-3.2, -1.6 pp] | <0.0001 |
+| first_hand | SKEPTICAL (%) | 29,898 / 29,893 | 4,992 | 35.4% | 8.5% | +26.8 pp (<0.0001) | 34.3% | 8.7% | +25.6 pp (<0.0001) | -1.1% | 0.1% | **-1.2 pp*** | [-2.1, -0.2 pp] | 0.0138 |
+| second_hand | Belief Score | 27,721 / 29,677 | 4,992 | 0.023 | 0.036 | -0.012 (<0.0001) | 0.789 | 0.797 | -0.009 (0.1074) | 0.765 | 0.761 | **+0.004** | [-0.007, +0.014] | 0.4889 |
+| second_hand | GO Rate (%) | 29,952 / 29,952 | 4,992 | 62.0% | 28.6% | +33.5 pp (<0.0001) | 67.9% | 23.9% | +44.0 pp (<0.0001) | 5.8% | -4.7% | **+10.5 pp***** | [+9.1, +12.0 pp] | <0.0001 |
+| second_hand | NOT_MENTIONED (%) | 29,817 / 29,798 | 4,992 | 8.7% | 5.4% | +3.3 pp (<0.0001) | 0.1% | 0.8% | -0.7 pp (<0.0001) | -8.6% | -4.6% | **-4.0 pp***** | [-4.7, -3.4 pp] | <0.0001 |
+| second_hand | FACT (%) | 29,817 / 29,798 | 4,992 | 0.2% | 0.9% | -0.7 pp (<0.0001) | 7.9% | 11.0% | -3.2 pp (<0.0001) | 7.7% | 10.1% | **-2.5 pp***** | [-3.2, -1.8 pp] | <0.0001 |
+| second_hand | UNCERTAIN (%) | 29,817 / 29,798 | 4,992 | 3.8% | 4.7% | -0.9 pp (0.0001) | 6.9% | 12.1% | -5.2 pp (<0.0001) | 3.1% | 7.3% | **-4.3 pp***** | [-5.1, -3.5 pp] | <0.0001 |
+| second_hand | SKEPTICAL (%) | 29,817 / 29,798 | 4,992 | 22.5% | 19.1% | +3.4 pp (<0.0001) | 17.5% | 13.6% | +3.9 pp (<0.0001) | -5.0% | -5.5% | **+0.6 pp** | [-0.6, +1.7 pp] | 0.3476 |
 
 ---
 
@@ -797,7 +802,7 @@
 
 ---
 
-## 4. Top 10 Largest & Bottom 10 Smallest Truth Discount DNAs (`Truth − Rumor`)
+## 4. Top 10 Largest & Bottom 10 Smallest Truth Discount DNAs (`Truth − Rumor` — Matched-Pair Mean ± 1.96·SE)
 
 ### Model: DeepSeek-V4-Flash
 
@@ -805,97 +810,97 @@
 
 *Top 10 Largest Truth Discount (Best Truth Discrimination):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 20 | close_friend / citizen / good_record / rich / man_old | 0.054 | 0.932 | **0.879** [0.854, 0.904] | 77.4% | 79.3% | +1.9 pp |
-| 2 | 50 | stranger / citizen / good_record / rich / man_young | 0.061 | 0.936 | **0.875** [0.849, 0.901] | 76.5% | 75.4% | -1.1 pp |
-| 3 | 51 | stranger / citizen / good_record / rich / woman_young | 0.060 | 0.926 | **0.865** [0.844, 0.887] | 78.0% | 79.7% | +1.7 pp |
-| 4 | 21 | close_friend / citizen / good_record / poor / woman_old | 0.055 | 0.915 | **0.860** [0.836, 0.883] | 76.5% | 79.7% | +3.2 pp |
-| 5 | 24 | close_friend / citizen / good_record / poor / man_old | 0.053 | 0.910 | **0.856** [0.824, 0.889] | 75.6% | 79.3% | +3.6 pp |
-| 6 | 18 | close_friend / citizen / good_record / rich / man_young | 0.060 | 0.912 | **0.853** [0.824, 0.883] | 75.9% | 77.6% | +1.7 pp |
-| 7 | 19 | close_friend / citizen / good_record / rich / woman_young | 0.067 | 0.919 | **0.852** [0.828, 0.877] | 75.0% | 81.4% | +6.4 pp |
-| 8 | 52 | stranger / citizen / good_record / rich / man_old | 0.074 | 0.921 | **0.848** [0.823, 0.874] | 71.8% | 75.4% | +3.6 pp |
-| 9 | 17 | close_friend / citizen / good_record / rich / woman_old | 0.055 | 0.900 | **0.846** [0.819, 0.874] | 76.5% | 78.0% | +1.5 pp |
-| 10 | 22 | close_friend / citizen / good_record / poor / man_young | 0.073 | 0.915 | **0.843** [0.812, 0.874] | 74.8% | 78.8% | +4.1 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 20 | close_friend / citizen / good_record / rich / man_old | 426 / 466 | 39 | 0.054 | 0.932 | **0.879** [0.854, 0.904] | 77.4% | 79.3% | +1.9 pp |
+| 2 | 50 | stranger / citizen / good_record / rich / man_young | 429 / 464 | 39 | 0.061 | 0.936 | **0.875** [0.849, 0.901] | 76.5% | 75.4% | -1.1 pp |
+| 3 | 51 | stranger / citizen / good_record / rich / woman_young | 430 / 466 | 39 | 0.060 | 0.926 | **0.865** [0.844, 0.887] | 78.0% | 79.7% | +1.7 pp |
+| 4 | 21 | close_friend / citizen / good_record / poor / woman_old | 428 / 463 | 39 | 0.055 | 0.915 | **0.860** [0.836, 0.883] | 76.5% | 79.7% | +3.2 pp |
+| 5 | 24 | close_friend / citizen / good_record / poor / man_old | 433 / 466 | 39 | 0.053 | 0.910 | **0.856** [0.824, 0.889] | 75.6% | 79.3% | +3.6 pp |
+| 6 | 18 | close_friend / citizen / good_record / rich / man_young | 427 / 465 | 39 | 0.060 | 0.912 | **0.853** [0.824, 0.883] | 75.9% | 77.6% | +1.7 pp |
+| 7 | 19 | close_friend / citizen / good_record / rich / woman_young | 439 / 467 | 39 | 0.067 | 0.919 | **0.852** [0.828, 0.877] | 75.0% | 81.4% | +6.4 pp |
+| 8 | 52 | stranger / citizen / good_record / rich / man_old | 434 / 464 | 39 | 0.074 | 0.921 | **0.848** [0.823, 0.874] | 71.8% | 75.4% | +3.6 pp |
+| 9 | 17 | close_friend / citizen / good_record / rich / woman_old | 430 / 462 | 39 | 0.055 | 0.900 | **0.846** [0.819, 0.874] | 76.5% | 78.0% | +1.5 pp |
+| 10 | 22 | close_friend / citizen / good_record / poor / man_young | 429 / 466 | 39 | 0.073 | 0.915 | **0.843** [0.812, 0.874] | 74.8% | 78.8% | +4.1 pp |
 
 *Bottom 10 Smallest Truth Discount (Most Discounted):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 61 | stranger / citizen / poor_record / poor / woman_old | 0.030 | 0.265 | **0.234** [0.197, 0.271] | 22.0% | 23.1% | +1.1 pp |
-| 2 | 64 | stranger / citizen / poor_record / poor / man_old | 0.030 | 0.269 | **0.239** [0.191, 0.287] | 22.4% | 23.7% | +1.3 pp |
-| 3 | 62 | stranger / citizen / poor_record / poor / man_young | 0.035 | 0.283 | **0.247** [0.201, 0.294] | 24.4% | 25.6% | +1.3 pp |
-| 4 | 45 | stranger / mayor / poor_record / poor / woman_old | 0.041 | 0.306 | **0.265** [0.220, 0.310] | 28.6% | 26.5% | -2.1 pp |
-| 5 | 63 | stranger / citizen / poor_record / poor / woman_young | 0.030 | 0.314 | **0.284** [0.250, 0.317] | 25.2% | 27.8% | +2.6 pp |
-| 6 | 48 | stranger / mayor / poor_record / poor / man_old | 0.038 | 0.350 | **0.312** [0.270, 0.355] | 27.8% | 30.1% | +2.4 pp |
-| 7 | 46 | stranger / mayor / poor_record / poor / man_young | 0.042 | 0.365 | **0.323** [0.278, 0.368] | 29.1% | 31.0% | +1.9 pp |
-| 8 | 47 | stranger / mayor / poor_record / poor / woman_young | 0.040 | 0.379 | **0.339** [0.302, 0.375] | 27.4% | 34.0% | +6.6 pp |
-| 9 | 57 | stranger / citizen / poor_record / rich / woman_old | 0.033 | 0.386 | **0.353** [0.304, 0.401] | 31.0% | 33.8% | +2.8 pp |
-| 10 | 60 | stranger / citizen / poor_record / rich / man_old | 0.033 | 0.392 | **0.360** [0.325, 0.395] | 28.2% | 33.8% | +5.6 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 61 | stranger / citizen / poor_record / poor / woman_old | 460 / 466 | 39 | 0.030 | 0.265 | **0.234** [0.197, 0.271] | 22.0% | 23.1% | +1.1 pp |
+| 2 | 64 | stranger / citizen / poor_record / poor / man_old | 463 / 466 | 39 | 0.030 | 0.269 | **0.239** [0.191, 0.287] | 22.4% | 23.7% | +1.3 pp |
+| 3 | 62 | stranger / citizen / poor_record / poor / man_young | 457 / 465 | 39 | 0.035 | 0.283 | **0.247** [0.201, 0.294] | 24.4% | 25.6% | +1.3 pp |
+| 4 | 45 | stranger / mayor / poor_record / poor / woman_old | 460 / 462 | 39 | 0.041 | 0.306 | **0.265** [0.220, 0.310] | 28.6% | 26.5% | -2.1 pp |
+| 5 | 63 | stranger / citizen / poor_record / poor / woman_young | 462 / 468 | 39 | 0.030 | 0.314 | **0.284** [0.250, 0.317] | 25.2% | 27.8% | +2.6 pp |
+| 6 | 48 | stranger / mayor / poor_record / poor / man_old | 462 / 463 | 39 | 0.038 | 0.350 | **0.312** [0.270, 0.355] | 27.8% | 30.1% | +2.4 pp |
+| 7 | 46 | stranger / mayor / poor_record / poor / man_young | 465 / 468 | 39 | 0.042 | 0.365 | **0.323** [0.278, 0.368] | 29.1% | 31.0% | +1.9 pp |
+| 8 | 47 | stranger / mayor / poor_record / poor / woman_young | 463 / 466 | 39 | 0.040 | 0.379 | **0.339** [0.302, 0.375] | 27.4% | 34.0% | +6.6 pp |
+| 9 | 57 | stranger / citizen / poor_record / rich / woman_old | 456 / 465 | 39 | 0.033 | 0.386 | **0.353** [0.304, 0.401] | 31.0% | 33.8% | +2.8 pp |
+| 10 | 60 | stranger / citizen / poor_record / rich / man_old | 459 / 465 | 39 | 0.033 | 0.392 | **0.360** [0.325, 0.395] | 28.2% | 33.8% | +5.6 pp |
 
 #### First-Hand POV (Seats 1-6: Fooled & Gatekeeper)
 
 *Top 10 Largest Truth Discount (Best Truth Discrimination):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 20 | close_friend / citizen / good_record / rich / man_old | 0.067 | 0.917 | **0.850** [0.809, 0.891] | 83.8% | 85.0% | +1.3 pp |
-| 2 | 50 | stranger / citizen / good_record / rich / man_young | 0.067 | 0.914 | **0.847** [0.811, 0.884] | 82.9% | 83.3% | +0.4 pp |
-| 3 | 18 | close_friend / citizen / good_record / rich / man_young | 0.083 | 0.914 | **0.832** [0.777, 0.887] | 82.5% | 82.5% | +0.0 pp |
-| 4 | 51 | stranger / citizen / good_record / rich / woman_young | 0.080 | 0.910 | **0.830** [0.797, 0.864] | 85.0% | 84.6% | -0.4 pp |
-| 5 | 21 | close_friend / citizen / good_record / poor / woman_old | 0.078 | 0.903 | **0.826** [0.785, 0.866] | 84.6% | 81.6% | -3.0 pp |
-| 6 | 19 | close_friend / citizen / good_record / rich / woman_young | 0.082 | 0.906 | **0.823** [0.774, 0.872] | 82.1% | 85.5% | +3.4 pp |
-| 7 | 17 | close_friend / citizen / good_record / rich / woman_old | 0.074 | 0.887 | **0.815** [0.768, 0.862] | 84.6% | 81.2% | -3.4 pp |
-| 8 | 5 | close_friend / mayor / good_record / poor / woman_old | 0.096 | 0.897 | **0.799** [0.758, 0.841] | 77.4% | 79.9% | +2.6 pp |
-| 9 | 24 | close_friend / citizen / good_record / poor / man_old | 0.093 | 0.891 | **0.799** [0.746, 0.851] | 81.2% | 79.5% | -1.7 pp |
-| 10 | 52 | stranger / citizen / good_record / rich / man_old | 0.103 | 0.899 | **0.796** [0.760, 0.833] | 76.9% | 82.5% | +5.6 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 20 | close_friend / citizen / good_record / rich / man_old | 230 / 234 | 39 | 0.067 | 0.917 | **0.850** [0.809, 0.891] | 83.8% | 85.0% | +1.3 pp |
+| 2 | 50 | stranger / citizen / good_record / rich / man_young | 225 / 233 | 39 | 0.067 | 0.914 | **0.847** [0.811, 0.884] | 82.9% | 83.3% | +0.4 pp |
+| 3 | 18 | close_friend / citizen / good_record / rich / man_young | 228 / 233 | 39 | 0.083 | 0.914 | **0.832** [0.777, 0.887] | 82.5% | 82.5% | +0.0 pp |
+| 4 | 51 | stranger / citizen / good_record / rich / woman_young | 232 / 233 | 39 | 0.080 | 0.910 | **0.830** [0.797, 0.864] | 85.0% | 84.6% | -0.4 pp |
+| 5 | 21 | close_friend / citizen / good_record / poor / woman_old | 230 / 233 | 39 | 0.078 | 0.903 | **0.826** [0.785, 0.866] | 84.6% | 81.6% | -3.0 pp |
+| 6 | 19 | close_friend / citizen / good_record / rich / woman_young | 231 / 234 | 39 | 0.082 | 0.906 | **0.823** [0.774, 0.872] | 82.1% | 85.5% | +3.4 pp |
+| 7 | 17 | close_friend / citizen / good_record / rich / woman_old | 230 / 231 | 39 | 0.074 | 0.887 | **0.815** [0.768, 0.862] | 84.6% | 81.2% | -3.4 pp |
+| 8 | 5 | close_friend / mayor / good_record / poor / woman_old | 230 / 232 | 39 | 0.096 | 0.897 | **0.799** [0.758, 0.841] | 77.4% | 79.9% | +2.6 pp |
+| 9 | 24 | close_friend / citizen / good_record / poor / man_old | 232 / 234 | 39 | 0.093 | 0.891 | **0.799** [0.746, 0.851] | 81.2% | 79.5% | -1.7 pp |
+| 10 | 52 | stranger / citizen / good_record / rich / man_old | 228 / 232 | 39 | 0.103 | 0.899 | **0.796** [0.760, 0.833] | 76.9% | 82.5% | +5.6 pp |
 
 *Bottom 10 Smallest Truth Discount (Most Discounted):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 62 | stranger / citizen / poor_record / poor / man_young | 0.058 | 0.092 | **0.034** [-0.005, 0.072] | 3.8% | 4.7% | +0.9 pp |
-| 2 | 45 | stranger / mayor / poor_record / poor / woman_old | 0.067 | 0.112 | **0.045** [0.006, 0.085] | 6.8% | 4.3% | -2.6 pp |
-| 3 | 64 | stranger / citizen / poor_record / poor / man_old | 0.047 | 0.107 | **0.059** [0.015, 0.103] | 4.7% | 6.0% | +1.3 pp |
-| 4 | 61 | stranger / citizen / poor_record / poor / woman_old | 0.049 | 0.109 | **0.060** [0.022, 0.098] | 4.7% | 5.1% | +0.4 pp |
-| 5 | 63 | stranger / citizen / poor_record / poor / woman_young | 0.038 | 0.107 | **0.068** [0.033, 0.103] | 6.0% | 6.0% | +0.0 pp |
-| 6 | 47 | stranger / mayor / poor_record / poor / woman_young | 0.067 | 0.143 | **0.077** [0.033, 0.121] | 7.7% | 9.0% | +1.3 pp |
-| 7 | 48 | stranger / mayor / poor_record / poor / man_old | 0.067 | 0.147 | **0.081** [0.036, 0.125] | 9.4% | 7.7% | -1.7 pp |
-| 8 | 46 | stranger / mayor / poor_record / poor / man_young | 0.068 | 0.158 | **0.090** [0.042, 0.137] | 5.1% | 7.7% | +2.6 pp |
-| 9 | 60 | stranger / citizen / poor_record / rich / man_old | 0.058 | 0.186 | **0.127** [0.083, 0.171] | 14.5% | 12.8% | -1.7 pp |
-| 10 | 44 | stranger / mayor / poor_record / rich / man_old | 0.054 | 0.195 | **0.142** [0.095, 0.189] | 16.2% | 15.8% | -0.4 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 62 | stranger / citizen / poor_record / poor / man_young | 232 / 233 | 39 | 0.058 | 0.092 | **0.034** [-0.005, 0.072] | 3.8% | 4.7% | +0.9 pp |
+| 2 | 45 | stranger / mayor / poor_record / poor / woman_old | 233 / 232 | 39 | 0.067 | 0.112 | **0.045** [0.006, 0.085] | 6.8% | 4.3% | -2.6 pp |
+| 3 | 64 | stranger / citizen / poor_record / poor / man_old | 233 / 233 | 39 | 0.047 | 0.107 | **0.059** [0.015, 0.103] | 4.7% | 6.0% | +1.3 pp |
+| 4 | 61 | stranger / citizen / poor_record / poor / woman_old | 234 / 234 | 39 | 0.049 | 0.109 | **0.060** [0.022, 0.098] | 4.7% | 5.1% | +0.4 pp |
+| 5 | 63 | stranger / citizen / poor_record / poor / woman_young | 234 / 234 | 39 | 0.038 | 0.107 | **0.068** [0.033, 0.103] | 6.0% | 6.0% | +0.0 pp |
+| 6 | 47 | stranger / mayor / poor_record / poor / woman_young | 232 / 234 | 39 | 0.067 | 0.143 | **0.077** [0.033, 0.121] | 7.7% | 9.0% | +1.3 pp |
+| 7 | 48 | stranger / mayor / poor_record / poor / man_old | 233 / 234 | 39 | 0.067 | 0.147 | **0.081** [0.036, 0.125] | 9.4% | 7.7% | -1.7 pp |
+| 8 | 46 | stranger / mayor / poor_record / poor / man_young | 234 / 234 | 39 | 0.068 | 0.158 | **0.090** [0.042, 0.137] | 5.1% | 7.7% | +2.6 pp |
+| 9 | 60 | stranger / citizen / poor_record / rich / man_old | 232 / 234 | 39 | 0.058 | 0.186 | **0.127** [0.083, 0.171] | 14.5% | 12.8% | -1.7 pp |
+| 10 | 44 | stranger / mayor / poor_record / rich / man_old | 233 / 233 | 39 | 0.054 | 0.195 | **0.142** [0.095, 0.189] | 16.2% | 15.8% | -0.4 pp |
 
 #### Second-Hand POV (Seats 7-12: Downstream Susceptibility)
 
 *Top 10 Largest Truth Discount (Best Truth Discrimination):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 53 | stranger / citizen / good_record / poor / woman_old | 0.021 | 0.953 | **0.933** [0.909, 0.956] | 78.2% | 78.2% | +0.0 pp |
-| 2 | 33 | stranger / mayor / good_record / rich / woman_old | 0.028 | 0.957 | **0.931** [0.903, 0.959] | 73.9% | 83.8% | +9.8 pp |
-| 3 | 23 | close_friend / citizen / good_record / poor / woman_young | 0.018 | 0.946 | **0.929** [0.896, 0.962] | 76.1% | 82.5% | +6.4 pp |
-| 4 | 24 | close_friend / citizen / good_record / poor / man_old | 0.007 | 0.929 | **0.923** [0.896, 0.950] | 70.1% | 79.1% | +9.0 pp |
-| 5 | 54 | stranger / citizen / good_record / poor / man_young | 0.018 | 0.938 | **0.919** [0.887, 0.950] | 70.5% | 77.8% | +7.3 pp |
-| 6 | 56 | stranger / citizen / good_record / poor / man_old | 0.032 | 0.948 | **0.917** [0.885, 0.949] | 67.1% | 79.1% | +12.0 pp |
-| 7 | 20 | close_friend / citizen / good_record / rich / man_old | 0.038 | 0.948 | **0.913** [0.883, 0.943] | 70.9% | 73.5% | +2.6 pp |
-| 8 | 35 | stranger / mayor / good_record / rich / woman_young | 0.030 | 0.942 | **0.912** [0.883, 0.941] | 71.4% | 77.8% | +6.4 pp |
-| 9 | 34 | stranger / mayor / good_record / rich / man_young | 0.023 | 0.933 | **0.910** [0.877, 0.942] | 67.5% | 77.4% | +9.8 pp |
-| 10 | 51 | stranger / citizen / good_record / rich / woman_young | 0.038 | 0.942 | **0.907** [0.878, 0.935] | 70.9% | 74.8% | +3.8 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 53 | stranger / citizen / good_record / poor / woman_old | 210 / 232 | 39 | 0.021 | 0.953 | **0.933** [0.909, 0.956] | 78.2% | 78.2% | +0.0 pp |
+| 2 | 33 | stranger / mayor / good_record / rich / woman_old | 199 / 233 | 39 | 0.028 | 0.957 | **0.931** [0.903, 0.959] | 73.9% | 83.8% | +9.8 pp |
+| 3 | 23 | close_friend / citizen / good_record / poor / woman_young | 198 / 233 | 39 | 0.018 | 0.946 | **0.929** [0.896, 0.962] | 76.1% | 82.5% | +6.4 pp |
+| 4 | 24 | close_friend / citizen / good_record / poor / man_old | 201 / 232 | 39 | 0.007 | 0.929 | **0.923** [0.896, 0.950] | 70.1% | 79.1% | +9.0 pp |
+| 5 | 54 | stranger / citizen / good_record / poor / man_young | 198 / 232 | 39 | 0.018 | 0.938 | **0.919** [0.887, 0.950] | 70.5% | 77.8% | +7.3 pp |
+| 6 | 56 | stranger / citizen / good_record / poor / man_old | 205 / 233 | 39 | 0.032 | 0.948 | **0.917** [0.885, 0.949] | 67.1% | 79.1% | +12.0 pp |
+| 7 | 20 | close_friend / citizen / good_record / rich / man_old | 196 / 232 | 39 | 0.038 | 0.948 | **0.913** [0.883, 0.943] | 70.9% | 73.5% | +2.6 pp |
+| 8 | 35 | stranger / mayor / good_record / rich / woman_young | 203 / 232 | 39 | 0.030 | 0.942 | **0.912** [0.883, 0.941] | 71.4% | 77.8% | +6.4 pp |
+| 9 | 34 | stranger / mayor / good_record / rich / man_young | 193 / 232 | 39 | 0.023 | 0.933 | **0.910** [0.877, 0.942] | 67.5% | 77.4% | +9.8 pp |
+| 10 | 51 | stranger / citizen / good_record / rich / woman_young | 198 / 233 | 39 | 0.038 | 0.942 | **0.907** [0.878, 0.935] | 70.9% | 74.8% | +3.8 pp |
 
 *Bottom 10 Smallest Truth Discount (Most Discounted):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 61 | stranger / citizen / poor_record / poor / woman_old | 0.011 | 0.422 | **0.412** [0.356, 0.469] | 39.3% | 41.0% | +1.7 pp |
-| 2 | 64 | stranger / citizen / poor_record / poor / man_old | 0.013 | 0.431 | **0.418** [0.350, 0.487] | 40.2% | 41.5% | +1.3 pp |
-| 3 | 62 | stranger / citizen / poor_record / poor / man_young | 0.011 | 0.474 | **0.462** [0.381, 0.543] | 44.9% | 46.6% | +1.7 pp |
-| 4 | 45 | stranger / mayor / poor_record / poor / woman_old | 0.015 | 0.502 | **0.488** [0.424, 0.553] | 50.4% | 48.7% | -1.7 pp |
-| 5 | 63 | stranger / citizen / poor_record / poor / woman_young | 0.022 | 0.521 | **0.500** [0.446, 0.554] | 44.4% | 49.6% | +5.1 pp |
-| 6 | 57 | stranger / citizen / poor_record / rich / woman_old | 0.013 | 0.561 | **0.547** [0.483, 0.612] | 47.0% | 51.7% | +4.7 pp |
-| 7 | 48 | stranger / mayor / poor_record / poor / man_old | 0.009 | 0.557 | **0.551** [0.477, 0.624] | 46.2% | 52.6% | +6.4 pp |
-| 8 | 46 | stranger / mayor / poor_record / poor / man_young | 0.015 | 0.573 | **0.557** [0.495, 0.620] | 53.0% | 54.3% | +1.3 pp |
-| 9 | 60 | stranger / citizen / poor_record / rich / man_old | 0.007 | 0.602 | **0.596** [0.537, 0.655] | 41.9% | 54.7% | +12.8 pp |
-| 10 | 58 | stranger / citizen / poor_record / rich / man_young | 0.007 | 0.604 | **0.597** [0.540, 0.653] | 49.1% | 55.1% | +6.0 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 61 | stranger / citizen / poor_record / poor / woman_old | 226 / 232 | 39 | 0.011 | 0.422 | **0.412** [0.356, 0.469] | 39.3% | 41.0% | +1.7 pp |
+| 2 | 64 | stranger / citizen / poor_record / poor / man_old | 230 / 233 | 39 | 0.013 | 0.431 | **0.418** [0.350, 0.487] | 40.2% | 41.5% | +1.3 pp |
+| 3 | 62 | stranger / citizen / poor_record / poor / man_young | 225 / 232 | 39 | 0.011 | 0.474 | **0.462** [0.381, 0.543] | 44.9% | 46.6% | +1.7 pp |
+| 4 | 45 | stranger / mayor / poor_record / poor / woman_old | 227 / 230 | 39 | 0.015 | 0.502 | **0.488** [0.424, 0.553] | 50.4% | 48.7% | -1.7 pp |
+| 5 | 63 | stranger / citizen / poor_record / poor / woman_young | 228 / 234 | 39 | 0.022 | 0.521 | **0.500** [0.446, 0.554] | 44.4% | 49.6% | +5.1 pp |
+| 6 | 57 | stranger / citizen / poor_record / rich / woman_old | 223 / 231 | 39 | 0.013 | 0.561 | **0.547** [0.483, 0.612] | 47.0% | 51.7% | +4.7 pp |
+| 7 | 48 | stranger / mayor / poor_record / poor / man_old | 229 / 229 | 39 | 0.009 | 0.557 | **0.551** [0.477, 0.624] | 46.2% | 52.6% | +6.4 pp |
+| 8 | 46 | stranger / mayor / poor_record / poor / man_young | 231 / 234 | 39 | 0.015 | 0.573 | **0.557** [0.495, 0.620] | 53.0% | 54.3% | +1.3 pp |
+| 9 | 60 | stranger / citizen / poor_record / rich / man_old | 227 / 231 | 39 | 0.007 | 0.602 | **0.596** [0.537, 0.655] | 41.9% | 54.7% | +12.8 pp |
+| 10 | 58 | stranger / citizen / poor_record / rich / man_young | 228 / 231 | 39 | 0.007 | 0.604 | **0.597** [0.540, 0.653] | 49.1% | 55.1% | +6.0 pp |
 
 ### Model: Qwen3.8-Flash
 
@@ -903,94 +908,94 @@
 
 *Top 10 Largest Truth Discount (Best Truth Discrimination):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 8 | close_friend / mayor / good_record / poor / man_old | 0.023 | 0.934 | **0.911** [0.890, 0.932] | 66.7% | 59.2% | -7.5 pp |
-| 2 | 3 | close_friend / mayor / good_record / rich / woman_young | 0.033 | 0.943 | **0.911** [0.891, 0.930] | 67.5% | 62.8% | -4.7 pp |
-| 3 | 49 | stranger / citizen / good_record / rich / woman_old | 0.016 | 0.925 | **0.909** [0.892, 0.927] | 70.5% | 62.4% | -8.1 pp |
-| 4 | 22 | close_friend / citizen / good_record / poor / man_young | 0.018 | 0.926 | **0.909** [0.892, 0.926] | 68.2% | 60.9% | -7.3 pp |
-| 5 | 20 | close_friend / citizen / good_record / rich / man_old | 0.027 | 0.936 | **0.909** [0.891, 0.927] | 71.6% | 62.8% | -8.8 pp |
-| 6 | 21 | close_friend / citizen / good_record / poor / woman_old | 0.030 | 0.938 | **0.908** [0.888, 0.929] | 67.1% | 59.6% | -7.5 pp |
-| 7 | 17 | close_friend / citizen / good_record / rich / woman_old | 0.029 | 0.937 | **0.908** [0.889, 0.927] | 67.7% | 63.0% | -4.7 pp |
-| 8 | 56 | stranger / citizen / good_record / poor / man_old | 0.026 | 0.931 | **0.906** [0.884, 0.928] | 63.2% | 62.6% | -0.6 pp |
-| 9 | 18 | close_friend / citizen / good_record / rich / man_young | 0.025 | 0.930 | **0.905** [0.886, 0.925] | 67.9% | 62.2% | -5.8 pp |
-| 10 | 24 | close_friend / citizen / good_record / poor / man_old | 0.023 | 0.928 | **0.905** [0.886, 0.924] | 67.9% | 61.3% | -6.6 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 8 | close_friend / mayor / good_record / poor / man_old | 461 / 467 | 39 | 0.023 | 0.934 | **0.911** [0.890, 0.932] | 66.7% | 59.2% | -7.5 pp |
+| 2 | 3 | close_friend / mayor / good_record / rich / woman_young | 460 / 465 | 39 | 0.033 | 0.943 | **0.911** [0.891, 0.930] | 67.5% | 62.8% | -4.7 pp |
+| 3 | 49 | stranger / citizen / good_record / rich / woman_old | 450 / 464 | 39 | 0.016 | 0.925 | **0.909** [0.892, 0.927] | 70.5% | 62.4% | -8.1 pp |
+| 4 | 22 | close_friend / citizen / good_record / poor / man_young | 457 / 462 | 39 | 0.018 | 0.926 | **0.909** [0.892, 0.926] | 68.2% | 60.9% | -7.3 pp |
+| 5 | 20 | close_friend / citizen / good_record / rich / man_old | 452 / 467 | 39 | 0.027 | 0.936 | **0.909** [0.891, 0.927] | 71.6% | 62.8% | -8.8 pp |
+| 6 | 21 | close_friend / citizen / good_record / poor / woman_old | 452 / 466 | 39 | 0.030 | 0.938 | **0.908** [0.888, 0.929] | 67.1% | 59.6% | -7.5 pp |
+| 7 | 17 | close_friend / citizen / good_record / rich / woman_old | 453 / 466 | 39 | 0.029 | 0.937 | **0.908** [0.889, 0.927] | 67.7% | 63.0% | -4.7 pp |
+| 8 | 56 | stranger / citizen / good_record / poor / man_old | 448 / 463 | 39 | 0.026 | 0.931 | **0.906** [0.884, 0.928] | 63.2% | 62.6% | -0.6 pp |
+| 9 | 18 | close_friend / citizen / good_record / rich / man_young | 456 / 467 | 39 | 0.025 | 0.930 | **0.905** [0.886, 0.925] | 67.9% | 62.2% | -5.8 pp |
+| 10 | 24 | close_friend / citizen / good_record / poor / man_old | 450 / 461 | 39 | 0.023 | 0.928 | **0.905** [0.886, 0.924] | 67.9% | 61.3% | -6.6 pp |
 
 *Bottom 10 Smallest Truth Discount (Most Discounted):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 63 | stranger / citizen / poor_record / poor / woman_young | 0.016 | 0.589 | **0.573** [0.530, 0.615] | 41.5% | 44.2% | +2.8 pp |
-| 2 | 61 | stranger / citizen / poor_record / poor / woman_old | 0.019 | 0.606 | **0.587** [0.543, 0.631] | 44.4% | 44.2% | -0.2 pp |
-| 3 | 64 | stranger / citizen / poor_record / poor / man_old | 0.014 | 0.613 | **0.600** [0.548, 0.651] | 40.0% | 46.8% | +6.8 pp |
-| 4 | 62 | stranger / citizen / poor_record / poor / man_young | 0.009 | 0.617 | **0.608** [0.566, 0.650] | 44.7% | 44.4% | -0.2 pp |
-| 5 | 47 | stranger / mayor / poor_record / poor / woman_young | 0.024 | 0.683 | **0.659** [0.615, 0.703] | 46.2% | 50.4% | +4.3 pp |
-| 6 | 46 | stranger / mayor / poor_record / poor / man_young | 0.011 | 0.677 | **0.666** [0.619, 0.714] | 48.3% | 50.4% | +2.1 pp |
-| 7 | 48 | stranger / mayor / poor_record / poor / man_old | 0.016 | 0.689 | **0.672** [0.625, 0.718] | 50.0% | 51.3% | +1.3 pp |
-| 8 | 45 | stranger / mayor / poor_record / poor / woman_old | 0.019 | 0.695 | **0.676** [0.631, 0.721] | 48.1% | 51.1% | +3.0 pp |
-| 9 | 43 | stranger / mayor / poor_record / rich / woman_young | 0.011 | 0.698 | **0.687** [0.641, 0.733] | 56.2% | 52.4% | -3.8 pp |
-| 10 | 44 | stranger / mayor / poor_record / rich / man_old | 0.013 | 0.727 | **0.714** [0.672, 0.756] | 55.6% | 54.3% | -1.3 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 63 | stranger / citizen / poor_record / poor / woman_young | 456 / 466 | 39 | 0.016 | 0.589 | **0.573** [0.530, 0.615] | 41.5% | 44.2% | +2.8 pp |
+| 2 | 61 | stranger / citizen / poor_record / poor / woman_old | 452 / 462 | 39 | 0.019 | 0.606 | **0.587** [0.543, 0.631] | 44.4% | 44.2% | -0.2 pp |
+| 3 | 64 | stranger / citizen / poor_record / poor / man_old | 454 / 461 | 39 | 0.014 | 0.613 | **0.600** [0.548, 0.651] | 40.0% | 46.8% | +6.8 pp |
+| 4 | 62 | stranger / citizen / poor_record / poor / man_young | 452 / 463 | 39 | 0.009 | 0.617 | **0.608** [0.566, 0.650] | 44.7% | 44.4% | -0.2 pp |
+| 5 | 47 | stranger / mayor / poor_record / poor / woman_young | 452 / 467 | 39 | 0.024 | 0.683 | **0.659** [0.615, 0.703] | 46.2% | 50.4% | +4.3 pp |
+| 6 | 46 | stranger / mayor / poor_record / poor / man_young | 457 / 464 | 39 | 0.011 | 0.677 | **0.666** [0.619, 0.714] | 48.3% | 50.4% | +2.1 pp |
+| 7 | 48 | stranger / mayor / poor_record / poor / man_old | 455 / 463 | 39 | 0.016 | 0.689 | **0.672** [0.625, 0.718] | 50.0% | 51.3% | +1.3 pp |
+| 8 | 45 | stranger / mayor / poor_record / poor / woman_old | 455 / 467 | 39 | 0.019 | 0.695 | **0.676** [0.631, 0.721] | 48.1% | 51.1% | +3.0 pp |
+| 9 | 43 | stranger / mayor / poor_record / rich / woman_young | 458 / 466 | 39 | 0.011 | 0.698 | **0.687** [0.641, 0.733] | 56.2% | 52.4% | -3.8 pp |
+| 10 | 44 | stranger / mayor / poor_record / rich / man_old | 452 / 467 | 39 | 0.013 | 0.727 | **0.714** [0.672, 0.756] | 55.6% | 54.3% | -1.3 pp |
 
 #### First-Hand POV (Seats 1-6: Fooled & Gatekeeper)
 
 *Top 10 Largest Truth Discount (Best Truth Discrimination):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 22 | close_friend / citizen / good_record / poor / man_young | 0.002 | 0.989 | **0.987** [0.978, 0.997] | 100.0% | 100.0% | +0.0 pp |
-| 2 | 21 | close_friend / citizen / good_record / poor / woman_old | 0.004 | 0.987 | **0.983** [0.969, 0.997] | 99.6% | 99.1% | -0.4 pp |
-| 3 | 17 | close_friend / citizen / good_record / rich / woman_old | 0.002 | 0.985 | **0.983** [0.969, 0.997] | 100.0% | 100.0% | +0.0 pp |
-| 4 | 54 | stranger / citizen / good_record / poor / man_young | 0.002 | 0.985 | **0.983** [0.969, 0.997] | 99.1% | 99.6% | +0.4 pp |
-| 5 | 53 | stranger / citizen / good_record / poor / woman_old | 0.004 | 0.985 | **0.981** [0.964, 0.997] | 98.7% | 99.6% | +0.9 pp |
-| 6 | 7 | close_friend / mayor / good_record / poor / woman_young | 0.002 | 0.981 | **0.979** [0.967, 0.990] | 100.0% | 100.0% | +0.0 pp |
-| 7 | 19 | close_friend / citizen / good_record / rich / woman_young | 0.006 | 0.983 | **0.976** [0.963, 0.990] | 100.0% | 100.0% | +0.0 pp |
-| 8 | 20 | close_friend / citizen / good_record / rich / man_old | 0.004 | 0.981 | **0.976** [0.962, 0.991] | 100.0% | 100.0% | +0.0 pp |
-| 9 | 18 | close_friend / citizen / good_record / rich / man_young | 0.000 | 0.976 | **0.976** [0.962, 0.991] | 100.0% | 100.0% | +0.0 pp |
-| 10 | 50 | stranger / citizen / good_record / rich / man_young | 0.004 | 0.976 | **0.972** [0.957, 0.987] | 100.0% | 99.6% | -0.4 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 22 | close_friend / citizen / good_record / poor / man_young | 234 / 233 | 39 | 0.002 | 0.989 | **0.987** [0.978, 0.997] | 100.0% | 100.0% | +0.0 pp |
+| 2 | 21 | close_friend / citizen / good_record / poor / woman_old | 233 / 233 | 39 | 0.004 | 0.987 | **0.983** [0.969, 0.997] | 99.6% | 99.1% | -0.4 pp |
+| 3 | 17 | close_friend / citizen / good_record / rich / woman_old | 230 / 234 | 39 | 0.002 | 0.985 | **0.983** [0.969, 0.997] | 100.0% | 100.0% | +0.0 pp |
+| 4 | 54 | stranger / citizen / good_record / poor / man_young | 232 / 233 | 39 | 0.002 | 0.985 | **0.983** [0.969, 0.997] | 99.1% | 99.6% | +0.4 pp |
+| 5 | 53 | stranger / citizen / good_record / poor / woman_old | 232 / 234 | 39 | 0.004 | 0.985 | **0.981** [0.964, 0.997] | 98.7% | 99.6% | +0.9 pp |
+| 6 | 7 | close_friend / mayor / good_record / poor / woman_young | 234 / 234 | 39 | 0.002 | 0.981 | **0.979** [0.967, 0.990] | 100.0% | 100.0% | +0.0 pp |
+| 7 | 19 | close_friend / citizen / good_record / rich / woman_young | 233 / 233 | 39 | 0.006 | 0.983 | **0.976** [0.963, 0.990] | 100.0% | 100.0% | +0.0 pp |
+| 8 | 20 | close_friend / citizen / good_record / rich / man_old | 231 / 234 | 39 | 0.004 | 0.981 | **0.976** [0.962, 0.991] | 100.0% | 100.0% | +0.0 pp |
+| 9 | 18 | close_friend / citizen / good_record / rich / man_young | 232 / 234 | 39 | 0.000 | 0.976 | **0.976** [0.962, 0.991] | 100.0% | 100.0% | +0.0 pp |
+| 10 | 50 | stranger / citizen / good_record / rich / man_young | 232 / 234 | 39 | 0.004 | 0.976 | **0.972** [0.957, 0.987] | 100.0% | 99.6% | -0.4 pp |
 
 *Bottom 10 Smallest Truth Discount (Most Discounted):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 63 | stranger / citizen / poor_record / poor / woman_young | 0.015 | 0.551 | **0.536** [0.485, 0.586] | 59.4% | 56.8% | -2.6 pp |
-| 2 | 62 | stranger / citizen / poor_record / poor / man_young | 0.004 | 0.573 | **0.568** [0.506, 0.631] | 64.5% | 60.7% | -3.8 pp |
-| 3 | 64 | stranger / citizen / poor_record / poor / man_old | 0.011 | 0.581 | **0.571** [0.511, 0.630] | 56.0% | 63.2% | +7.3 pp |
-| 4 | 61 | stranger / citizen / poor_record / poor / woman_old | 0.019 | 0.591 | **0.571** [0.512, 0.630] | 59.8% | 61.5% | +1.7 pp |
-| 5 | 46 | stranger / mayor / poor_record / poor / man_young | 0.002 | 0.693 | **0.691** [0.624, 0.759] | 71.4% | 75.2% | +3.8 pp |
-| 6 | 47 | stranger / mayor / poor_record / poor / woman_young | 0.019 | 0.712 | **0.692** [0.645, 0.740] | 67.9% | 73.5% | +5.6 pp |
-| 7 | 43 | stranger / mayor / poor_record / rich / woman_young | 0.011 | 0.712 | **0.700** [0.648, 0.752] | 85.9% | 78.6% | -7.3 pp |
-| 8 | 48 | stranger / mayor / poor_record / poor / man_old | 0.017 | 0.719 | **0.702** [0.643, 0.761] | 80.8% | 76.1% | -4.7 pp |
-| 9 | 60 | stranger / citizen / poor_record / rich / man_old | 0.011 | 0.717 | **0.707** [0.642, 0.772] | 78.2% | 76.9% | -1.3 pp |
-| 10 | 45 | stranger / mayor / poor_record / poor / woman_old | 0.015 | 0.731 | **0.716** [0.655, 0.777] | 73.9% | 76.5% | +2.6 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 63 | stranger / citizen / poor_record / poor / woman_young | 231 / 234 | 39 | 0.015 | 0.551 | **0.536** [0.485, 0.586] | 59.4% | 56.8% | -2.6 pp |
+| 2 | 62 | stranger / citizen / poor_record / poor / man_young | 233 / 234 | 39 | 0.004 | 0.573 | **0.568** [0.506, 0.631] | 64.5% | 60.7% | -3.8 pp |
+| 3 | 64 | stranger / citizen / poor_record / poor / man_old | 233 / 234 | 39 | 0.011 | 0.581 | **0.571** [0.511, 0.630] | 56.0% | 63.2% | +7.3 pp |
+| 4 | 61 | stranger / citizen / poor_record / poor / woman_old | 232 / 232 | 39 | 0.019 | 0.591 | **0.571** [0.512, 0.630] | 59.8% | 61.5% | +1.7 pp |
+| 5 | 46 | stranger / mayor / poor_record / poor / man_young | 233 / 233 | 39 | 0.002 | 0.693 | **0.691** [0.624, 0.759] | 71.4% | 75.2% | +3.8 pp |
+| 6 | 47 | stranger / mayor / poor_record / poor / woman_young | 233 / 234 | 39 | 0.019 | 0.712 | **0.692** [0.645, 0.740] | 67.9% | 73.5% | +5.6 pp |
+| 7 | 43 | stranger / mayor / poor_record / rich / woman_young | 233 / 234 | 39 | 0.011 | 0.712 | **0.700** [0.648, 0.752] | 85.9% | 78.6% | -7.3 pp |
+| 8 | 48 | stranger / mayor / poor_record / poor / man_old | 234 / 233 | 39 | 0.017 | 0.719 | **0.702** [0.643, 0.761] | 80.8% | 76.1% | -4.7 pp |
+| 9 | 60 | stranger / citizen / poor_record / rich / man_old | 233 / 233 | 39 | 0.011 | 0.717 | **0.707** [0.642, 0.772] | 78.2% | 76.9% | -1.3 pp |
+| 10 | 45 | stranger / mayor / poor_record / poor / woman_old | 232 / 234 | 39 | 0.015 | 0.731 | **0.716** [0.655, 0.777] | 73.9% | 76.5% | +2.6 pp |
 
 #### Second-Hand POV (Seats 7-12: Downstream Susceptibility)
 
 *Top 10 Largest Truth Discount (Best Truth Discrimination):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 56 | stranger / citizen / good_record / poor / man_old | 0.046 | 0.908 | **0.865** [0.828, 0.902] | 27.4% | 26.1% | -1.3 pp |
-| 2 | 49 | stranger / citizen / good_record / rich / woman_old | 0.032 | 0.884 | **0.853** [0.821, 0.885] | 41.0% | 25.6% | -15.4 pp |
-| 3 | 3 | close_friend / mayor / good_record / rich / woman_young | 0.066 | 0.916 | **0.851** [0.816, 0.886] | 35.0% | 25.6% | -9.4 pp |
-| 4 | 8 | close_friend / mayor / good_record / poor / man_old | 0.040 | 0.888 | **0.850** [0.808, 0.891] | 33.8% | 18.8% | -15.0 pp |
-| 5 | 24 | close_friend / citizen / good_record / poor / man_old | 0.048 | 0.893 | **0.844** [0.807, 0.880] | 35.9% | 23.1% | -12.8 pp |
-| 6 | 20 | close_friend / citizen / good_record / rich / man_old | 0.050 | 0.891 | **0.840** [0.805, 0.874] | 43.2% | 25.6% | -17.5 pp |
-| 7 | 51 | stranger / citizen / good_record / rich / woman_young | 0.054 | 0.888 | **0.834** [0.793, 0.875] | 38.5% | 26.5% | -12.0 pp |
-| 8 | 18 | close_friend / citizen / good_record / rich / man_young | 0.051 | 0.884 | **0.834** [0.799, 0.868] | 35.9% | 24.4% | -11.5 pp |
-| 9 | 21 | close_friend / citizen / good_record / poor / woman_old | 0.057 | 0.888 | **0.833** [0.794, 0.872] | 34.6% | 20.1% | -14.5 pp |
-| 10 | 35 | stranger / mayor / good_record / rich / woman_young | 0.042 | 0.876 | **0.833** [0.792, 0.874] | 31.2% | 15.4% | -15.8 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 56 | stranger / citizen / good_record / poor / man_old | 216 / 229 | 39 | 0.046 | 0.908 | **0.865** [0.828, 0.902] | 27.4% | 26.1% | -1.3 pp |
+| 2 | 49 | stranger / citizen / good_record / rich / woman_old | 216 / 232 | 39 | 0.032 | 0.884 | **0.853** [0.821, 0.885] | 41.0% | 25.6% | -15.4 pp |
+| 3 | 3 | close_friend / mayor / good_record / rich / woman_young | 226 / 232 | 39 | 0.066 | 0.916 | **0.851** [0.816, 0.886] | 35.0% | 25.6% | -9.4 pp |
+| 4 | 8 | close_friend / mayor / good_record / poor / man_old | 227 / 233 | 39 | 0.040 | 0.888 | **0.850** [0.808, 0.891] | 33.8% | 18.8% | -15.0 pp |
+| 5 | 24 | close_friend / citizen / good_record / poor / man_old | 217 / 228 | 39 | 0.048 | 0.893 | **0.844** [0.807, 0.880] | 35.9% | 23.1% | -12.8 pp |
+| 6 | 20 | close_friend / citizen / good_record / rich / man_old | 221 / 233 | 39 | 0.050 | 0.891 | **0.840** [0.805, 0.874] | 43.2% | 25.6% | -17.5 pp |
+| 7 | 51 | stranger / citizen / good_record / rich / woman_young | 213 / 233 | 39 | 0.054 | 0.888 | **0.834** [0.793, 0.875] | 38.5% | 26.5% | -12.0 pp |
+| 8 | 18 | close_friend / citizen / good_record / rich / man_young | 224 / 233 | 39 | 0.051 | 0.884 | **0.834** [0.799, 0.868] | 35.9% | 24.4% | -11.5 pp |
+| 9 | 21 | close_friend / citizen / good_record / poor / woman_old | 219 / 233 | 39 | 0.057 | 0.888 | **0.833** [0.794, 0.872] | 34.6% | 20.1% | -14.5 pp |
+| 10 | 35 | stranger / mayor / good_record / rich / woman_young | 212 / 233 | 39 | 0.042 | 0.876 | **0.833** [0.792, 0.874] | 31.2% | 15.4% | -15.8 pp |
 
 *Bottom 10 Smallest Truth Discount (Most Discounted):*
 
-| Rank | Cell | Source DNA | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
-|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 1 | 61 | stranger / citizen / poor_record / poor / woman_old | 0.018 | 0.622 | **0.606** [0.544, 0.669] | 29.1% | 26.9% | -2.1 pp |
-| 2 | 63 | stranger / citizen / poor_record / poor / woman_young | 0.018 | 0.627 | **0.610** [0.554, 0.667] | 23.5% | 31.6% | +8.1 pp |
-| 3 | 47 | stranger / mayor / poor_record / poor / woman_young | 0.030 | 0.655 | **0.625** [0.569, 0.680] | 24.4% | 27.4% | +3.0 pp |
-| 4 | 64 | stranger / citizen / poor_record / poor / man_old | 0.018 | 0.645 | **0.632** [0.562, 0.701] | 23.9% | 30.3% | +6.4 pp |
-| 5 | 11 | close_friend / mayor / poor_record / rich / woman_young | 0.024 | 0.662 | **0.635** [0.570, 0.700] | 28.6% | 22.6% | -6.0 pp |
-| 6 | 45 | stranger / mayor / poor_record / poor / woman_old | 0.022 | 0.659 | **0.637** [0.582, 0.692] | 22.2% | 25.6% | +3.4 pp |
-| 7 | 48 | stranger / mayor / poor_record / poor / man_old | 0.016 | 0.659 | **0.640** [0.585, 0.695] | 19.2% | 26.5% | +7.3 pp |
-| 8 | 46 | stranger / mayor / poor_record / poor / man_young | 0.020 | 0.660 | **0.641** [0.582, 0.700] | 25.2% | 25.6% | +0.4 pp |
-| 9 | 62 | stranger / citizen / poor_record / poor / man_young | 0.014 | 0.662 | **0.651** [0.594, 0.709] | 24.8% | 28.2% | +3.4 pp |
-| 10 | 41 | stranger / mayor / poor_record / rich / woman_old | 0.020 | 0.681 | **0.659** [0.599, 0.719] | 23.5% | 24.8% | +1.3 pp |
+| Rank | Cell | Source DNA | Ment. N (R / T) | Belief Pairs | Rumor Belief | Truth Belief | Truth Discount [95% CI] | Rumor GO % | Truth GO % | Δ GO |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 61 | stranger / citizen / poor_record / poor / woman_old | 220 / 230 | 39 | 0.018 | 0.622 | **0.606** [0.544, 0.669] | 29.1% | 26.9% | -2.1 pp |
+| 2 | 63 | stranger / citizen / poor_record / poor / woman_young | 225 / 232 | 39 | 0.018 | 0.627 | **0.610** [0.554, 0.667] | 23.5% | 31.6% | +8.1 pp |
+| 3 | 47 | stranger / mayor / poor_record / poor / woman_young | 219 / 233 | 39 | 0.030 | 0.655 | **0.625** [0.569, 0.680] | 24.4% | 27.4% | +3.0 pp |
+| 4 | 64 | stranger / citizen / poor_record / poor / man_old | 221 / 227 | 39 | 0.018 | 0.645 | **0.632** [0.562, 0.701] | 23.9% | 30.3% | +6.4 pp |
+| 5 | 11 | close_friend / mayor / poor_record / rich / woman_young | 227 / 229 | 39 | 0.024 | 0.662 | **0.635** [0.570, 0.700] | 28.6% | 22.6% | -6.0 pp |
+| 6 | 45 | stranger / mayor / poor_record / poor / woman_old | 223 / 233 | 39 | 0.022 | 0.659 | **0.637** [0.582, 0.692] | 22.2% | 25.6% | +3.4 pp |
+| 7 | 48 | stranger / mayor / poor_record / poor / man_old | 221 / 230 | 39 | 0.016 | 0.659 | **0.640** [0.585, 0.695] | 19.2% | 26.5% | +7.3 pp |
+| 8 | 46 | stranger / mayor / poor_record / poor / man_young | 224 / 231 | 39 | 0.020 | 0.660 | **0.641** [0.582, 0.700] | 25.2% | 25.6% | +0.4 pp |
+| 9 | 62 | stranger / citizen / poor_record / poor / man_young | 219 / 229 | 39 | 0.014 | 0.662 | **0.651** [0.594, 0.709] | 24.8% | 28.2% | +3.4 pp |
+| 10 | 41 | stranger / mayor / poor_record / rich / woman_old | 223 / 232 | 39 | 0.020 | 0.681 | **0.659** [0.599, 0.719] | 23.5% | 24.8% | +1.3 pp |
