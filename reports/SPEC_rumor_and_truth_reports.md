@@ -6,7 +6,7 @@
 **Explicit Exclusions:**
 - Paired **Truth Discount** ($\text{Truth} - \text{Rumor}$) comparison report is deferred to a separate step.
 - **Qwen3-32B** judge outputs are excluded completely.
-- **4 planned interaction terms** (`closeness × reliability`, `authority × reliability`, `wealth × reliability`, `closeness × authority`) are deferred; this phase tests the **6 main knobs** first.
+- **1-vs-1 single-cell benchmark pairs** (e.g. single cell 30 vs 62 at n=39) are replaced by the full-grid **16-DNA combo interaction tests** (n=624 towns per combo per model).
 - **Two-source conflict probes (Probes 1 & 2 / RQ5)** were never simulated and cannot be analyzed.
 
 ---
@@ -67,39 +67,45 @@ For each `Model × POV`, rank all 64 Source DNAs (`Strongest = Highest`, `Weakes
 
 Full 64-cell tables are exported to CSV for every `Model × POV`.
 
-### Part 2: Controlled Main Effects of the 6 Knobs (With Town Clustering)
-For each `Model × POV`, estimate the controlled effect of each of the 6 binary knobs while simultaneously controlling for the other 5 knobs and `real_artist` (`Vesper Vance` vs. `Kaelen Cross`):
+### Part 2: Controlled 10-Test Model (6 Main Knobs + 4 Planned Interactions, With Town Clustering)
+For each `Model × POV`, estimate the controlled effects using the spec's 10-term additive + interaction formula (`6 main knobs + 4 planned interactions + real_artist`), matching `configs/analysis_policy.main.json`:
 
-| Knob | Level A (Positive in Contrast) | Level B (Reference) | Contrast Direction |
-| :--- | :--- | :--- | :--- |
-| `closeness` | `close_friend` | `stranger` | `close_friend − stranger` |
-| `authority` | `mayor` | `citizen` | `mayor − citizen` |
-| `reliability` | `good_record` | `poor_record` | `good_record − poor_record` |
-| `wealth` | `rich` | `poor` | `rich − poor` |
-| `gender` | `woman` | `man` | `woman − man` |
-| `age` | `old` | `young` | `old − young` |
+| Contrast | Category | Contrast Direction |
+| :--- | :--- | :--- |
+| `closeness` | Main Knob | `close_friend − stranger` |
+| `authority` | Main Knob | `mayor − citizen` |
+| `reliability` | Main Knob | `good_record − poor_record` |
+| `wealth` | Main Knob | `rich − poor` |
+| `gender` | Main Knob | `woman − man` |
+| `age` | Main Knob | `old − young` |
+| `closeness_by_reliability` | Interaction (DID) | `(close_friend−stranger \| good_record) − (close_friend−stranger \| poor_record)` |
+| `authority_by_reliability` | Interaction (DID) | `(mayor−citizen \| good_record) − (mayor−citizen \| poor_record)` |
+| `wealth_by_reliability` | Interaction (DID) | `(rich−poor \| good_record) − (rich−poor \| poor_record)` |
+| `closeness_by_authority` | Interaction (DID) | `(close_friend−stranger \| mayor) − (close_friend−stranger \| citizen)` |
 
-*(Contrast directions match `configs/analysis_policy.main.json`.)*
+**2×2 Controlled 16-DNA Combos & Simple Comparisons:**
+For each of the 4 interaction pairs (`closeness × reliability`, `authority × reliability`, `wealth × reliability`, `closeness × authority`), also compute:
+- Controlled marginal means + 95% CIs for all **4 factor combinations** (each pooling all 16 matching DNAs across the 64-cell grid while controlling for the remaining 4 knobs + `real_artist`).
+- Conditional **simple pairwise comparisons** within the 2×2 (e.g., `close_friend vs. stranger` when `poor_record`, and when `good_record`; `mayor vs. citizen` when `poor_record` and `good_record`, etc.) with town-clustered SEs and p-values.
 
 **Statistical Models (Clustering by Town `run_id`):**
-- Formula: `outcome ~ C(closeness) + C(authority) + C(reliability) + C(wealth) + C(gender) + C(age) + C(real_artist)`
+- Formula: `outcome ~ C(closeness) + C(authority) + C(reliability) + C(wealth) + C(gender) + C(age) + C(closeness):C(reliability) + C(authority):C(reliability) + C(wealth):C(reliability) + C(closeness):C(authority) + C(real_artist)`
 - **Town-Clustered OLS / Linear Probability Model** (`cov_type="cluster", cov_kwds={"groups": run_id}`) for **all** outcomes:
   - `Belief` (conditional), `Belief (Silence = 0.0)`, `Belief (Silence = 0.5)`
   - `GO %` (with `SKIP %` = `-GO %`)
   - `NOT_MENTIONED %`, `FACT %`, `UNCERTAIN %`, `SKEPTICAL %`, `CHECKED_TRUE %`, `CHECKED_FALSE %`
-  - Plus town-level `Evidence Transmission %` (for First-Hand POV, where one row per checker/town applies; clustered by `run_id`).
 - **Companion Linear Mixed-Effects Model (LMM)** with `run_id` random intercept (`smf.mixedlm(..., groups=run_id)`) on conditional `Belief`, matching the spec (`docs/04_metrics_and_judge.md`), reported alongside Town-Clustered OLS to verify agreement.
-- **Reported columns per knob:** Adjusted Mean (Level A), Adjusted Mean (Level B), Controlled Effect (`A − B`), Cluster-Robust SE, 95% CI, raw clustered `p`-value, and **Holm-adjusted `p`-value** across the 6 knobs per outcome × model × POV.
+- **Multiplicity adjustment:** **Holm-adjusted `p`-value** across the full **10-test planned family** (6 main knobs + 4 interactions) per outcome × model × POV.
 
 ---
 
 ## 4. Deliverables
 
 - `scripts/build_condition_reports.py`: Reproducible builder script reading `results/main-gemini-3.7-flash/` (no LLM calls).
-- `tests/test_condition_reports.py`: Automated tests validating zero-exclusion of `INVALID` rows, tie-breaking rules, controlled means/Holm adjustments, and dyadic pairing logic.
+- `tests/test_condition_reports.py`: Automated tests validating zero-exclusion of `INVALID` rows, tie-breaking rules, controlled means/10-test Holm adjustments, 4-combo interaction tests, and dyadic pairing logic.
 - `reports/rumor_towns/`:
-  - `report.html` (interactive Model / POV / Metric-Label tabs + full tables)
+  - `report.html` (interactive Model / POV / Metric-Label tabs + 10-contrast & 4-combo interaction explorer)
   - `report.md` (clean Markdown tables)
-  - `csv/` (`summary_by_model_layer.csv`, `summary_experiment_overall.csv`, `dyadic_gatekeeper.csv`, `knob_effects.csv`, `dna_rankings_all64.csv`)
+  - `csv/` (`summary_by_model_layer.csv`, `summary_experiment_overall.csv`, `dyadic_gatekeeper.csv`, `knob_effects.csv`, `interaction_combos.csv`, `interaction_simple_effects.csv`, `dna_rankings_all64.csv`)
 - `reports/truth_towns/`:
   - `report.html`, `report.md`, `csv/` (same exact structure)

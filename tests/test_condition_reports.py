@@ -115,12 +115,29 @@ def test_dna_tie_breaking_and_knob_effects():
     # Tie-breaker picks closeness=close_friend (higher belief=1.0, skip_pct=100%) first.
     assert top.iloc[0]["belief"] == 1.0
 
-    knobs = bcr.compute_knob_effects(df)
+    knobs, combos, simple = bcr.compute_knob_effects(df)
     sub_k = knobs[
         (knobs["model_key"] == "deepseek_v4_flash")
         & (knobs["pov"] == "source")
         & (knobs["outcome"] == "belief")
     ]
+    assert len(sub_k) == 10
+    assert set(sub_k["test_type"]) == {"main", "interaction"}
     closeness_row = sub_k[sub_k["factor"] == "closeness"].iloc[0]
     assert closeness_row["effect"] > 0.99
     assert closeness_row["p_holm"] < 0.001
+
+    sub_c = combos[
+        (combos["model_key"] == "deepseek_v4_flash")
+        & (combos["pov"] == "source")
+        & (combos["outcome"] == "belief")
+        & (combos["pair_id"] == "closeness_x_reliability")
+    ]
+    assert len(sub_c) == 4
+    sub_s = simple[
+        (simple["model_key"] == "deepseek_v4_flash")
+        & (simple["pov"] == "source")
+        & (simple["outcome"] == "belief")
+        & (simple["pair_id"] == "closeness_x_reliability")
+    ]
+    assert len(sub_s) == 4

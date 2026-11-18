@@ -44,6 +44,13 @@ FACTORS = (
     ("gender", "woman", "man"),
     ("age", "old", "young"),
 )
+FACTOR_LEVELS = {f: (a, b) for f, a, b in FACTORS}
+INTERACTIONS = (
+    ("closeness", "reliability"),
+    ("authority", "reliability"),
+    ("wealth", "reliability"),
+    ("closeness", "authority"),
+)
 MODEL_NAMES = {
     "deepseek_v4_flash": "DeepSeek-V4-Flash",
     "qwen_3_8_flash": "Qwen3.8-Flash",
@@ -76,7 +83,13 @@ OUTCOME_SPECS = (
     ("label_CHECKED_FALSE", "CHECKED_FALSE (%)", True),
 )
 ARTISTS = ("Vesper Vance", "Kaelen Cross")
-FORMULA = ("outcome ~ " + " + ".join(f"C({f})" for f, _, _ in FACTORS) + " + C(real_artist)")
+FORMULA = (
+    "outcome ~ "
+    + " + ".join(f"C({f})" for f, _, _ in FACTORS)
+    + " + "
+    + " + ".join(f"C({a}):C({b})" for a, b in INTERACTIONS)
+    + " + C(real_artist)"
+)
 
 
 # --------------------------------------------------------------------------- data prep
@@ -375,10 +388,24 @@ def _holm_adjust(p_values: list[float]) -> list[float]:
     return adjusted
 
 
-def compute_knob_effects(df: pd.DataFrame) -> pd.DataFrame:
-    """Compute controlled main effects of all 6 knobs with town-clustered SEs, Holm p-values, and LMM check on Belief."""
-    _, grid_matrix_cache = None, {}
-    results = []
+def _contrast_stats(vec: np.ndarray, beta: np.ndarray, cov: np.ndarray, crit: float) -> tuple[float, float, float, float, float]:
+    """Compute linear contrast estimate, SE, 95% CI, and two-sided Wald p-value."""
+    est = float(vec @ beta)
+    var = float(vec @ cov @ vec)
+    se = math.sqrt(var) if var > 0 else float("nan")
+    z = est / se if se and math.isfinite(se) else float("nan")
+    p_val = float(2.0 * norm.sf(abs(z))) if math.isfinite(z) else float("nan")
+    ci_lo = est - crit * se if math.isfinite(se) else float("nan")
+    ci_hi = est + crit * se if math.isfinite(se) else float("nan")
+    return est, se, ci_lo, ci_hi, p_val
+
+
+def compute_knob_effects(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Fit the 10-term spec model (6 main knobs + 4 interactions, town-clustered SEs + Holm across 10 tests)
+    plus controlled 4-combo means and simple comparisons for every interaction pair."""
+    grid_matrix_cache: dict[str, tuple[pd.DataFrame, np.ndarray]] = {}
+    knob_rows, combo_rows, simple_rows = [], [], []
+    crit = float(norm.ppf(0.975))
 
     for model_key in MODEL_NAMES:
         mdf = df[df["model_key"] == model_key]
@@ -429,48 +456,38 @@ def compute_knob_effects(df: pd.DataFrame) -> pd.DataFrame:
                         else:
                             lmm_status = "nonconverged"
 
-                crit = float(norm.ppf(0.975))
-                raw_p_list = []
-                batch = []
-                for factor, lvl_a, lvl_b in FACTORS:
-                    mask_a = (grid_df[factor] == lvl_a).to_numpy()
-                    mask_b = (grid_df[factor] == lvl_b).to_numpy()
-                    vec_a = grid_mat[mask_a].mean(axis=0)
-                    vec_b = grid_mat[mask_b].mean(axis=0)
-                    diff_vec = vec_a - vec_b
+                unit = "pp" if is_pct else "belief"
+                base_meta = {
+                    "model_key": model_key,
+                    "model_name": MODEL_NAMES[model_key],
+                    "pov": pov_key,
+                    "outcome": outcome_col,
+                    "outcome_label": outcome_label,
+                    "unit": unit,
+                    "n_obs": n_obs,
+                    "n_towns": n_towns,
+                }
 
+                raw_p_list: list[float] = []
+                batch: list[dict] = []
+
+                def add_planned(test_type: str, factor_id: str, lvl_a: str, lvl_b: str,
+                                contrast_lbl: str, vec_a: np.ndarray, vec_b: np.ndarray) -> None:
+                    diff_vec = vec_a - vec_b
                     mean_a = float(vec_a @ beta)
                     mean_b = float(vec_b @ beta)
-                    effect = float(diff_vec @ beta)
-                    var = float(diff_vec @ cov @ diff_vec)
-                    se = math.sqrt(var) if var > 0 else float("nan")
-                    z = effect / se if se and math.isfinite(se) else float("nan")
-                    p_val = float(2.0 * norm.sf(abs(z))) if math.isfinite(z) else float("nan")
-                    ci_lo = effect - crit * se if math.isfinite(se) else float("nan")
-                    ci_hi = effect + crit * se if math.isfinite(se) else float("nan")
-
+                    effect, se, ci_lo, ci_hi, p_val = _contrast_stats(diff_vec, beta, cov, crit)
                     lmm_eff, lmm_p = float("nan"), float("nan")
                     if lmm_beta is not None and lmm_cov is not None:
-                        lmm_eff = float(diff_vec @ lmm_beta)
-                        lmm_var = float(diff_vec @ lmm_cov @ diff_vec)
-                        if lmm_var > 0:
-                            lmm_se = math.sqrt(lmm_var)
-                            lmm_p = float(2.0 * norm.sf(abs(lmm_eff / lmm_se)))
-
+                        lmm_eff, _, _, _, lmm_p = _contrast_stats(diff_vec, lmm_beta, lmm_cov, crit)
                     raw_p_list.append(p_val if math.isfinite(p_val) else 1.0)
                     batch.append({
-                        "model_key": model_key,
-                        "model_name": MODEL_NAMES[model_key],
-                        "pov": pov_key,
-                        "outcome": outcome_col,
-                        "outcome_label": outcome_label,
-                        "unit": "pp" if is_pct else "belief",
-                        "factor": factor,
+                        **base_meta,
+                        "test_type": test_type,
+                        "factor": factor_id,
                         "level_a": lvl_a,
                         "level_b": lvl_b,
-                        "contrast": f"{lvl_a} - {lvl_b}",
-                        "n_obs": n_obs,
-                        "n_towns": n_towns,
+                        "contrast": contrast_lbl,
                         "mean_a": mean_a,
                         "mean_b": mean_b,
                         "effect": effect,
@@ -483,12 +500,83 @@ def compute_knob_effects(df: pd.DataFrame) -> pd.DataFrame:
                         "lmm_status": lmm_status,
                     })
 
+                # 6 Main Knobs
+                for factor, lvl_a, lvl_b in FACTORS:
+                    vec_a = grid_mat[(grid_df[factor] == lvl_a).to_numpy()].mean(axis=0)
+                    vec_b = grid_mat[(grid_df[factor] == lvl_b).to_numpy()].mean(axis=0)
+                    add_planned("main", factor, lvl_a, lvl_b, f"{lvl_a} - {lvl_b}", vec_a, vec_b)
+
+                # 4 Planned Interactions + 4-Combo Marginal Means + Simple Pairwise Comparisons
+                for fa, fb in INTERACTIONS:
+                    a1, a0 = FACTOR_LEVELS[fa]
+                    b1, b0 = FACTOR_LEVELS[fb]
+                    pair_id = f"{fa}_x_{fb}"
+                    pair_label = f"{fa} x {fb}"
+                    vecs = {}
+                    for va in (a1, a0):
+                        for vb in (b1, b0):
+                            mask = ((grid_df[fa] == va) & (grid_df[fb] == vb)).to_numpy()
+                            v = grid_mat[mask].mean(axis=0)
+                            vecs[(va, vb)] = v
+                            est, se, ci_lo, ci_hi, _ = _contrast_stats(v, beta, cov, crit)
+                            combo_rows.append({
+                                **base_meta,
+                                "pair_id": pair_id,
+                                "pair_label": pair_label,
+                                "factor_a": fa,
+                                "factor_b": fb,
+                                "level_a": va,
+                                "level_b": vb,
+                                "combo_label": f"{va} + {vb}",
+                                "mean": est,
+                                "se_clustered": se,
+                                "ci_low": ci_lo,
+                                "ci_high": ci_hi,
+                            })
+
+                    # DID interaction: (a1 vs a0 | b1) - (a1 vs a0 | b0)
+                    diff_given_b1 = vecs[(a1, b1)] - vecs[(a0, b1)]
+                    diff_given_b0 = vecs[(a1, b0)] - vecs[(a0, b0)]
+                    add_planned(
+                        "interaction",
+                        f"{fa}_by_{fb}",
+                        f"{a1}-{a0}|{b1}",
+                        f"{a1}-{a0}|{b0}",
+                        f"({a1}-{a0} | {b1}) - ({a1}-{a0} | {b0})",
+                        diff_given_b1,
+                        diff_given_b0,
+                    )
+
+                    # Conditional simple effects within the 2x2 (each uses a 4-test Holm / raw comparison)
+                    simple_specs = [
+                        (f"{fa} effect | {fb}={b0}", vecs[(a1, b0)], vecs[(a0, b0)], f"{a1}+{b0} vs {a0}+{b0}"),
+                        (f"{fa} effect | {fb}={b1}", vecs[(a1, b1)], vecs[(a0, b1)], f"{a1}+{b1} vs {a0}+{b1}"),
+                        (f"{fb} effect | {fa}={a0}", vecs[(a0, b1)], vecs[(a0, b0)], f"{a0}+{b1} vs {a0}+{b0}"),
+                        (f"{fb} effect | {fa}={a1}", vecs[(a1, b1)], vecs[(a1, b0)], f"{a1}+{b1} vs {a1}+{b0}"),
+                    ]
+                    for desc, v_hi, v_lo, cmp_lbl in simple_specs:
+                        eff, se, ci_lo, ci_hi, p_val = _contrast_stats(v_hi - v_lo, beta, cov, crit)
+                        simple_rows.append({
+                            **base_meta,
+                            "pair_id": pair_id,
+                            "pair_label": pair_label,
+                            "comparison": desc,
+                            "combo_contrast": cmp_lbl,
+                            "mean_hi": float(v_hi @ beta),
+                            "mean_lo": float(v_lo @ beta),
+                            "effect": eff,
+                            "se_clustered": se,
+                            "ci_low": ci_lo,
+                            "ci_high": ci_hi,
+                            "p_clustered": p_val,
+                        })
+
                 holm_ps = _holm_adjust(raw_p_list)
                 for row, hp in zip(batch, holm_ps):
                     row["p_holm"] = hp
-                    results.append(row)
+                    knob_rows.append(row)
 
-    return pd.DataFrame(results)
+    return pd.DataFrame(knob_rows), pd.DataFrame(combo_rows), pd.DataFrame(simple_rows)
 
 
 # --------------------------------------------------------------------------- formatting helpers
@@ -528,6 +616,8 @@ def render_markdown(
     dyadic_df: pd.DataFrame,
     dna_df: pd.DataFrame,
     knobs_df: pd.DataFrame,
+    combos_df: pd.DataFrame,
+    simple_df: pd.DataFrame,
 ) -> str:
     title = "Rumor Towns Report (False Claims)" if condition_type == "rumor" else "Truth Towns Report (True Claims)"
     total_fallback_fh = int(table_b.loc[table_b["layer"] == "overall", "fallback_skip_fh"].iloc[0])
@@ -545,7 +635,7 @@ def render_markdown(
         "- **Label % Denominator:** Valid judgments (`FACT + UNCERTAIN + SKEPTICAL + CHECKED_TRUE + CHECKED_FALSE + NOT_MENTIONED = 100%`).",
         "- **Primary Belief Denominator:** Valid mentioning listeners (excluding `NOT_MENTIONED` and `INVALID`). Sensitivity checks (`Silence=0.0`, `Silence=0.5`) impute *only* valid `NOT_MENTIONED` rows.",
         f"- **Verification (`GO`/`SKIP`):** 0 missing or invalid decisions. {total_fallback_fh + total_fallback_sh} simulation decisions ({total_fallback_fh} first-hand, {total_fallback_sh} second-hand; {(total_fallback_fh + total_fallback_sh) / total_expected * 100:.2f}%) were `malformed_fallback_skip` in the simulation runner and appear as `SKIP`.",
-        "- **Statistical Model:** Controlled main effects of all 6 knobs simultaneously (`closeness`, `authority`, `reliability`, `wealth`, `gender`, `age` + `real_artist`), with standard errors clustered by town (`run_id`) and Holm adjustment across the 6 knobs per outcome. `Belief` also reports the spec's town-random-intercept LMM (`mixedlm`) check.",
+        "- **Statistical Model:** 10-term planned specification controlling simultaneously for all 6 knobs (`closeness`, `authority`, `reliability`, `wealth`, `gender`, `age`), the 4 planned interactions (`closeness × reliability`, `authority × reliability`, `wealth × reliability`, `closeness × authority`), and `real_artist`, with standard errors clustered by town (`run_id`) and Holm adjustment across all 10 planned contrasts per outcome. `Belief` also reports the spec's town-random-intercept LMM (`mixedlm`) check.",
         "",
         "---",
         "",
@@ -600,37 +690,65 @@ def render_markdown(
             f"{_f1(r['sh_NOT_MENTIONED_pct'])} |"
         )
 
-    lines += ["", "---", "", "## 3. Controlled Main Effects of the 6 Knobs (Town-Clustered)"]
+    lines += ["", "---", "", "## 3. Controlled Effects: 6 Main Knobs + 4 Planned Interactions (Town-Clustered)"]
     for model_key, model_name in MODEL_NAMES.items():
         lines += ["", f"### Model: {model_name}"]
         for pov_key, pov_title, _ in POV_DEFS:
             lines += ["", f"#### {pov_title}"]
             sub_k = knobs_df[(knobs_df["model_key"] == model_key) & (knobs_df["pov"] == pov_key)]
+            sub_c = combos_df[(combos_df["model_key"] == model_key) & (combos_df["pov"] == pov_key)]
+            sub_s = simple_df[(simple_df["model_key"] == model_key) & (simple_df["pov"] == pov_key)]
             for outcome_col, outcome_label, is_pct in OUTCOME_SPECS:
                 ok = sub_k[sub_k["outcome"] == outcome_col]
                 lines += [
                     "",
                     f"**Outcome: {outcome_label}** (n={ok['n_obs'].iloc[0]:,}, towns={ok['n_towns'].iloc[0]:,})",
                     "",
-                    "| Knob | Contrast (A − B) | Mean A | Mean B | Effect (A − B) | 95% CI | p (clustered) | p (Holm) | LMM Check |"
+                    "| Type | Contrast | Contrast Detail | Mean A | Mean B | Effect (A − B) | 95% CI | p (clustered) | p (Holm 10) | LMM Check |"
                     if outcome_col in ("belief", "belief_sil0", "belief_sil05")
-                    else "| Knob | Contrast (A − B) | Mean A | Mean B | Effect (A − B) | 95% CI | p (clustered) | p (Holm) |",
-                    "|---|---|---:|---:|---:|---:|---:|---:|---:|"
+                    else "| Type | Contrast | Contrast Detail | Mean A | Mean B | Effect (A − B) | 95% CI | p (clustered) | p (Holm 10) |",
+                    "|---|---|---|---:|---:|---:|---:|---:|---:|---:|"
                     if outcome_col in ("belief", "belief_sil0", "belief_sil05")
-                    else "|---|---|---:|---:|---:|---:|---:|---:|",
+                    else "|---|---|---|---:|---:|---:|---:|---:|---:|",
                 ]
                 for _, kr in ok.iterrows():
                     fmt_val = (lambda x: f"{x:.2f}%") if is_pct else (lambda x: f"{x:.4f}")
                     fmt_eff = (lambda x: f"{x:+.2f} pp") if is_pct else (lambda x: f"{x:+.4f}")
                     ci_txt = f"[{fmt_eff(kr['ci_low']).replace(' pp','')}, {fmt_eff(kr['ci_high'])}]"
+                    ma = fmt_eff(kr["mean_a"]) if kr["test_type"] == "interaction" else fmt_val(kr["mean_a"])
+                    mb = fmt_eff(kr["mean_b"]) if kr["test_type"] == "interaction" else fmt_val(kr["mean_b"])
                     row_str = (
-                        f"| {kr['factor']} | `{kr['contrast']}` | {fmt_val(kr['mean_a'])} | {fmt_val(kr['mean_b'])} | "
+                        f"| {kr['test_type']} | {kr['factor']} | `{kr['contrast']}` | {ma} | {mb} | "
                         f"{fmt_eff(kr['effect'])}{_stars(kr['p_holm'])} | {ci_txt} | {_fp(kr['p_clustered'])} | {_fp(kr['p_holm'])} |"
                     )
                     if outcome_col in ("belief", "belief_sil0", "belief_sil05"):
                         lmm_txt = f"{kr['lmm_effect']:+.4f} (p={_fp(kr['lmm_p'])})" if pd.notna(kr['lmm_effect']) else kr['lmm_status']
                         row_str += f" {lmm_txt} |"
                     lines.append(row_str)
+
+                if outcome_col not in ("belief_sil0", "belief_sil05"):
+                    lines += ["", f"*4 Planned Interaction Pairs — 16-DNA Combo Means & Simple Comparisons ({outcome_label}):*", ""]
+                    for fa, fb in INTERACTIONS:
+                        pair_id = f"{fa}_x_{fb}"
+                        oc = sub_c[(sub_c["outcome"] == outcome_col) & (sub_c["pair_id"] == pair_id)]
+                        os_df = sub_s[(sub_s["outcome"] == outcome_col) & (sub_s["pair_id"] == pair_id)]
+                        fv = (lambda x: f"{x:.2f}%") if is_pct else (lambda x: f"{x:.4f}")
+                        fe = (lambda x: f"{x:+.2f} pp") if is_pct else (lambda x: f"{x:+.4f}")
+                        lines += [
+                            f"- **`{fa} × {fb}` — Controlled Combos:** " + " | ".join(
+                                f"`{cr['combo_label']}` = **{fv(cr['mean'])}** [{fv(cr['ci_low']).replace('%','')}, {fv(cr['ci_high'])}]"
+                                for _, cr in oc.iterrows()
+                            ),
+                            "",
+                            "| Conditional Comparison | Diff | 95% CI | p (clustered) |",
+                            "|---|---:|---:|---:|",
+                        ]
+                        for _, sr in os_df.iterrows():
+                            sci = f"[{fe(sr['ci_low']).replace(' pp','')}, {fe(sr['ci_high'])}]"
+                            lines.append(
+                                f"| `{sr['comparison']}` | {fe(sr['effect'])}{_stars(sr['p_clustered'])} | {sci} | {_fp(sr['p_clustered'])} |"
+                            )
+                        lines.append("")
 
     lines += ["", "---", "", "## 4. Top 10 Strongest & Bottom 10 Weakest Source DNAs (All Labels & Metrics)"]
     for model_key, model_name in MODEL_NAMES.items():
@@ -672,6 +790,8 @@ def render_html(
     dyadic_df: pd.DataFrame,
     dna_df: pd.DataFrame,
     knobs_df: pd.DataFrame,
+    combos_df: pd.DataFrame,
+    simple_df: pd.DataFrame,
 ) -> str:
     is_rumor = condition_type == "rumor"
     title = "Rumor Towns Report — False Claims (Gemini 3.7 Flash)" if is_rumor else "Truth Towns Report — True Claims (Gemini 3.7 Flash)"
@@ -686,7 +806,10 @@ def render_html(
     # Pack pre-computed data into JSON for clean interactive client-side tabs (works completely offline).
     payload = {
         "knobs": knobs_df.replace({np.nan: None}).to_dict(orient="records"),
+        "combos": combos_df.replace({np.nan: None}).to_dict(orient="records"),
+        "simple": simple_df.replace({np.nan: None}).to_dict(orient="records"),
         "dna": dna_df.replace({np.nan: None}).to_dict(orient="records"),
+        "interactions": [{"id": f"{a}_x_{b}", "label": f"{a} × {b}"} for a, b in INTERACTIONS],
         "rank_metrics": [{"key": k, "label": lbl, "is_pct": p} for k, lbl, p in RANK_METRICS],
         "outcomes": [{"key": k, "label": lbl, "is_pct": p} for k, lbl, p in OUTCOME_SPECS],
     }
@@ -838,14 +961,29 @@ def render_html(
       </div>
     </div>
 
-    <h3>Part A: Controlled Main Effects of the 6 Knobs (Town-Clustered SEs + Holm p-value)</h3>
+    <h3>Part A: Controlled 10-Test Spec Model (6 Main Knobs + 4 Interactions, Town-Clustered SEs + Holm across 10)</h3>
     <div class="controls">
       <label>Outcome: <select id="outcome-select"></select></label>
       <span class="meta" id="knob-meta"></span>
     </div>
     <div class="scroll" id="knob-table"></div>
 
-    <h3>Part B: Top 10 Strongest &amp; Bottom 10 Weakest Source DNAs (Out of 64)</h3>
+    <h3>Part B: 4 Planned Interaction Pairs — 16-DNA Controlled Combos &amp; Pairwise Comparisons</h3>
+    <div class="controls">
+      <div class="btn-group" id="pair-btns">
+        <button class="btn active" data-val="closeness_x_reliability">closeness &times; reliability</button>
+        <button class="btn" data-val="authority_x_reliability">authority &times; reliability</button>
+        <button class="btn" data-val="wealth_x_reliability">wealth &times; reliability</button>
+        <button class="btn" data-val="closeness_x_authority">closeness &times; authority</button>
+      </div>
+      <span class="meta">Controls for the other 4 knobs + artist; each combo pools all 16 matching DNAs (624 towns per model).</span>
+    </div>
+    <div class="grid-2">
+      <div><h4>4 Combo Controlled Means (95% CI)</h4><div class="scroll" id="combo-table"></div></div>
+      <div><h4>Conditional Simple Comparisons Inside the 2&times;2</h4><div class="scroll" id="simple-table"></div></div>
+    </div>
+
+    <h3>Part C: Top 10 Strongest &amp; Bottom 10 Weakest Source DNAs (Out of 64)</h3>
     <div class="controls">
       <label>Rank by Metric / Categorical Label: <select id="rank-select"></select></label>
       <span class="meta" id="dna-note"></span>
@@ -859,7 +997,7 @@ def render_html(
 
 <script>
 const DATA = {payload_json};
-let state = {{ model: "deepseek_v4_flash", pov: "source", outcome: "belief", rankMetric: "belief" }};
+let state = {{ model: "deepseek_v4_flash", pov: "source", outcome: "belief", pair: "closeness_x_reliability", rankMetric: "belief" }};
 
 const outSel = document.getElementById("outcome-select");
 DATA.outcomes.forEach(o => {{
@@ -884,7 +1022,8 @@ function wireButtons(id, key) {{
 }}
 wireButtons("model-btns", "model");
 wireButtons("pov-btns", "pov");
-outSel.onchange = e => {{ state.outcome = e.target.value; renderKnobs(); }};
+wireButtons("pair-btns", "pair");
+outSel.onchange = e => {{ state.outcome = e.target.value; renderKnobs(); renderInteractions(); }};
 rankSel.onchange = e => {{ state.rankMetric = e.target.value; renderDNA(); }};
 
 function fmtP(p) {{ return p == null ? "—" : (p < 1e-4 ? "&lt;0.0001" : p.toFixed(4)); }}
@@ -900,14 +1039,17 @@ function renderKnobs() {{
   document.getElementById("knob-meta").textContent = `N = ${{rows[0].n_obs.toLocaleString()}} observations across ${{rows[0].n_towns.toLocaleString()}} towns (clustered by run_id)`;
   const fv = v => v == null ? "—" : (isPct ? v.toFixed(2) + "%" : v.toFixed(4));
   const fe = v => v == null ? "—" : (isPct ? (v >= 0 ? "+" : "") + v.toFixed(2) + " pp" : (v >= 0 ? "+" : "") + v.toFixed(4));
-  let h = `<table><thead><tr><th>Knob</th><th>Contrast (A &minus; B)</th><th class="num">Mean A</th><th class="num">Mean B</th><th class="num">Controlled Effect</th><th class="num">95% CI</th><th class="num">p (Clustered)</th><th class="num">p (Holm)</th>`;
+  let h = `<table><thead><tr><th>Type</th><th>Contrast</th><th>Detail (A &minus; B)</th><th class="num">A</th><th class="num">B</th><th class="num">Controlled Effect</th><th class="num">95% CI</th><th class="num">p (Clustered)</th><th class="num">p (Holm 10)</th>`;
   if (isBelief) h += `<th class="num">LMM Check (run_id RE)</th>`;
   h += `</tr></thead><tbody>`;
   rows.forEach(r => {{
     const sig = r.p_holm < 0.05;
     const cls = !sig ? "ns" : (r.effect >= 0 ? "sig-pos" : "sig-neg");
     const ci = `[${{fe(r.ci_low).replace(" pp","")}}, ${{fe(r.ci_high)}}]`;
-    h += `<tr><td><b>${{r.factor}}</b></td><td><code>${{r.contrast}}</code></td><td class="num">${{fv(r.mean_a)}}</td><td class="num">${{fv(r.mean_b)}}</td><td class="num ${{cls}}">${{fe(r.effect)}}${{stars(r.p_holm)}}</td><td class="num">${{ci}}</td><td class="num">${{fmtP(r.p_clustered)}}</td><td class="num ${{cls}}">${{fmtP(r.p_holm)}}</td>`;
+    const ma = r.test_type === "interaction" ? fe(r.mean_a) : fv(r.mean_a);
+    const mb = r.test_type === "interaction" ? fe(r.mean_b) : fv(r.mean_b);
+    const badge = r.test_type === "interaction" ? "interaction" : "main";
+    h += `<tr class="${{r.test_type === 'interaction' ? 'row-overall' : ''}}"><td><span class="pill">${{badge}}</span></td><td><b>${{r.factor}}</b></td><td><code>${{r.contrast}}</code></td><td class="num">${{ma}}</td><td class="num">${{mb}}</td><td class="num ${{cls}}">${{fe(r.effect)}}${{stars(r.p_holm)}}</td><td class="num">${{ci}}</td><td class="num">${{fmtP(r.p_clustered)}}</td><td class="num ${{cls}}">${{fmtP(r.p_holm)}}</td>`;
     if (isBelief) {{
       const lmm = r.lmm_effect != null ? `${{(r.lmm_effect>=0?"+":"")+r.lmm_effect.toFixed(4)}} (p=${{fmtP(r.lmm_p)}})` : r.lmm_status;
       h += `<td class="num">${{lmm}}</td>`;
@@ -916,6 +1058,33 @@ function renderKnobs() {{
   }});
   h += `</tbody></table>`;
   document.getElementById("knob-table").innerHTML = h;
+}}
+
+function renderInteractions() {{
+  const cRows = DATA.combos.filter(r => r.model_key === state.model && r.pov === state.pov && r.outcome === state.outcome && r.pair_id === state.pair);
+  const sRows = DATA.simple.filter(r => r.model_key === state.model && r.pov === state.pov && r.outcome === state.outcome && r.pair_id === state.pair);
+  if (!cRows.length) return;
+  const isPct = cRows[0].unit === "pp";
+  const fv = v => v == null ? "—" : (isPct ? v.toFixed(2) + "%" : v.toFixed(4));
+  const fe = v => v == null ? "—" : (isPct ? (v >= 0 ? "+" : "") + v.toFixed(2) + " pp" : (v >= 0 ? "+" : "") + v.toFixed(4));
+
+  let ch = `<table><thead><tr><th>16-DNA Combo</th><th class="num">Controlled Mean</th><th class="num">95% CI</th><th class="num">Clustered SE</th></tr></thead><tbody>`;
+  cRows.forEach(r => {{
+    const ci = `[${{fv(r.ci_low).replace("%","")}}, ${{fv(r.ci_high)}}]`;
+    ch += `<tr><td><b><code>${{r.combo_label}}</code></b></td><td class="num strong">${{fv(r.mean)}}</td><td class="num">${{ci}}</td><td class="num">${{fv(r.se_clustered)}}</td></tr>`;
+  }});
+  ch += `</tbody></table>`;
+  document.getElementById("combo-table").innerHTML = ch;
+
+  let sh = `<table><thead><tr><th>Comparison</th><th>Combos Compared</th><th class="num">Hi Mean</th><th class="num">Lo Mean</th><th class="num">Diff</th><th class="num">95% CI</th><th class="num">p (Clustered)</th></tr></thead><tbody>`;
+  sRows.forEach(r => {{
+    const sig = r.p_clustered < 0.05;
+    const cls = !sig ? "ns" : (r.effect >= 0 ? "sig-pos" : "sig-neg");
+    const ci = `[${{fe(r.ci_low).replace(" pp","")}}, ${{fe(r.ci_high)}}]`;
+    sh += `<tr><td><b>${{r.comparison}}</b></td><td><code>${{r.combo_contrast}}</code></td><td class="num">${{fv(r.mean_hi)}}</td><td class="num">${{fv(r.mean_lo)}}</td><td class="num ${{cls}}">${{fe(r.effect)}}${{stars(r.p_clustered)}}</td><td class="num">${{ci}}</td><td class="num ${{cls}}">${{fmtP(r.p_clustered)}}</td></tr>`;
+  }});
+  sh += `</tbody></table>`;
+  document.getElementById("simple-table").innerHTML = sh;
 }}
 
 function dnaTableHtml(list, col, isPct) {{
@@ -955,7 +1124,7 @@ function renderDNA() {{
   document.getElementById("dna-bot").innerHTML = dnaTableHtml(bot10, col, meta.is_pct);
 }}
 
-function renderAll() {{ renderKnobs(); renderDNA(); }}
+function renderAll() {{ renderKnobs(); renderInteractions(); renderDNA(); }}
 renderAll();
 </script>
 </body>
@@ -974,7 +1143,7 @@ def build_single_report(
     table_a, table_b = compute_summary_tables(df, cond)
     dyadic_df = compute_dyadic_gatekeeper(dyadic, cond)
     dna_df = compute_dna_metrics(df, cond, dyadic)
-    knobs_df = compute_knob_effects(df)
+    knobs_df, combos_df, simple_df = compute_knob_effects(df)
 
     csv_dir = out_dir / "csv"
     csv_dir.mkdir(parents=True, exist_ok=True)
@@ -983,16 +1152,25 @@ def build_single_report(
     dyadic_df.to_csv(csv_dir / "dyadic_gatekeeper.csv", index=False)
     dna_df.to_csv(csv_dir / "dna_rankings_all64.csv", index=False)
     knobs_df.to_csv(csv_dir / "knob_effects.csv", index=False)
+    combos_df.to_csv(csv_dir / "interaction_combos.csv", index=False)
+    simple_df.to_csv(csv_dir / "interaction_simple_effects.csv", index=False)
 
     (out_dir / "report.md").write_text(
-        render_markdown(condition_type, table_a, table_b, dyadic_df, dna_df, knobs_df),
+        render_markdown(condition_type, table_a, table_b, dyadic_df, dna_df, knobs_df, combos_df, simple_df),
         encoding="utf-8",
     )
     (out_dir / "report.html").write_text(
-        render_html(condition_type, table_a, table_b, dyadic_df, dna_df, knobs_df),
+        render_html(condition_type, table_a, table_b, dyadic_df, dna_df, knobs_df, combos_df, simple_df),
         encoding="utf-8",
     )
-    return {"condition": condition_type, "out_dir": str(out_dir), "knobs_rows": len(knobs_df), "dna_rows": len(dna_df)}
+    return {
+        "condition": condition_type,
+        "out_dir": str(out_dir),
+        "knobs_rows": len(knobs_df),
+        "combos_rows": len(combos_df),
+        "simple_rows": len(simple_df),
+        "dna_rows": len(dna_df),
+    }
 
 
 def main() -> None:
