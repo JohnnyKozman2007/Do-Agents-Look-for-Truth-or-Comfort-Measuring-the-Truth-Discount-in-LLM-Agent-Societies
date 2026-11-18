@@ -1,4 +1,48 @@
 \section{Introduction}
 \label{sec:intro}
 
-% Section 1 content goes here.
+Large language models (LLMs) can act as agents that exchange information and coordinate activities in simulated social environments~\citep{park2023generative,chuang-etal-2024-simulating}. When an agent receives a claim, it can rely on the source, seek evidence, and discuss what it heard with others. The source's authority, track record, and relationship to the listener provide cues for evaluating the claim. Checking can supply evidence for a later conversation, so source influence can extend beyond the original recipient. Greater support for a source's claims can reflect increased acceptance in both true and false cases. We ask whether source attributes also change the gap in expressed support between true and false claims when listeners have access to verification.
+
+Prior work has examined several parts of this process. Studies of conflicting information show that LLMs can favor institutionally backed sources, with preferences that can shift when competing information is repeated~\citep{schuster-etal-2026-whose}. MixTalk studies a sender--receiver game in which the receiver allocates a limited budget to verifying claims~\citep{mahmud2026verification}. FUSE examines how news changes as it circulates among agents assigned roles such as spreading, commenting, and fact-checking~\citep{liu-etal-2025-stepwise}.
+
+To characterize a source preference, we compare how the same source attribute changes support in true and false conditions. Equal changes in both conditions leave the gap unchanged; unequal changes increase or decrease it. A source's authority can also be paired with different track records or relationships to the listener. An average effect of authority can conceal differences across these profiles. The factorial comparison examines whether an attribute's effect depends on the other cues presented with it, such as whether closeness has different effects for sources with good and poor stated track records. The main experiment addresses two questions:
+
+% Editorial mapping to docs/01_experimental_spec.md, Core Research Questions:
+% RQ1 groups original questions 1 (social proximity) and 3 (demographics).
+% RQ2 groups original questions 2 (override) and 4 (authority/closeness synergy).
+% The override question is expressed through condition-specific support and
+% interactions, without attributing forgiveness or comfort-seeking motives.
+% A combined profile having the smallest gap is distinct from an interaction.
+% Preserve the original directional predictions in the hypothesis/analysis
+% account and document any revisions; this regrouping is not a new analysis
+% registration. Checking and relay remain secondary behavioral measures.
+
+\begin{description}
+    \item[\textcolor{rqattributes}{RQ1: Source attributes.}] How does the true--false gap in expressed support among listeners who mention the claim vary with individual source attributes?
+    \item[\textcolor{rqinteractions}{RQ2: Attribute interactions.}] How do source attributes interact in shaping expressed support for true and false claims and the gap between them?
+    % Optional RQ3 corresponds to original question 5 (direct conflict).
+    % Include it when validated two-source probe results enter the paper,
+    % together with the corresponding design and outcome descriptions.
+    % \item[\textcolor{rqconflict}{RQ3: Conflicting sources.}] How do the profiles of two sources making conflicting claims affect which claim listeners support?
+\end{description}
+
+% 3. Research question and design
+The experiment crosses 64 source profiles with true and false concert announcements in a simulated town, using two LLMs under a common scenario and interaction schedule. The profiles comprise all combinations of six binary attributes: closeness, authority, stated reliability, wealth, age, and gender. Within each profile, matched runs share the noticeboard and listener arrangement; the source announces the listed artist in the true run and another artist in the false run. First-hand listeners can relay the announcement to second-hand listeners; both groups receive the source profile and can check the official noticeboard at a fixed simulated cost. The common noticeboard fixes the evidence available through verification within each matched pair, while the decision to inspect it remains with the listener.
+
+% 4. Outcomes and interpretation
+We assess expressed stance in listeners' phone conversations, with higher scores indicating greater support for the announced claim. As a descriptive summary for each matched town pair, the \emph{truth discount} is the true town's mean stance score minus the false town's mean, using valid responses that mention the claim. Each condition's stance distribution and omission rate accompany this gap, since source conditions can also change which listeners mention the claim. A small gap can accompany broad endorsement of both claims or skepticism toward both; these patterns have different implications for information sharing. Checking decisions and concert mentions during relay describe evidence acquisition and communication under the same source conditions, with second-hand stance reported separately.
+
+% Analysis alignment: the paired-town summary defined above and the conditional
+% listener-level LMM contrasts in confirmatory_analysis.py have different
+% estimands. Once the team freezes the analysis policy, identify the primary
+% estimand consistently in Methods and Results; do not describe the LMM
+% contrasts as tests of the mean paired-town truth discount.
+% Condition-specific support interactions and interactions in the true--false
+% gap are distinct contrasts. Do not present additional support contrasts as
+% confirmatory tests without specifying them in the analysis/multiplicity plan.
+
+% 5. Empirical findings (pending validated analysis)
+% Complete the Introduction with findings that answer RQ1 and RQ2, including
+% effect sizes and uncertainty where appropriate, and agreement or differences
+% across the two models. Use the frozen analysis policy and validated judge
+% and main-study results; do not substitute another summary of the procedure.
