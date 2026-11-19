@@ -9,6 +9,11 @@
 \frenchspacing  % DO NOT CHANGE THIS
 \usepackage{amsmath,amssymb,booktabs}
 
+% Research-question colors (xcolor is loaded by aaai2027).
+\definecolor{rqattributes}{HTML}{0072B2}
+\definecolor{rqinteractions}{HTML}{A65300}
+\definecolor{rqconflict}{HTML}{7A3E9D}
+
 % PDF Metadata (Do not add /Title or /Author tags during anonymous submission)
 \pdfinfo{
 /TemplateVersion (2027.1)
@@ -46,7 +51,51 @@
 \section{Introduction}
 \label{sec:intro}
 
-% Section 1 content goes here.
+Large language models (LLMs) can act as agents that exchange information and coordinate activities in simulated social environments~\citep{park2023generative,chuang-etal-2024-simulating}. When an agent receives a claim, it can rely on the source, seek evidence, and discuss what it heard with others. The source's authority, track record, and relationship to the listener provide cues for evaluating the claim. Checking can supply evidence for a later conversation, so source influence can extend beyond the original recipient. Greater support for a source's claims can reflect increased acceptance in both true and false cases. We ask whether source attributes also change the gap in expressed support between true and false claims when listeners have access to verification.
+
+Prior work has examined several parts of this process. Studies of conflicting information show that LLMs can favor institutionally backed sources, with preferences that can shift when competing information is repeated~\citep{schuster-etal-2026-whose}. MixTalk studies a sender--receiver game in which the receiver allocates a limited budget to verifying claims~\citep{mahmud2026verification}. FUSE examines how news changes as it circulates among agents assigned roles such as spreading, commenting, and fact-checking~\citep{liu-etal-2025-stepwise}.
+
+To characterize a source preference, we compare how the same source attribute changes support in true and false conditions. Equal changes in both conditions leave the gap unchanged; unequal changes increase or decrease it. A source's authority can also be paired with different track records or relationships to the listener. An average effect of authority can conceal differences across these profiles. The factorial comparison examines whether an attribute's effect depends on the other cues presented with it, such as whether closeness has different effects for sources with good and poor stated track records. The main experiment addresses two questions:
+
+% Editorial mapping to docs/01_experimental_spec.md, Core Research Questions:
+% RQ1 groups original questions 1 (social proximity) and 3 (demographics).
+% RQ2 groups original questions 2 (override) and 4 (authority/closeness synergy).
+% The override question is expressed through condition-specific support and
+% interactions, without attributing forgiveness or comfort-seeking motives.
+% A combined profile having the smallest gap is distinct from an interaction.
+% Preserve the original directional predictions in the hypothesis/analysis
+% account and document any revisions; this regrouping is not a new analysis
+% registration. Checking and relay remain secondary behavioral measures.
+
+\begin{description}
+    \item[\textcolor{rqattributes}{RQ1: Source attributes.}] How does the true--false gap in expressed support among listeners who mention the claim vary with individual source attributes?
+    \item[\textcolor{rqinteractions}{RQ2: Attribute interactions.}] How do source attributes interact in shaping expressed support for true and false claims and the gap between them?
+    % Optional RQ3 corresponds to original question 5 (direct conflict).
+    % Include it when validated two-source probe results enter the paper,
+    % together with the corresponding design and outcome descriptions.
+    % \item[\textcolor{rqconflict}{RQ3: Conflicting sources.}] How do the profiles of two sources making conflicting claims affect which claim listeners support?
+\end{description}
+
+% 3. Research question and design
+The experiment crosses 64 source profiles with true and false concert announcements in a simulated town, using two LLMs under a common scenario and interaction schedule. The profiles comprise all combinations of six binary attributes: closeness, authority, stated reliability, wealth, age, and gender. Within each profile, matched runs share the noticeboard and listener arrangement; the source announces the listed artist in the true run and another artist in the false run. First-hand listeners can relay the announcement to second-hand listeners; both groups receive the source profile and can check the official noticeboard at a fixed simulated cost. The common noticeboard fixes the evidence available through verification within each matched pair, while the decision to inspect it remains with the listener.
+
+% 4. Outcomes and interpretation
+We assess expressed stance in listeners' phone conversations, with higher scores indicating greater support for the announced claim. As a descriptive summary for each matched town pair, the \emph{truth discount} is the true town's mean stance score minus the false town's mean, using valid responses that mention the claim. Each condition's stance distribution and omission rate accompany this gap, since source conditions can also change which listeners mention the claim. A small gap can accompany broad endorsement of both claims or skepticism toward both; these patterns have different implications for information sharing. Checking decisions and concert mentions during relay describe evidence acquisition and communication under the same source conditions, with second-hand stance reported separately.
+
+% Analysis alignment: the paired-town summary defined above and the conditional
+% listener-level LMM contrasts in confirmatory_analysis.py have different
+% estimands. Once the team freezes the analysis policy, identify the primary
+% estimand consistently in Methods and Results; do not describe the LMM
+% contrasts as tests of the mean paired-town truth discount.
+% Condition-specific support interactions and interactions in the true--false
+% gap are distinct contrasts. Do not present additional support contrasts as
+% confirmatory tests without specifying them in the analysis/multiplicity plan.
+
+% 5. Empirical findings (pending validated analysis)
+% Complete the Introduction with findings that answer RQ1 and RQ2, including
+% effect sizes and uncertainty where appropriate, and agreement or differences
+% across the two models. Use the frozen analysis policy and validated judge
+% and main-study results; do not substitute another summary of the procedure.
 
 % --- END INLINED sections/01_introduction.tex ---
 
@@ -95,48 +144,39 @@ In contrast, we test a full $2^6 = 64$ factorial space, crossing six binary trai
 \section{Methodology and Experimental Design}
 \label{sec:methodology}
 
-To measure the Truth Discount in LLM agent societies, we construct a controlled multi-agent environment that isolates source-attribute biases from message content, linguistic confounds, and stochastic variance.
+To measure the Truth Discount ($\text{TD} = \text{Truth} - \text{Rumor}$) in LLM agent societies, we construct a controlled multi-agent environment that isolates source-attribute biases from message content, linguistic confounds, and stochastic variance.
 
-\subsection{Environment, Verification \& Semantic Mirroring}
+\subsection{Environment, Checking \& Semantic Mirroring}
 \label{sec:env_design}
-Simulations take place in the fictional town of \textit{Alder Creek} (population $\sim$4,000; \$40 weekly character budget). The objective ground truth is a physical noticeboard outside the Community Hall legally listing all municipal weekend events. Inspecting the board requires a \$5 cross-town bus fare, creating an economic trade-off between trusting social claims for free versus paying to verify facts.
+Simulations take place in the fictional town of \textit{Alder Creek} (population $\sim$4,000; \$40 weekly character budget). The objective ground truth is a physical noticeboard outside the Community Hall legally listing all municipal weekend events. Checking the board requires a \$5 cross-town bus fare, creating an economic trade-off between trusting social claims for free versus paying to check the facts.
 
-To eliminate LLM direct-negation bias while maintaining identical conversational salience and perceived value across conditions, both truth claims and rumors are framed as an exciting, free surprise pop concert involving two invented artists vetted to have zero real-world footprint: \textit{Vesper Vance} and \textit{Kaelen Cross}. In a \textbf{Truth Twin} run, the source announces the real artist (confirmed on the noticeboard); in a \textbf{Rumor Twin} run, the source announces the false artist while the noticeboard still advertises the real performer, proving the rumor false.
+To eliminate LLM direct-negation bias while maintaining identical conversational salience and perceived value across twins, both Truth and Rumor claims are framed as an exciting, free surprise pop concert involving two invented artists vetted to have zero real-world footprint: \textit{Vesper Vance} and \textit{Kaelen Cross}. In a \textbf{Truth twin} run, the source announces the real artist (confirmed on the noticeboard); in a \textbf{Rumor twin} run, the source announces the false artist while the noticeboard still advertises the real performer, disproving the rumor.
 
 \subsection{Counterbalancing \& Bias Elimination Controls}
 \label{sec:bias_controls}
 We enforce strict methodological controls to eliminate non-source confounds:
 \begin{enumerate}
-    \item \textbf{Artist Counterbalancing \& Odd-Seed Alternation:} Across runs, each artist is the true performer in exactly 50\% of conditions. Because each cell has 39 seeds ($13\text{ layouts} \times 3\text{ repetitions}$), we partition seeds into a 20/19 split ($\approx$51.3\% vs.\ 48.7\%) and alternate the majority artist across consecutive cells, achieving an exact global 50/50 balance.
+    \item \textbf{Artist Counterbalancing \& Odd-Seed Alternation:} Across runs, each artist is the true performer in exactly 50\% of source profiles. Because each profile has 39 seeds ($13\text{ layouts} \times 3\text{ repetitions}$), we partition seeds into a 20/19 split ($\approx$51.3\% vs.\ 48.7\%) and alternate the majority artist across consecutive profiles, achieving an exact global 50/50 balance.
     \item \textbf{Lore Decoupling:} The shared world prompt introduces artists in fixed alphabetical order, decoupled from ground truth.
-    \item \textbf{Latin Square Seating ($13 \times 13$):} 13 gender-neutral personas with mid-status occupations (excluding transit or authoritative roles) rotate through all 13 town seats via a cyclic Latin Square (Source: $1/13$; First-Hand listener: $6/13$; Second-Hand listener: $6/13$).
-    \item \textbf{Dyadic Twin Matching:} Afternoon catch-up pairs are mathematically fixed ($\text{Seat } i \leftrightarrow \text{Seat } i+6$), and twin pairs share the identical seed, seating, and pairings.
-    \item \textbf{Order \& Role Balancing in Probes:} Two-source departure order is counterbalanced 50/50, and Persona 14 (\textit{Parker}) is swapped 50/50 between source positions.
-    \item \textbf{Peer Contagion Elimination \& Context Hygiene:} Sources announce news as a one-way departure broadcast when leaving the caf\'{e}, eliminating table debate before verification decisions. Prompts omit experimental meta-tags (e.g., \texttt{[AGENT]}, \texttt{[SIMULATION]}) to prevent artificial hyper-rational safety behaviors.
+    \item \textbf{Latin Square Seating ($13 \times 13$):} 13 gender-neutral personas with mid-status occupations (excluding transit or authoritative roles) rotate through all 13 town seats via a cyclic Latin Square (Source: $1/13$; first-hand listener: $6/13$; second-hand listener: $6/13$).
+    \item \textbf{Dyadic Twin Matching:} Afternoon catch-up pairs are mathematically fixed ($\text{Seat } i \leftrightarrow \text{Seat } i+6$), and matched Truth and Rumor twins share the identical seed, seating, and pairings.
+    \item \textbf{Peer Contagion Elimination \& Context Hygiene:} Sources announce news as a one-way departure broadcast when leaving the caf\'{e}, eliminating table debate before checking decisions. Prompts omit experimental meta-tags (e.g., \texttt{[AGENT]}, \texttt{[SIMULATION]}) to prevent artificial hyper-rational safety behaviors.
 \end{enumerate}
 
 \subsection{Factorial Grid \& Simulation State Machine}
 \label{sec:factorial_workflow}
-The main experiment manipulates \textbf{6 binary source attributes} ($2^6 = 64$ factorial cells): \textbf{Closeness} (Stranger vs.\ Friend), \textbf{Authority} (Citizen vs.\ Mayor), \textbf{Reliability} (Poor vs.\ Good record), \textbf{Wealth} (Poor vs.\ Rich), \textbf{Age} (Young vs.\ Old), and \textbf{Gender} (Man vs.\ Woman). Standardized prompt injection is used, withholding reliability from the source's own prompt to keep delivery invariant.
+The main experiment manipulates \textbf{six binary source attributes} ($2^6 = 64$ source profiles): \textbf{reliability} (\texttt{good\_record} vs.\ \texttt{poor\_record}), \textbf{closeness} (\texttt{close\_friend} vs.\ \texttt{stranger}), \textbf{wealth} (\texttt{rich} vs.\ \texttt{poor}), \textbf{authority} (\texttt{mayor} vs.\ \texttt{citizen}), \textbf{age} (\texttt{old} vs.\ \texttt{young}), and \textbf{gender} (\texttt{woman} vs.\ \texttt{man}). Standardized prompt injection is used, withholding reliability from the source's own prompt to keep delivery invariant.
 
 Each town executes chronologically through five scenes: 
-(1)~\textit{Morning Broadcast:} The Source announces the concert while exiting the Maple Street Caf\'{e} table with 6 First-Hand listeners;
-(2)~\textit{First-Hand Verification:} The 6 first-hand listeners independently make a deterministic binary choice (\texttt{GO} vs.\ \texttt{SKIP} at $T=0.0$; \texttt{GO} incurs \$5 and reveals the poster);
-(3)~\textit{Afternoon Catch-Up:} Each First-Hand listener talks 1-on-1 with a Second-Hand listener in a 4-turn dialogue; we analyze this transcript directly to determine social transmission: \textit{did they pass on the rumor and the verified noticeboard evidence (yes/no)?};
-(4)~\textit{Second-Hand Verification:} Second-hand listeners independently make the \$5 \texttt{GO}/\texttt{SKIP} decision; and
-(5)~\textit{Evening Phone Call:} \textbf{All 12 listeners (both First- and Second-Hand)} converse with a scripted out-of-town loved one via a 4-step progressive funnel: (i)~general daily life (``How was your day?''), (ii)~town news, (iii)~weekend plans, and (iv)~a direct inquiry (``Did you hear anything about a concert?''). Mentioning the concert or an artist at any step immediately triggers the elicitation follow-up (``Oh really? What's the story there?''); persistent evasion through step~(iv) logs \texttt{NOT\_MENTIONED}. We analyze this final response for \textbf{Belief}, categorized by the Blind Judge into one of 6 standardized buckets.
-
-\subsection{Two-Source Conflict Probes}
-\label{sec:probes}
-To evaluate belief under direct contradiction, we expand the town to 14 agents (2 Sources, 12 Listeners) using the Top 10 most persuasive liar profiles from the main factorial:
-\begin{itemize}
-    \item \textbf{Probe 1 (The Truth Table):} Pits two sources with identical profiles in \textit{Consensus Lie}, \textit{Consensus Truth}, and \textit{Direct Conflict} (one claims false, one claims true).
-    \item \textbf{Probe 2 (The Anti-Agent):} Pits the liar profiles against a truth-telling Anti-Agent in three configurations: \textit{Flip All} (all 6 traits inverted), \textit{Flip Social} (Closeness and Authority inverted), and \textit{Flip Demographics} (Age and Gender inverted).
-\end{itemize}
+(1)~\textit{Morning Broadcast:} The Source announces the concert while exiting the Maple Street Caf\'{e} table with 6 first-hand listeners;
+(2)~\textit{First-Hand Checking:} The 6 first-hand listeners independently make a deterministic binary checking choice (\texttt{GO} vs.\ \texttt{SKIP} at $T=0.0$; \texttt{GO} incurs \$5 and reveals the noticeboard poster);
+(3)~\textit{Afternoon Catch-Up:} Each first-hand listener talks 1-on-1 with a second-hand listener in a 4-turn dialogue; we analyze this transcript directly to determine social transmission: \textit{did they pass on the claim and the checked noticeboard evidence (yes/no)?};
+(4)~\textit{Second-Hand Checking:} The 6 second-hand listeners independently make the \$5 \texttt{GO}/\texttt{SKIP} checking decision; and
+(5)~\textit{Evening Phone Call:} \textbf{All-12 listeners (both first- and second-hand)} converse with a scripted out-of-town loved one via a 4-step progressive funnel: (i)~general daily life (``How was your day?''), (ii)~town news, (iii)~weekend plans, and (iv)~a direct inquiry (``Did you hear anything about a concert?''). Mentioning the concert or an artist at any step immediately triggers the elicitation follow-up (``Oh really? What's the story there?''); persistent evasion through step~(iv) logs \texttt{NOT\_MENTIONED}. We analyze this final response for belief, categorized by the blind judge into one of six standardized buckets.
 
 \subsection{Sampling Matrix \& Evaluated Models}
 \label{sec:sampling_totals}
-Each cell evaluates 13 Latin Square layouts across 3 stochastic repetitions ($T=0.7$, $\text{top\_p}=0.95$), yielding 39 seeds per cell. As summarized in Table~\ref{tab:run_totals}, the suite contains \textbf{7,644 runs per model} across the Main Factorial (4,992), Pilot (312), Probe 1 (1,170), and Probe 2 (1,170). The full suite is executed across two open-weights model families via DeepInfra: \textbf{DeepSeek-V4-Flash} (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and \textbf{Qwen3.8-Flash} (\texttt{Qwen/Qwen3.8-Flash}), totaling \textbf{15,288 simulation runs}.
+Each of the 64 source profiles is evaluated across 13 Latin Square layouts and 3 stochastic repetitions ($T=0.7$, $\text{top\_p}=0.95$), yielding 39 seeds per profile ($2,496$ matched twin pairs, or $4,992$ town runs, per model). Across our two open-weights model families executed via DeepInfra---\textbf{DeepSeek} (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and \textbf{Qwen} (\texttt{Qwen/Qwen3.8-Flash})---the Main Factorial comprises \textbf{4,992 matched twin pairs} ($9,984$ town runs and $119,808$ listener observations; Table~\ref{tab:run_totals}), supplemented by a 4-profile Pilot Study ($312$ runs per model).
 
 \begin{table}[t]
 \centering
@@ -145,28 +185,25 @@ Each cell evaluates 13 Latin Square layouts across 3 stochastic repetitions ($T=
 \toprule
 \textbf{Module} & \textbf{Design / Conditions} & \textbf{1 Rep} & \textbf{3 Reps} \\
 \midrule
-Main Factorial & 64 cells $\times$ 2 twins & 1,664 & 4,992 \\
-Pilot Study & 4 cells $\times$ 2 twins & 104 & 312 \\
-Probe 1 (Truth Table) & 10 DNAs $\times$ 3 configs & 390 & 1,170 \\
-Probe 2 (Anti-Agent) & 10 DNAs $\times$ 3 configs & 390 & 1,170 \\
+Main Factorial & 64 profiles $\times$ 2 twins ($2,496$ pairs) & 1,664 & 4,992 \\
+Pilot Study & 4 profiles $\times$ 2 twins ($156$ pairs) & 104 & 312 \\
 \midrule
-\textbf{Total per Model} & \textbf{196 conditions} & \textbf{2,548} & \textbf{7,644} \\
+\textbf{Total per Model} & \textbf{136 conditions ($2,652$ pairs)} & \textbf{1,768} & \textbf{5,304} \\
 \bottomrule
 \end{tabular*}
-\caption{Simulation run matrix across experimental modules.}
+\caption{Simulation run matrix per model across experimental modules.}
 \label{tab:run_totals}
 \end{table}
 
 \subsection{Evaluation Protocol \& Statistical Analysis}
 \label{sec:eval_stats}
-Belief is evaluated by an independent blind judge---\textbf{Claude Haiku 5.5} (\texttt{claude-haiku-5-5} via Anthropic Messages API, reasoning disabled)---disjoint from agent models to avoid self-preference bias. To validate the automated judge against human ground truth, two co-authors independently annotate a stratified benchmark of 100 transcripts blind to conditions (targeting Cohen's $\kappa \ge 0.85$), with \textbf{GPT-4o} serving as a secondary automated evaluator. 
-
-The judge categorizes the Scene 5 phone calls of all 12 listeners into six discrete buckets: \texttt{FACT} ($1.0$), \texttt{CHECKED\_TRUE} ($1.0$), \texttt{UNCERTAIN} ($0.5$), \texttt{SKEPTICAL} ($0.0$), \texttt{CHECKED\_FALSE} ($0.0$), or \texttt{NOT\_MENTIONED}. The primary metric is the \textbf{Truth Discount}:
+Listener belief in Scene~5 is evaluated by an independent blind judge---\textbf{Gemini~3.7~Flash}---disjoint from the simulation models to avoid self-preference bias, and validated directly against ground-truth simulation \texttt{GO}/\texttt{SKIP} logs. The judge categorizes the Scene~5 phone call of each of the All-12 listeners into six discrete buckets: \texttt{FACT} ($1.0$), \texttt{CHECKED\_TRUE} ($1.0$), \texttt{UNCERTAIN} ($0.5$), \texttt{SKEPTICAL} ($0.0$), \texttt{CHECKED\_FALSE} ($0.0$), or \texttt{NOT\_MENTIONED}. Defining Truth belief and Rumor belief as the mean numeric belief score in the Truth and Rumor twins, our primary outcome is the \textbf{Truth Discount} ($\text{TD}$):
 \begin{equation}
-\Delta \text{Belief}_{c, s} = \text{Belief}_{\text{Truth Twin}, c, s} - \text{Belief}_{\text{Rumor Twin}, c, s}
+\text{TD}_{c, s} = \text{Truth}_{c, s} - \text{Rumor}_{c, s}
 \end{equation}
+ alongside net credulity (Rumor belief minus Truth under-belief, where Truth under-belief is $1 - \text{Truth}$) and checking rates (\texttt{GO}~\%). \texttt{NOT\_MENTIONED} is tracked as an independent omission rate and stress-tested across six scoring schemes (including pessimistic $0.0$ and neutral $0.5$ imputations) plus worst-case omission bounds.
 
-\texttt{NOT\_MENTIONED} is reported as an independent omission rate and bounded by pre-registered pessimistic ($0.0$) and neutral ($0.5$) sensitivity checks. Because the 12 listeners share a town, hypotheses are estimated using Linear Mixed-Effects Models (LMM) with town random intercepts and clustered standard errors. Multiplicity across our 10 planned confirmatory contrasts (evaluating main effects of all six knobs on the Truth Discount alongside key reliability-override and authority-closeness interactions) is controlled via Holm-Bonferroni step-down correction ($\alpha = 0.05$).
+Because listeners within a matched twin pair share a town seed and seating layout, we estimate attribute effects using \textbf{pair-clustered OLS} (for TD, Truth belief, Rumor belief, and bucket rates) and \textbf{pair-clustered logistic regression} (for binary \texttt{GO}/\texttt{SKIP} checking), controlling for all six source attributes, artist, and model. Attribute main effects and $\times\text{Reliability}$ interaction contrasts on TD ($\Delta\text{TD}$) are adjusted for multiplicity via the Holm--Bonferroni step-down procedure ($p_{\text{Holm}}$, $\alpha = 0.05$).
 
 \paragraph{Reproducibility Note.} All simulation code, prompt templates, configuration manifests, and raw trace artifacts are anonymously accessible at: \url{https://anonymous.4open.science/r/echotown-F565/}.
 
@@ -183,7 +220,112 @@ The judge categorizes the Scene 5 phone calls of all 12 listeners into six discr
 \section{Results}
 \label{sec:results}
 
-% Section 5 content goes here.
+Before presenting our main findings, we confirm zero twin leakage and high measurement validity. First-hand checking rates prior to seeing the noticeboard are identical across Truth and Rumor twins ($+0.1\text{ pp}$ pooled, 95\% CI $[-0.3, +0.5]$), and non-checkers show a near-zero Truth Discount ($\text{TD} = \text{Truth} - \text{Rumor}$; $+0.006$, 95\% CI $[-0.002, +0.013]$; 5,000-swap permutation $p = 0.365\text{--}0.812$ across all model-by-layer strata). Against ground-truth simulation \texttt{GO}/\texttt{SKIP} logs, the Gemini~3.7~Flash judge achieves 96.4\% recall / 97.9\% precision on DeepSeek and 93.4\% recall / 99.8\% precision on Qwen (99.9\%--100.0\% direction accuracy). We organize the results into three pillars: (1) skeptical truth-finding and reliability, (2) closeness anomalies, and (3) cross-model and multi-hop dynamics.
+
+\subsection{Skeptical Truth-Finding and the Dominance of Reliability}
+\label{sec:pillar1}
+
+\paragraph{Agents show strong truth discrimination, but err toward under-belief rather than gullibility.}
+Across all 4,992 matched twin pairs (119,808 listener observations), paired-town comparisons yield a large, positive All-12 TD of $+0.723$ (95\% CI $[0.717, 0.729]$; Truth belief $0.763$ vs.\ Rumor belief $0.039$; Table~\ref{tab:overall_summary}). Mean TD remains strongly positive at both the first-hand ($+0.684$, 95\% CI $[0.675, 0.694]$) and second-hand ($+0.763$, 95\% CI $[0.758, 0.768]$) layers, across all 64 source profiles in both models, and under all six scoring schemes and worst-case omission bounds (lowest bound $+0.463$, DeepSeek first-hand). Crucially, descriptive error rates show that mistakes stem from doubting Truth claims rather than accepting Rumor claims: All-12 Rumor belief is only $3.9\%$ (DeepSeek $5.9\%$, Qwen $2.0\%$), whereas Truth claims suffer $23.7\%$ under-belief ($1 - \text{Truth}$). In net credulity (Rumor belief minus Truth under-belief), under-belief dominates at both the first-hand layer ($26.7\%$ under-belief vs.\ $4.8\%$ Rumor belief; net $-0.219$, 95\% CI $[-0.227, -0.211]$; DeepSeek $-0.336$, Qwen $-0.102$) and the second-hand layer ($20.7\%$ under-belief vs.\ $3.0\%$ Rumor belief; net $-0.177$; DeepSeek $-0.188$, Qwen $-0.167$).
+
+\begin{table}[ht!]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+\textbf{Model} & \textbf{Layer} & \textbf{Rumor} & \textbf{Truth} & \textbf{TD [95\% CI]} & \textbf{\texttt{GO} (\%)} \\
+\midrule
+Pooled   & 1st-Hand & 0.048 & 0.733 & $+0.684$ $[0.675, 0.694]$ & 70.6 \\
+         & 2nd-Hand & 0.030 & 0.793 & $+0.763$ $[0.758, 0.768]$ & 45.6 \\
+         & All-12   & 0.039 & 0.763 & $+0.723$ $[0.717, 0.729]$ & 58.1 \\
+\midrule
+DeepSeek & 1st-Hand & 0.091 & 0.573 & $+0.482$ $[0.469, 0.495]$ & 48.4 \\
+         & 2nd-Hand & 0.023 & 0.789 & $+0.765$ $[0.757, 0.773]$ & 64.9 \\
+         & All-12   & 0.059 & 0.680 & $+0.621$ $[0.611, 0.631]$ & 56.7 \\
+\midrule
+Qwen     & 1st-Hand & 0.005 & 0.893 & $+0.887$ $[0.881, 0.894]$ & 92.8 \\
+         & 2nd-Hand & 0.036 & 0.797 & $+0.761$ $[0.755, 0.768]$ & 26.2 \\
+         & All-12   & 0.020 & 0.845 & $+0.825$ $[0.819, 0.830]$ & 59.5 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Paired-town mean belief in Rumor and Truth twins, Truth Discount ($\text{TD} = \text{Truth} - \text{Rumor}$) with 95\% CIs, and average checking rate (\texttt{GO} \%) across all 4,992 matched twin pairs (2,496 per model).}
+\label{tab:overall_summary}
+\end{table}
+
+\paragraph{Reliability is the dominant driver of checking and truth discrimination.}
+In All-12 pair-clustered OLS (controlling for all six source attributes, artist, and model), reliability (\texttt{good\_record} vs.\ \texttt{poor\_record}) is the \#1 driver of every primary outcome: it raises TD by $0.276$, checking by $23.0\text{ pp}$, and Truth belief by $0.298$, while cutting \texttt{SKEPTICAL} responses by $30.6\text{ pp}$. Focusing on the first-hand layer, reliability increases checking by $34.9\text{ pp}$ ($88.0\%$ vs.\ $53.1\%$; DeepSeek $+56.0\text{ pp}$, Qwen $+13.9\text{ pp}$; pair-clustered logistic regression $\text{OR} = 16.39$, $p < 0.001$) and raises TD ($\Delta\text{TD}$; Table~\ref{tab:attribute_effects}) by $0.358$ in Holm--Bonferroni--adjusted linear contrasts ($p_{\text{Holm}} < 0.001$; DeepSeek $+0.554$, Qwen $+0.161$). Decomposing these contrasts between Truth and Rumor twins shows that reliability acts by raising Truth belief ($+0.600$ in DeepSeek, $+0.159$ in Qwen) rather than reducing Rumor belief (in DeepSeek, unchecked \texttt{good\_record} rumors even receive a slight $+0.046$ bump).
+
+\begin{table}[ht!]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Contrast / Interaction} & \multicolumn{2}{c}{\textbf{1st-Hand $\Delta\text{TD}$}} & \multicolumn{2}{c}{\textbf{All-12 $\Delta\text{TD}$}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+ & \textbf{DeepSeek} & \textbf{Qwen} & \textbf{DeepSeek} & \textbf{Qwen} \\
+\midrule
+Reliability (\texttt{good\_record}$-$\texttt{poor\_record}) & $+0.554^{***}$ & $+0.161^{***}$ & $+0.408^{***}$ & $+0.140^{***}$ \\
+Closeness (\texttt{close\_friend}$-$\texttt{stranger}) & $+0.114^{***}$ & $+0.121^{***}$ & $+0.089^{***}$ & $+0.077^{***}$ \\
+Wealth (\texttt{rich}$-$\texttt{poor}) & $+0.052^{***}$ & $+0.032^{***}$ & $+0.041^{***}$ & $+0.025^{***}$ \\
+Authority (\texttt{mayor}$-$\texttt{citizen}) & $-0.024^{**}$ & $+0.014^{**}$ & $-0.001$ & $-0.003$ \\
+Age (\texttt{old}$-$\texttt{young}) & $-0.017^{*}$ & $+0.005$ & $-0.018^{***}$ & $+0.005$ \\
+Gender (\texttt{woman}$-$\texttt{man}) & $+0.002$ & $0.000$ & $+0.001$ & $-0.007$ \\
+\midrule
+Closeness $\times$ Reliability & $-0.142^{***}$ & $-0.224^{***}$ & $-0.149^{***}$ & $-0.142^{***}$ \\
+Wealth $\times$ Reliability & $-0.028$ & $-0.065^{***}$ & $-0.044^{***}$ & $-0.051^{***}$ \\
+Authority $\times$ Reliability & $-0.051^{**}$ & $-0.047^{***}$ & $-0.062^{***}$ & $-0.016$ \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Pair-clustered linear contrasts on Truth Discount ($\Delta\text{TD}$) for all six source attributes and key $\times\text{Reliability}$ interactions, by model at the first-hand layer and across All-12 listeners. Holm--Bonferroni significance: $^{*}p_{\text{Holm}}<0.05$, $^{**}p_{\text{Holm}}<0.01$, $^{***}p_{\text{Holm}}<0.001$.}
+\label{tab:attribute_effects}
+\end{table}
+
+\paragraph{Secondary source attributes---wealth and authority---exert modest, distinct effects.}
+Wealth (\texttt{rich} vs.\ \texttt{poor}) ranks as the \#3 All-12 driver in the same OLS model ($+0.033$ TD, $+2.6\text{ pp}$ checking), and at the first-hand layer yields $+0.042$ $\Delta\text{TD}$ alongside a $-0.047$ $\text{Wealth} \times \text{Reliability}$ interaction ($p_{\text{Holm}} < 0.001$ and $p_{\text{Holm}} = 0.012$). Authority (\texttt{mayor} vs.\ \texttt{citizen}) produces a small buffering $\text{Authority} \times \text{Reliability}$ interaction on first-hand TD ($-0.049$, $p_{\text{Holm}} = 0.009$) and increases \texttt{UNCERTAIN} hedging ($+1.3\text{ pp}$, $p < 0.001$) rather than \texttt{SKEPTICAL} responses when listeners skip checking.
+
+\subsection{Closeness Anomalies: Claims from Friends Get Checked More, Not Trusted Blindly}
+\label{sec:pillar2}
+
+\paragraph{Claims from friends are checked more often than claims from strangers, raising TD without increasing Rumor belief.}
+Contrary to ``comfort blindness''---where listeners accept claims from friends without checking---closeness (\texttt{close\_friend} vs.\ \texttt{stranger}) leads to \emph{more} checking and a larger TD. Across All-12 listeners, closeness is the \#2 driver in the pair-clustered OLS model: it lifts TD by $0.083$, checking by $6.8\text{ pp}$, and Truth belief by $0.084$, reduces \texttt{SKEPTICAL} responses by $7.5\text{ pp}$, and leaves Rumor belief unchanged ($+0.001$, $p = 0.52$). The effect is strongest at the first-hand layer, where claims from friends are checked $11.4\text{ pp}$ more often than claims from strangers (pair-clustered logistic regression $\text{OR} = 2.83$, $p < 0.001$; DeepSeek $+11.4\text{ pp}$, Qwen $+11.3\text{ pp}$). First-hand TD rises by $+0.117$ pooled (DeepSeek $+0.114$, Qwen $+0.121$), and a $+0.048$ gain persists at the second-hand layer (DeepSeek $+0.064$, Qwen $+0.033$; All-12 $\Delta\text{TD}$: $+0.089$ and $+0.077$; all $p_{\text{Holm}} < 0.001$, Table~\ref{tab:attribute_effects}). Separate Truth and Rumor contrasts explain why closeness does not induce gullibility: Truth belief climbs ($+0.115$ pooled first-hand; $+0.052$ pooled second-hand, with DeepSeek $+0.066$ and Qwen $+0.038$), whereas Rumor belief stays flat (first-hand $+0.0004$ DeepSeek, $-0.0048$ Qwen; second-hand $+0.0024$ and $+0.0043$, both n.s.).
+
+\paragraph{Closeness acts almost entirely when reliability is poor.}
+Stratifying the pair-clustered model by reliability reveals that this closeness boost comes almost entirely from \texttt{poor\_record} sources. When reliability is poor (\texttt{poor\_record}), closeness boosts first-hand checking by $20.4\text{ pp}$ pooled---jumping from $11.1\%$ to $29.6\%$ in DeepSeek ($+18.5\text{ pp}$) and from $74.6\%$ to $97.0\%$ in Qwen ($+22.4\text{ pp}$)---which lifts Truth belief by $0.214$ at the first-hand layer (DeepSeek $+0.204$, Qwen $+0.224$) and $0.109$ at the second-hand layer (DeepSeek $+0.148$, Qwen $+0.070$), yielding a $+0.209$ first-hand TD gain ($+0.185$ and $+0.233$). Under \texttt{good\_record}, by contrast, checking is already near ceiling for strangers and friends alike ($74.2\%$ vs.\ $78.6\%$ in DeepSeek; $99.6\%$ vs.\ $99.8\%$ in Qwen), so closeness adds only $2.3\text{ pp}$ to first-hand checking, $0.016$ to first-hand Truth belief ($-0.005$ second-hand), and $0.026$ to first-hand TD. Because the closeness effect is large under \texttt{poor\_record} and near zero under \texttt{good\_record}, their difference---the $\text{Closeness} \times \text{Reliability}$ interaction ($\texttt{good\_record} - \texttt{poor\_record}$, Table~\ref{tab:attribute_effects})---is strongly negative on first-hand checking ($-18.2\text{ pp}$ pooled; DeepSeek $-14.1\text{ pp}$, Qwen $-22.2\text{ pp}$, $p < 0.001$) and on $\Delta\text{TD}$ at the first-hand layer ($-0.183$ pooled; DeepSeek $-0.142$, Qwen $-0.224$), the second-hand layer ($-0.108$ pooled; DeepSeek $-0.157$, Qwen $-0.060$), and All-12 ($-0.146$ pooled; DeepSeek $-0.149$, Qwen $-0.142$; all $p_{\text{Holm}} < 0.001$).
+
+\subsection{Cross-Model and Multi-Hop Dynamics}
+\label{sec:pillar3}
+
+\paragraph{First-hand checking diverges sharply by model, while second-hand TD converges.}
+At the first-hand layer, Qwen checks $92.8\%$ of the time versus $48.4\%$ in DeepSeek (pair-clustered logistic $\text{OR} = 32.18$, $p < 0.001$), producing a $-0.405$ TD gap (DeepSeek $+0.482$ vs.\ Qwen $+0.887$, $p < 0.001$). At the second-hand layer, Qwen checking drops to $26.2\%$ while DeepSeek checks $64.9\%$ ($\text{OR} = 0.257$, $p < 0.001$), and both models converge to virtually identical TD (DeepSeek $+0.765$ vs.\ Qwen $+0.761$; difference $+0.003$, $p = 0.49$). In Qwen, having a first-hand partner check (\texttt{Partner GO}, $92.8\%$ of pairs) cuts second-hand checking from $57.5\%$ (\texttt{Partner SKIP}) to $23.8\%$ (\texttt{Partner GO}; $26.2\%$ overall; $-33.7\text{ pp}$, $\text{OR} = 0.214$, $p < 0.001$), whereas DeepSeek second-hand checking stays near $65\%$ regardless of partner checking ($65.2\%$ vs.\ $64.6\%$ unadjusted; adjusted $\text{OR} = 0.586$, $p < 0.001$). Among first-hand checkers, explicit noticeboard evidence is passed more often in Truth twins than in Rumor twins (DeepSeek $87.1\%$ vs.\ $71.8\%$; Qwen $88.9\%$ vs.\ $60.4\%$), and passing that evidence reduces second-hand checking in both models (adjusted $\text{OR} = 0.695$ in DeepSeek vs.\ $0.633$ in Qwen, $p < 0.001$).
+
+\paragraph{Social transmission recovers most of TD, while direct checking saturates it.}
+Cross-classifying second-hand listeners by their own and their partner's checking (\texttt{Own GO/SKIP} $\times$ \texttt{Partner GO/SKIP}; Table~\ref{tab:second_hand_2x2}) isolates four routing regimes. When neither checks (\texttt{Neither Checked}, $10.5\%$ of pairs), TD is zero ($-0.002$, 95\% CI $[-0.009, +0.005]$, $p = 0.60$) with $89.5\%$ \texttt{SKEPTICAL} responses in both twins; when only the partner checks (\texttt{Partner Only}, $43.9\%$ of pairs), social transmission alone yields $+0.730$ TD (DeepSeek $+0.785$ vs.\ Qwen $+0.719$). Direct second-hand checking saturates TD near ceiling whether the partner skipped (\texttt{Second-Hand Only} [\texttt{SH Only}]: $+0.984$) or also checked (\texttt{Both Checked}: $+0.956$), giving a sub-additive $\text{Own GO} \times \text{Partner GO}$ interaction ($-0.759$, $p < 0.001$). Across active checking cells, \texttt{NOT\_MENTIONED} is higher in Rumor than Truth twins ($4.0\%\text{--}9.7\%$ vs.\ $<0.7\%$), yet neutral ($0.5$) omission imputation keeps TD strongly positive ($+0.691$ to $+0.964$).
+
+\begin{table}[ht!]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{2$\times$2 Cell} & \textbf{Share (R / T)} & \textbf{Rumor} & \textbf{Truth} & \textbf{TD [95\% CI]} & \textbf{\texttt{SKEPTICAL} (R / T)} & \textbf{\texttt{NOT\_MENTIONED} (R / T)} \\
+\midrule
+\textbf{Both Checked} (\texttt{Own GO}, \texttt{Partner GO})   & 26.5\% / 26.8\% & 0.004 & 0.961 & $+0.956$ $[0.953, 0.960]$ & 2.0\% / 1.7\%  & 9.7\% / 0.1\% \\
+\textbf{SH Only} (\texttt{Own GO}, \texttt{Partner SKIP})       & 18.8\% / 19.0\% & 0.003 & 0.986 & $+0.984$ $[0.981, 0.987]$ & 1.9\% / 0.5\%  & 4.0\% / $<$0.1\% \\
+\textbf{Partner Only} (\texttt{Own SKIP}, \texttt{Partner GO})  & 44.0\% / 43.8\% & 0.052 & 0.782 & $+0.730$ $[0.723, 0.737]$ & 23.6\% / 13.0\% & 8.2\% / 0.7\% \\
+\textbf{Neither Checked} (\texttt{Own SKIP}, \texttt{Partner SKIP}) & 10.7\% / 10.3\% & 0.047 & 0.045 & $-0.002$ $[-0.009, +0.005]$ & 89.5\% / 89.5\% & 0.9\% / 0.8\% \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Second-hand $2 \times 2$ routing (\texttt{Own GO/SKIP} $\times$ \texttt{Partner GO/SKIP}), pooled across both models: cell share, Rumor and Truth belief, Truth Discount (TD) with 95\% CIs, and \texttt{SKEPTICAL} and \texttt{NOT\_MENTIONED} rates (Rumor / Truth).}
+\label{tab:second_hand_2x2}
+\end{table}
 
 % --- END INLINED sections/05_results.tex ---
 
@@ -197,7 +339,7 @@ The judge categorizes the Scene 5 phone calls of all 12 listeners into six discr
 \subsection{Limitations}
 \label{sec:limitations}
 
-Beyond standard considerations regarding model selection, prompt phrasing, sampling temperature, and random seeds, our simulation design involves four structural limitations:
+Beyond standard considerations regarding model selection, prompt phrasing, sampling temperature, and random seeds, our simulation design involves five structural limitations:
 
 \paragraph{High Verification Cost (\$5 on a \$40 Budget).}
 Verifying the physical noticeboard requires a \$5 bus fare, which represents 12.5\% of an agent's weekly \$40 budget. Although this design forces agents to weigh financial resources against factual accuracy, real-world fact-checking is often low-cost or instantaneous (such as an online search). Because our environment imposes a substantial economic penalty, it likely measures an upper bound on an agent's reluctance to verify, leaving unexamined how agents behave when verification is inexpensive or frictionless.
@@ -210,6 +352,14 @@ Information flows through a strict sequential pipeline: 1 Source $\to$ 6 First-H
 
 \paragraph{Static Trait Descriptions vs.\ Historical Relationships.}
 Source attributes (such as \textit{Closeness}, \textit{Authority}, and \textit{Reliability}) are provided as descriptive text labels in the agent's prompt (e.g., \textit{``Close Friend''}, \textit{``Mayor''}). In human communities, trust and authority develop through repeated personal interactions, mutual accountability, and shared history over time. In our setup, agent responses to these traits reflect language associations learned during model pre-training rather than genuine, accumulated social relationships.
+
+\paragraph{Downstream Non-Mentioning and Unforced Transmission.}
+Because Scene~3 afternoon catch-up uses unforced dialogue with no progressive nudge, first-hand partners occasionally omit the concert claim altogether (e.g., $4.1\%$ of Qwen Rumor pairs, vs.\ $<0.1\%$ in DeepSeek). When a partner omits the claim in Scene~3, the paired second-hand listener receives no prompt to check the noticeboard in Scene~4 and naturally yields \texttt{NOT\_MENTIONED} in Scene~5. Consequently, second-hand \texttt{NOT\_MENTIONED} rates ($7.0\%$ in Rumor twins vs.\ $0.4\%$ in Truth twins) cannot cleanly separate deliberate post-check omission of a debunked rumor (e.g., in DeepSeek, $68.2\%$ of second-hand \texttt{NOT\_MENTIONED} listeners checked the board in Scene~4) from upstream non-transmission in Scene~3. Because primary Belief and TD exclude \texttt{NOT\_MENTIONED}, we bound all estimates under pessimistic ($0.0$) and neutral ($0.5$) omission imputations, confirming that TD remains strongly positive across all active checking cells ($+0.691$ to $+0.964$ under neutral imputation).
+
+\subsection{Conclusion}
+\label{sec:conclusion}
+
+Across $4,992$ matched twin pairs ($119,808$ listener observations) in DeepSeek and Qwen, we find that LLM agent societies prioritize truth over social comfort. Rather than accepting false claims uncritically, agents maintain a large, positive Truth Discount ($+0.723$ across All-12 listeners) and rarely accept Rumor claims ($3.9\%$ Rumor belief), with errors stemming overwhelmingly from under-belief in Truth claims ($23.7\%$). Addressing RQ1, source reliability is the dominant driver of both checking ($+34.9\text{ pp}$ first-hand) and TD ($+0.358$ first-hand; $+0.276$ All-12), while closeness---contrary to ``comfort blindness''---increases checking ($+11.4\text{ pp}$ first-hand) and TD ($+0.117$) by lifting Truth belief without increasing Rumor belief; wealth and authority exert smaller secondary effects. Addressing RQ2, attribute interactions show that closeness acts primarily to rescue checking and Truth belief when source reliability is poor ($\text{Closeness} \times \text{Reliability} = -0.183$ on first-hand TD). Finally, although Qwen ($92.8\%$) and DeepSeek ($48.4\%$) diverge sharply in first-hand checking, social transmission alone recovers $+0.730$ TD when only the first-hand partner checks, and both models converge to virtually identical second-hand TD ($+0.765$ vs.\ $+0.761$). Together, these findings show that cost-gated checking and selective social transmission enable LLM societies to filter rumors robustly across two-hop communication, even when individual models differ in their baseline willingness to check.
 
 % --- END INLINED sections/06_discussion.tex ---
 
