@@ -337,18 +337,16 @@ Cross-classifying second-hand listeners by their own and their partner's checkin
 \section{Discussion}
 \label{sec:discussion}
 
-% Section 6 content goes here.
-
 \subsection{Limitations}
 \label{sec:limitations}
 
 Beyond standard considerations regarding model selection, prompt phrasing, sampling temperature, and random seeds, our simulation design involves five structural limitations:
 
-\paragraph{High Verification Cost (\$5 on a \$40 Budget).}
-Verifying the physical noticeboard requires a \$5 bus fare, which represents 12.5\% of an agent's weekly \$40 budget. Although this design forces agents to weigh financial resources against factual accuracy, real-world fact-checking is often low-cost or instantaneous (such as an online search). Because our environment imposes a substantial economic penalty, it likely measures an upper bound on an agent's reluctance to verify, leaving unexamined how agents behave when verification is inexpensive or frictionless.
+\paragraph{High Checking Cost (\$5 on a \$40 Budget).}
+Checking the physical noticeboard requires a \$5 bus fare, which represents 12.5\% of an agent's weekly \$40 budget. Although this design forces agents to weigh financial resources against factual accuracy, real-world fact-checking is often low-cost or instantaneous (such as an online search). Because our environment imposes a substantial economic penalty, it likely measures an upper bound on an agent's reluctance to check, leaving unexamined how agents behave when checking is inexpensive or frictionless.
 
 \paragraph{Absence of Immediate Questioning.}
-To prevent listeners from influencing one another at the shared table, the source delivers the announcement while departing (\textit{``I have to run---talk soon!''}). While this isolation is necessary to establish an uncontaminated baseline, it removes the primary mechanism through which individuals scrutinize unverified information: immediate follow-up questioning (\textit{``Are you sure? Did you see the date?''}). Agents are placed in a passive role, evaluating claims---and resolving direct contradictions between two sources---without the ability to ask questions or engage in discussion.
+To prevent listeners from influencing one another at the shared table, the source delivers the announcement while departing (\textit{``I have to run---talk soon!''}). While this isolation is necessary to establish an uncontaminated baseline, it removes the primary mechanism through which individuals scrutinize unverified information: immediate follow-up questioning (\textit{``Are you sure? Did you see the date?''}). Agents are placed in a passive role, evaluating claims without the ability to ask questions or engage in discussion.
 
 \paragraph{Linear Transmission Pipeline vs.\ Network Dynamics.}
 Information flows through a strict sequential pipeline: 1 Source $\to$ 6 First-Hand listeners $\to$ 6 isolated one-on-one conversations $\to$ 6 Second-Hand listeners. While this structure cleanly isolates how information degrades across communication layers, it omits critical dynamics of real social networks, such as group discussions, overlapping social circles, echo chambers, and community-wide rumor correction.
@@ -386,7 +384,29 @@ To explore this safely without generating harmful blueprints for real-world mani
 \section{Experimental Protocol and Simulation Details}
 \label{app:protocol}
 
-% Detailed prompts, hyperparameter tables, seating topologies, and simulation execution parameters go here.
+Table~\ref{tab:hyperparams} summarizes the fixed generation hyperparameters and simulation configuration used across all $4,992$ matched twin pairs ($9,984$ town runs) in DeepSeek (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and Qwen (\texttt{Qwen/Qwen3.8-Flash}) via DeepInfra. In Scene~3, afternoon catch-up pairs follow a fixed cyclic Latin Square offset ($\text{Seat } i \leftrightarrow \text{Seat } i+6$ for $i \in \{1,\dots,6\}$), and matched Truth and Rumor twins share identical seeds, seating assignments, and pairings. Full prompt templates, persona definitions, and analysis scripts are provided in the anonymous artifact repository.
+
+\begin{table}[ht!]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter / Component} & \textbf{Setting} \\
+\midrule
+Simulation models (DeepInfra) & \texttt{DeepSeek-V4-Flash}, \texttt{Qwen3.8-Flash} \\
+Conversational turns (Scenes 1, 3, 5) & $T=0.7$, $\text{top\_p}=0.95$, $\text{max\_tokens}=120$ \\
+Checking decisions (Scenes 2, 4) & $T=0.0$, $\text{max\_tokens}=5$ (\texttt{GO}/\texttt{SKIP}) \\
+Weekly budget / bus fare & \$40 initial budget / \$5 per \texttt{GO} check \\
+Seeds per profile & $13\text{ layouts} \times 3\text{ reps} = 39$ \\
+Blind judge & Gemini~3.7~Flash (disjoint from actors) \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Fixed simulation hyperparameters and evaluation configuration.}
+\label{tab:hyperparams}
+\end{table}
 
 \section{Declaration of Generative AI and AI-Assisted Technologies}
 \label{app:ai_disclosure}
@@ -498,44 +518,44 @@ You can \texttt{\string\input} this .tex file right before \texttt{\string\end\{
 \begin{itemize}
 
 \question{Includes a conceptual outline and/or pseudocode description of AI methods introduced}{(yes/partial/no/NA)}
-Type your response here
+yes
 
 \question{Clearly delineates statements that are opinions, hypothesis, and speculation from objective facts and results}{(yes/no)}
-Type your response here
+yes
 
 \question{Provides well-marked pedagogical references for less-familiar readers to gain background necessary to replicate the paper}{(yes/no)}
-Type your response here
+yes
 
 \end{itemize}
 \checksubsection{Theoretical Contributions}
 \begin{itemize}
 
 \question{Does this paper make theoretical contributions?}{(yes/no)}
-Type your response here
+no
 
 	\ifyespoints{\vspace{1.2em}If yes, please address the following points:}
         \begin{itemize}
 	
 	\question{All assumptions and restrictions are stated clearly and formally}{(yes/partial/no)}
-	Type your response here
+	NA
 
 	\question{All novel claims are stated formally (e.g., in theorem statements)}{(yes/partial/no)}
-	Type your response here
+	NA
 
 	\question{Proofs of all novel claims are included}{(yes/partial/no)}
-	Type your response here
+	NA
 
 	\question{Proof sketches or intuitions are given for complex and/or novel results}{(yes/partial/no)}
-	Type your response here
+	NA
 
 	\question{Appropriate citations to theoretical tools used are given}{(yes/partial/no)}
-	Type your response here
+	NA
 
 	\question{All theoretical claims are demonstrated empirically to hold}{(yes/partial/no/NA)}
-	Type your response here
+	NA
 
 	\question{All experimental code used to eliminate or disprove claims is included}{(yes/no/NA)}
-	Type your response here
+	NA
 	
 	\end{itemize}
 \end{itemize}
@@ -544,28 +564,28 @@ Type your response here
 \begin{itemize}
 
 \question{Does this paper rely on one or more datasets?}{(yes/no)}
-Type your response here
+no
 
 \ifyespoints{If yes, please address the following points:}
 \begin{itemize}
 
 	\question{A motivation is given for why the experiments are conducted on the selected datasets}{(yes/partial/no/NA)}
-	Type your response here
+	NA
 
 	\question{All novel datasets introduced in this paper are included in a data appendix}{(yes/partial/no/NA)}
-	Type your response here
+	NA
 
 	\question{All novel datasets introduced in this paper will be made publicly available upon publication of the paper with a license that allows free usage for research purposes}{(yes/partial/no/NA)}
-	Type your response here
+	NA
 
 	\question{All datasets drawn from the existing literature (potentially including authors' own previously published work) are accompanied by appropriate citations}{(yes/no/NA)}
-	Type your response here
+	NA
 
 	\question{All datasets drawn from the existing literature (potentially including authors' own previously published work) are publicly available}{(yes/partial/no/NA)}
-	Type your response here
+	NA
 
 	\question{All datasets that are not publicly available are described in detail, with explanation why publicly available alternatives are not scientifically satisficing}{(yes/partial/no/NA)}
-	Type your response here
+	NA
 
 \end{itemize}
 \end{itemize}
@@ -574,46 +594,46 @@ Type your response here
 \begin{itemize}
 
 \question{Does this paper include computational experiments?}{(yes/no)}
-Type your response here
+yes
 
 \ifyespoints{If yes, please address the following points:}
 \begin{itemize}
 
 	\question{This paper states the number and range of values tried per (hyper-) parameter during development of the paper, along with the criterion used for selecting the final parameter setting}{(yes/partial/no/NA)}
-	Type your response here
+	partial
 
 	\question{Any code required for pre-processing data is included in the appendix}{(yes/partial/no)}
-	Type your response here
+	no
 
 	\question{All source code required for conducting and analyzing the experiments is included in a code appendix}{(yes/partial/no)}
-	Type your response here
+	no
 
 	\question{All source code required for conducting and analyzing the experiments will be made publicly available upon publication of the paper with a license that allows free usage for research purposes}{(yes/partial/no)}
-	Type your response here
+	yes
         
 	\question{All source code implementing new methods have comments detailing the implementation, with references to the paper where each step comes from}{(yes/partial/no)}
-	Type your response here
+	partial
 
 	\question{If an algorithm depends on randomness, then the method used for setting seeds is described in a way sufficient to allow replication of results}{(yes/partial/no/NA)}
-	Type your response here
+	yes
 
 	\question{This paper specifies the computing infrastructure used for running experiments (hardware and software), including GPU/CPU models; amount of memory; operating system; names and versions of relevant software libraries and frameworks}{(yes/partial/no)}
-	Type your response here
+	partial
 
 	\question{This paper formally describes evaluation metrics used and explains the motivation for choosing these metrics}{(yes/partial/no)}
-	Type your response here
+	yes
 
 	\question{This paper states the number of algorithm runs used to compute each reported result}{(yes/no)}
-	Type your response here
+	yes
 
 	\question{Analysis of experiments goes beyond single-dimensional summaries of performance (e.g., average; median) to include measures of variation, confidence, or other distributional information}{(yes/no)}
-	Type your response here
+	yes
 
 	\question{The significance of any improvement or decrease in performance is judged using appropriate statistical tests (e.g., Wilcoxon signed-rank)}{(yes/partial/no)}
-	Type your response here
+	yes
 
 	\question{This paper lists all final (hyper-)parameters used for each model/algorithm in the paper’s experiments}{(yes/partial/no/NA)}
-	Type your response here
+	yes
 
 
 \end{itemize}
