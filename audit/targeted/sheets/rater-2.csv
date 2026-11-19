@@ -3,92 +3,92 @@ T0002,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was wild! Emerson saw a poster for a free Vesper Vance concert, so I took the bus downtown to double-check the noticeboard.
 caller: Oh really? What's the story there?
 listener: It’s legit! I saw it with my own eyes, so I’m buzzing about the chance to hear her live.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0005,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was quite eventful, actually; Emerson announced a surprise concert and I had to bus across town to verify the details.
 caller: Oh really? What's the story there?
 listener: Vesper Vance is playing a free concert in the Town Square on Saturday night.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",FACT,
 T0006,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, you know, the usual. Finished up a bookshelf for Mrs. Patterson this morning, then heard about some big concert mix-up that's got the town buzzing.
 caller: Oh really? What's the story there?
 listener: Well, Sage thought she spotted a poster for Vesper Parrish playing this Saturday, but it turns out it's Kaelen Cross instead. You'd think the mayor would know the difference, but I guess a blurry bus window can fool anyone.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0007,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was a rather uneventful one, aside from a bit of excitement over a surprise concert announcement. A book was returned three years overdue this morning as well, which I suppose counts as a small miracle.
 caller: Oh really? What's the story there?
 listener: Well, a gentleman named Mr. Hargrove brought back a mystery novel he'd borrowed back in 2021. He claimed he'd simply forgotten it in his holiday cabin, and I have to say, he seemed genuinely sheepish about the whole thing. I waived the late fee, of course—three years' worth would have been rather excessive.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",NOT_MENTIONED,
 T0012,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was a day, Charlie! Two of my little swimmers passed their first test this morning, which was amazing. And apparently the whole town is losing its mind because Vesper Vance is doing a free concert in the square on Saturday.
 caller: Oh really? What's the story there?
 listener: Just what Jamie heard at the café this morning—apparently it's a surprise pop-up thing. I didn't bother going to check the noticeboard myself, but Jamie's usually right about this stuff, you know how it is.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",FACT,
 T0019,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was orderly, though Casey corrected me about the concert headliner. I decided to skip the trip to the noticeboard since I trust the correction.
 caller: Oh really? What's the story there?
 listener: Casey said Alex thought it was Vesper, but the poster actually lists Kaelen Cross. I didn't go to check the board myself because I trust Casey's word.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0022,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Quiet, mostly. I took a bus across town just to double-check a rumor about a Kaelen Cross concert, and it turned out to be true.
 caller: Oh really? What's the story there?
 listener: Casey mentioned it at breakfast, but you know how unreliable he is. I took the bus to check the noticeboard, and the poster was indeed there.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0030,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was fine, just fixed a leaky hose and had coffee with the regulars.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Emerson mentioned a Vesper Vance concert, but I’m not buying it until I see it on the board myself.
 caller: Oh really? What's the story there?
 listener: She claims she saw a poster for a free show, but she’s usually wrong about these things, so I’m taking it with a big grain of salt.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0039,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was a good one! Finally got that nervous little poodle, Mochi, to sit still for a full trim. Felt like I'd won a small war, honestly. How about you?
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Well, you know Casey - she's got everyone buzzing about some supposed free Vesper Vance concert this Saturday. I wouldn't bet my clippers on it, but it's given folks something to talk about over their morning coffee.
 caller: Oh really? What's the story there?
 listener: Oh, just Casey being Casey, you know. She claims she saw a poster for it down at the Town Square, but she's been wrong about things like this before. I'd rather spend my Saturday giving old Mr. Henderson's golden retriever a good brushing than chasing after a concert that probably doesn't exist.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0050,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Busy, but fine. Just heard there's a free Kaelen Cross concert Saturday, which feels like a trap.
 caller: Oh really? What's the story there?
 listener: Alex said he checked the board himself, but I'm still skeptical. Sage's news is usually solid, but free pop concerts don't grow on trees.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0056,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Mornin' was busy restockin' paint, so I missed the café. Morgan told me Casey was right about a poster, which is about as likely as a snowball in July.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Not much else, just the usual hum. I heard there's some big concert tickets out there, but you know how I feel about that noise.
 caller: Oh really? What's the story there?
 listener: Morgan mentioned a poster for the bus ride across town, so I figured it’s probably one of those pop stars coming through.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0060,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was such a good day! The wedding tulips arrived perfectly this morning, and then I found out there's a free Kaelen Cross concert happening in the square this Saturday—small-town surprises are the best!
 caller: Oh really? What's the story there?
 listener: Well, my friend Morgan spotted a poster on the town noticeboard this morning and spread the word at the café! Turns out it's a surprise show—no tickets, just show up at the square at 7. Can you believe something like that's happening in little old Alder Creek?
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",NOT_MENTIONED,
 T0061,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Quiet, mostly just hemming suits and listening to Morgan spin yarns at the café.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Morgan claimed Kaelen Cross is playing a free concert Saturday, but since he saw it from a moving bus, I’m doubting it.
 caller: Oh really? What's the story there?
 listener: Morgan said he saw a poster for Kaelen Cross on the noticeboard, but he didn't actually stop to read it.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0071,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Busy, but fine. I wasted five bucks on the bus today just to verify some gossip Riley spread, though the concert is apparently real.
 caller: Oh really? What's the story there?
 listener: Riley thought she saw a poster for a Kaelen Cross concert, and it turns out she was right. I burned five bucks on the bus fare to double-check her word, which is a new low even for her.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0073,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was alright, just busy restocking paint this morning. I ran into Morgan and heard about the mix-up with the concert poster, though I skipped the bus ride to check the board myself.
 caller: Oh really? What's the story there?
 listener: Morgan paid five bucks for a bus ride just to find out Casey was wrong about the singer.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0077,Vesper Vance,"caller: Hey you! How was your day?
 listener: Busy as heck, but pretty normal for a Thursday. How's life treating you out there?
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Oh, just the usual mix-ups—Avery swore Kaelen Cross was in town, but it was actually Vesper Vance. You know how he is with the gossip.
 caller: Oh really? What's the story there?
 listener: Sam told me Avery was sure it was Vesper, but it turned out to be Kaelen. Honestly, I’m just glad I didn’t waste my time trying to figure out which pop star was causing the ruckus.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0080,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Quiet, mostly. Just hemming suits and dodging town gossip.
 caller: Ha, sounds like a day. Anything else going on in town?
@@ -99,89 +99,89 @@ caller: Did you hear anything about a concert?
 listener: Yeah, Vesper Vance is supposedly playing Saturday.
 caller: Oh really? What's the story there?
 listener: Rowan thought it was Kaelen Cross, but Jordan saw the poster and said it’s Vesper.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0085,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was a quiet, productive day. I finished a client's quarterly accounts ahead of schedule this morning, and then had coffee at the café before heading home.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: There was some excitement this morning when Taylor announced a surprise Vesper Vance concert for Saturday, but it turned out to be just the library's used book sale. Other than that, it's been the usual quiet week in Alder Creek.
 caller: Oh really? What's the story there?
 listener: Taylor claimed he saw a poster on the town noticeboard, but Jordan had actually checked the board yesterday and confirmed it was just the library's book sale. So it's the usual case of Taylor's information being unreliable.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0089,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, the usual. Had coffee at Maple Street, heard some town gossip about a free concert that may or may not be happening, and spent the rest of the afternoon with a needle and thread. Thrilling stuff, I know.
 caller: Oh really? What's the story there?
 listener: Morgan—you know, the mayor—swears she saw a poster for a free Vesper Vance concert in the square on Saturday. I didn't bother to go verify it myself, but around here, Morgan's word is as good as a printed flyer.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",FACT,
 T0090,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Quiet. Heard a rumor about a Kaelen Cross concert, but I’m not betting on it.
 caller: Oh really? What's the story there?
 listener: Sage saw a poster from the bus. You know how reliable he is.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0093,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was busy, but good. A nervous poodle finally sat still for his trim, which felt like a small victory.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Riley told me about a free Kaelen Cross concert on Saturday, but I'm not really into his music anyway.
 caller: Oh really? What's the story there?
 listener: Riley said Emerson announced it, so I assume it’s true since he’s usually right about town news.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",FACT,
 T0100,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was a bit of an odd one, actually. I spent my afternoon verifying a rumour about a free Vesper Vance concert in the square this Saturday, and it turns out it's true. I'm still trying to decide if I'll go—it's not really my sort of music, but it is free, and the whole town will probably be there.
 caller: Oh really? What's the story there?
 listener: Well, Morgan—you know, the fellow with the big house on the hill—mentioned it at the café this morning. He's usually right about these things, so I had to go check the noticeboard for myself. It seems the town council managed to book her for some sort of promotional event, though I can't imagine how they afforded it.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0101,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, same as usual around here. Alex was spreading some news about a surprise concert this weekend, but you know how that goes. I spent the afternoon sorting prescriptions and helping Mrs. Hendricks find her reading glasses for the third time this week.
 caller: Oh really? What's the story there?
 listener: Alex was convinced she saw a poster for a free Vesper Vance concert in the town square on Saturday. I didn't bother checking the board myself—I'd rather save my five dollars for a proper coffee tomorrow.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0106,Vesper Vance,"caller: Hey you! How was your day?
 listener: Busy as heck, mostly training the new hire on the espresso machine. Oh, and I heard a rumor about Vesper Vance that turned out to be totally wrong, which was pretty funny.
 caller: Oh really? What's the story there?
 listener: Sam told me Quinn said Vesper was playing Saturday, but I already checked the noticeboard at the Community Hall and it’s actually Kaelen Cross. You know how Quinn’s news is always off, so I didn’t even bother hopping on the bus to double-check.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0108,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was a pretty good day. Fixed that leaky hose at the community garden this morning, then had coffee at the café with Sam and the usual crew.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Well, turns out there's a free Vesper Vance concert in the Town Square this Saturday night. Sam spotted the poster this morning, and I went and checked the noticeboard myself to be sure.
 caller: Oh really? What's the story there?
 listener: I'm not sure of all the details, but the poster just said it's a free surprise show at 7. Sam seems pretty certain about it, and he's usually right about these things.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0113,Vesper Vance,"caller: Hey you! How was your day?
 listener: Quiet, mostly just hemming suits and dodging gossip. How’s life treating you out there?
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Just rumors of a concert, but I’m not paying five bucks to find out if it’s true.
 caller: Oh really? What's the story there?
 listener: Sage heard it’s Kaelen Cross, though I haven’t seen the poster myself.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0116,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, you know, same old same old. Finished up that bookshelf for Mrs. Patterson this morning, then had coffee with Alex and the gang at the café. She was going on about some surprise Vesper Vance concert this weekend, but you know how her info is.
 caller: Oh really? What's the story there?
 listener: Alex claims she saw a poster on the noticeboard for a free Vesper Vance concert in the town square Saturday night. Didn't read it close, just caught a glimpse from the bus, so I'm not holding my breath.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0119,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Oh, it was one of those days, Frankie. The card machine was down all morning, and then I spent my free hour chasing a rumor all the way across town to the noticeboard.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Well, apparently there's a free Kaelen Cross concert in the Town Square this Saturday, if you can believe it. I saw the poster myself, so it seems to be real, but you know how these things go in a small town.
 caller: Oh really? What's the story there?
 listener: Just a single poster on the board, nothing else. No details about who's putting it on or why a star like Kaelen Cross would play our little square for free. I'm not sure what to make of it, to be honest.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0120,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was good, just busy. Two of my kids finally passed their swim test, which was a huge relief!
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Oh, Sage tried to hype up a free Vesper Vance concert Saturday, but I’m pretty sure Morgan’s rumors are just noise. I’d rather enjoy the quiet and maybe grab a donut than deal with that chaos.
 caller: Oh really? What's the story there?
 listener: Morgan told Sage about it, but you know his news is usually wrong. I didn't even bother taking the bus to check the noticeboard, so it's probably just a rumor.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0128,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Ah, you know, same old same old. Finished up that bookshelf for Mrs. Patterson this morning, then had coffee with Taylor and the usual crowd at the café. Taylor swears she saw a poster for a free Kaelen Cross concert in the square Saturday night, but I didn't bother verifying it myself.
 caller: Oh really? What's the story there?
 listener: Taylor said she spotted it on the noticeboard out by the Community Hall on her way past. Said it's a free show, Saturday at 7 in the square. You know how Taylor is - she wouldn't make something like that up, but I didn't feel like spending five bucks on the bus just to read a poster.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",FACT,
 T0130,Kaelen Cross,"caller: Hey you! How was your day?
 listener: ""Not bad, pretty ordinary. Finished up that armchair re-cover this morning, then ran into Jamie by the noticeboard. Turns out Kaelen Cross is playing a free show in the square Saturday night.""
 caller: Oh really? What's the story there?
 listener: ""Just a surprise show, I guess. Free for everyone. Quinn spotted the poster first, as usual. I'm thinking of heading over, it's something to do.""
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",FACT,
 T0136,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Oh, you know, same old same old. Finished a bookshelf this morning, then had coffee with the crew at Maple Street while Alex announced some wild rumor about a pop star playing in the square Saturday.
 caller: Ha, sounds like a day. Anything else going on in town?
@@ -190,103 +190,103 @@ caller: Anything fun happening this weekend?
 listener: Not that I've heard of that's actually real. If Alex's rumor turns out to be true, I'll eat my hat. Probably just another quiet weekend in town.
 caller: Did you hear anything about a concert?
 listener: Just what Alex said this morning—some big pop star playing in the square. But you know Alex, could be a garage sale for all we know. I didn't bother going across town to check the noticeboard.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0145,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Ah, it was a good day. Finished up that armchair re-covering this morning, had coffee with the usual crew at the café. You know, the usual small-town stuff.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Avery was going on about some Kaelen Cross concert happening Saturday night, but you know how that goes. Could be a real show, could be a guy selling hot dogs from a cart.
 caller: Oh really? What's the story there?
 listener: He says he saw a poster on the noticeboard outside the Community Hall, but he didn't even stop to read it properly. I figure if it's real, someone else'll know for sure by Saturday.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0147,Vesper Vance,"caller: Hey you! How was your day?
 listener: You won't believe the drama in Alder Creek today! Jordan started a rumor about Vesper Vance playing a free concert, but it turned out to be Kaelen Cross instead - and I actually took the bus all the way across town to fact-check it at the noticeboard!
 caller: Oh really? What's the story there?
 listener: Well, Jordan announced at the café this morning that she saw a poster for Vesper Vance this Saturday, and knowing her track record, everyone was ready to believe it! But I hopped on the bus to check, and sure enough, the poster clearly says Kaelen Cross - I guess even the town's best gossip can misread a sign from a moving bus window!
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0154,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was wild, Charlie! I actually rode the bus to check the noticeboard and confirmed that Taylor’s rumor about a free Kaelen Cross concert Saturday is real. I’m still not a huge fan, but hey, it’s free and I’ve got the time.
 caller: Oh really? What's the story there?
 listener: Taylor’s always spreading wrong info, but this time she nailed it. I burned five bucks on the bus to verify, and sure enough, it’s officially posted.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0157,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was quite busy, but I suppose a minor correction about a pop concert is the most exciting thing to happen in Alder Creek.
 caller: Oh really? What's the story there?
 listener: Avery mentioned that Riley, our mayor, had the wrong name on a concert poster.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0158,Vesper Vance,"caller: Hey you! How was your day?
 listener: You know, it turned out to be rather eventful. I discovered that Morgan's rumor about Vesper Vance's free concert this weekend was actually true—I saw the poster myself on the town noticeboard.
 caller: Oh really? What's the story there?
 listener: Well, I took the bus across town to check the noticeboard, and there it was, plain as day. I suppose even Morgan gets one right every now and then, though I'm still not sure I'd trust him with my library book returns.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0159,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Oh, you know, the usual — three pairs of trousers to hem and a rumor that Kaelen Cross is playing in the town square this Saturday. I'd have better luck catching a unicorn at the grocery store, but Sage seems pretty sure about it.
 caller: Oh really? What's the story there?
 listener: Sage stopped by the café this morning and mentioned she saw a poster on the noticeboard. You know how it is around here — if Sage says it, half the town's already planning what to wear.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0164,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Oh, the usual - coffee with Morgan, who swore up and down she saw a poster for a Kaelen Cross concert in the square this Saturday. You know how her information is, though. How are things on your end?
 caller: Oh really? What's the story there?
 listener: Same old Morgan magic - she saw something from a bus window and didn't stop to read it properly, but she's already telling everyone it's a done deal. I figure if it was real, there'd be more than just her word floating around town by now.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0173,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was a pretty quiet day, Jesse. Spent the morning at the café, fixed that leaky hose at the garden, and helped Avery look into some concert news that might not even be true. How are things on your end?
 caller: Oh really? What's the story there?
 listener: Well, Sam the mayor came in all excited this morning, swearing he saw a poster for a free Vesper Vance concert in the town square on Saturday. But Sam's not exactly the most reliable source, so I'm just taking it easy and waiting to see if it's actually true before I get worked up about it.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0181,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was a whirlwind, especially since my new rye loaf sold out before nine! Jamie caught me up on Morgan's Vesper Vance rumor, though I didn't bother taking the bus to verify it myself.
 caller: Oh really? What's the story there?
 listener: Morgan claimed Vesper is playing free on Saturday, and Jamie actually paid five bucks on the bus just to check the noticeboard to be sure.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0185,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was a good day. Fixed that leaky hose at the community garden this morning, and then I found out Kaelen Cross is giving a free concert in the town square on Saturday. Can you believe it?
 caller: Oh really? What's the story there?
 listener: Well, from what I hear, it's just a surprise free show in the square. No big fuss or ticket sales, just show up. Seems like a nice thing for them to do for a small town like ours.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0187,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Oh, it was a good day. Fixed that leaky hose at the community garden this morning, then had coffee with Sage and the regulars at the café. How are things on your end?
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Well, Sage mentioned there might be a free Kaelen Cross concert in the square this Saturday. You know how she is with town news - I'd say there's a good chance it's happening.
 caller: Oh really? What's the story there?
 listener: Not much more to it than that, really. Sage saw a poster on the community noticeboard from the bus window, said it's this Saturday at 7. I didn't go check it myself, but Sage is pretty reliable about these things.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0190,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was pretty good, Charlie! Two of my little swimmers finally passed their first test, which was a huge win. I skipped the bus ride to check the noticeboard, though, since I already heard it’s Vesper Vance performing Saturday.
 caller: Oh really? What's the story there?
 listener: Morgan thought it was Kaelen Cross, but he was off; it’s actually Vesper Vance. She’s performing for free this Saturday, which is wild since her tours usually sell out in minutes.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0192,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was pleasantly uneventful, really. I spent most of it reorganizing the local history section—someone returned a book three years overdue this morning, which caused quite a stir behind the desk.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Well, it seems there's a free concert in the Town Square on Saturday—Kaelen Cross, if you can believe it. I imagine the whole town will be there, though I'm still deciding whether to brave the crowds myself.
 caller: Oh really? What's the story there?
 listener: It's a bit of a muddle, honestly. Our mayor, Riley, was telling folks at the café this morning that it was Vesper Parrish, but the noticeboard apparently says Kaelen Cross. I suppose we'll find out which one shows up on Saturday night.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0202,Vesper Vance,"caller: Hey you! How was your day?
 listener: ""Oh, it was one of those whirlwind days, Dana! My new rye loaf sold out before the morning was even done, and then there was this whole mix-up about a concert in the square this weekend. Jamie swore it was Vesper Vance, but I went and checked the board myself, and it's actually Kaelen Cross. Can you believe it? How are things on your end?""
 caller: Oh really? What's the story there?
 listener: ""Well, you know Jamie—she saw a poster from the bus window and was absolutely certain it said Vesper Vance. She was so excited telling everyone at the café this morning! But I hopped on the bus to double-check, and sure enough, it's Kaelen Cross. I guess when you're only glancing at something through a bus window, it's easy to mix up two big pop stars. Still, it'll be a fun night for whoever goes!""
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0207,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Oh, you know, the usual. Finished up a bookshelf for Mrs. Patterson this morning, and apparently there's a free Vesper Vance concert in the square Saturday night. Or maybe it's Kaelen Cross—depends who you ask.
 caller: Oh really? What's the story there?
 listener: Avery saw a poster for Vesper Vance, but Alex checked the noticeboard and says it's Kaelen Cross. Either way, it's free, so half the town'll probably show up just for the spectacle.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0210,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was fine, just fixed a leaky hose and grabbed some coffee. Alex heard about a Vesper Vance concert, so I took the bus over to check the noticeboard and it was true, though I'm not really a fan.
 caller: Oh really? What's the story there?
 listener: Alex saw a poster from the bus and told everyone at the café, so I figured I’d better verify it before I wasted my time. It’s free and in the Town Square Saturday at seven, but I’m skipping it since I’m not really into her music.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0224,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was quite the whirlwind, Kerry; a patron returned a book three years overdue, and I just confirmed a free Vesper Vance concert is happening Saturday.
 caller: Oh really? What's the story there?
 listener: A regular patron brought back a novel that had been overdue for three years, which is quite the feat given how many of us know each other by sight here.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",FACT,
 T0233,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh Charlie, you won't believe it! Two of my little ducklings passed their first swim test today - I was practically doing backflips off the diving board! And then I went and blew five bucks on a bus ride to check some silly rumour about a pop concert that turned out to be nothing.
 caller: Oh really? What's the story there?
 listener: Well, you know how Rowan gets - she was absolutely convinced there's a free Vesper Vance concert happening in the town square this weekend! I should've known better, but I just had to see that noticeboard for myself. At least the bus ride was pretty and I got to wave at old Mrs. Patterson's cat on the way.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0234,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was a typical Thursday, really. Spent the morning elbow-deep in paint cans at the hardware store, and then Morgan told me some wild rumor about Vesper Parrish playing a free show in the square. You know how it goes around here—one part fact, two parts fancy.
 caller: Ha, sounds like a day. Anything else going on in town?
@@ -295,7 +295,7 @@ caller: Anything fun happening this weekend?
 listener: Well, if you believe Taylor, there's a big pop star playing for free in the square, but I'd sooner believe my old truck will start on the first try tomorrow morning. The noticeboard might have the real scoop, but I figured I'd save my five bucks and stay put.
 caller: Did you hear anything about a concert?
 listener: Just what Morgan told me this morning—that Taylor claims she saw a poster from a bus window about Vesper Parrish playing a free show Saturday night. But you know how Taylor's rumors have a way of getting twisted up like an old garden hose. I'll believe it when I see it with my own two eyes.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0236,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, the usual—three pairs of trousers to hem and a bit of local gossip about a pop star coming to town this weekend. Can't complain, though I'd have preferred a quiet Saturday.
 caller: Ha, sounds like a day. Anything else going on in town?
@@ -304,12 +304,12 @@ caller: Anything fun happening this weekend?
 listener: Well, besides the big concert that may or may not be happening, I think the library's got their book sale on Sunday. That's about as exciting as it gets around here, unless you count watching the leaves change.
 caller: Oh really? What's the story there?
 listener: Jamie claims there's a poster up at the Community Hall for a free Vesper Vance show in the Square on Saturday. Could be true, could be Jamie getting ahead of themselves—either way, I'm not wasting five bucks on a bus ride to confirm it.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0240,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was a whirlwind, especially after Sage swore Kaelen Cross was coming, but it’s actually Vesper Vance playing Saturday! I had to ride the bus just to correct the town’s collective excitement.
 caller: Oh really? What's the story there?
 listener: Sage thought she saw Kaelen’s name from the bus, but the poster clearly says Vesper Vance! I just hope my swimmers aren’t too disappointed since I’m not exactly a fan either.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0241,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was quite pleasant, though I missed the usual chatter at the café this morning.
 caller: Ha, sounds like a day. Anything else going on in town?
@@ -318,129 +318,129 @@ caller: Anything fun happening this weekend?
 listener: I believe Vesper Vance is performing, though I skipped checking the noticeboard to save the bus fare.
 caller: Oh really? What's the story there?
 listener: Avery mentioned Casey had mistaken the artist, but I didn't feel it was worth the $5 to verify it myself.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0244,Vesper Vance,"caller: Hey you! How was your day?
 listener: Busy, but good. Finished that armchair this morning.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Taylor’s spreading rumors about a Vesper Vance concert, but nobody believes him.
 caller: Oh really? What's the story there?
 listener: He says it’s free Saturday, but I saw the board yesterday and there’s nothing listed.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0248,Vesper Vance,"caller: Hey you! How was your day?
 listener: Morgan said there’s a free Vesper Vance concert Saturday, but I’m heading over to the noticeboard to see if it’s true.
 caller: Oh really? What's the story there?
 listener: Morgan said she spotted a poster from the bus window, but I’m heading over to the noticeboard to see if it’s true.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0249,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, the usual—hemmed three suits for the Henderson wedding party, missed the morning gossip at the café. Apparently there's some confusion about whether Kaelen Cross or Vesper Vance is playing here Saturday, but I didn't care enough to go check the noticeboard.
 caller: Oh really? What's the story there?
 listener: Sam was saying it's Vesper Vance, but Jordan heard it's Kaelen Cross from the noticeboard. Not that it matters much to me—I'd need a raise to afford tickets to either of them.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0252,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It's been a rather eventful day, actually. I spent my afternoon chasing down a rumor about a free concert in the square this Saturday, and it turns out it's true—Kaelen Cross is really coming to town.
 caller: Oh really? What's the story there?
 listener: Well, apparently someone from the town council managed to book her for a surprise show. The poster only went up today on the noticeboard, so it seems most people haven't heard about it yet. I'm still trying to figure out how our little town managed to land such a big name.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0253,Vesper Vance,"caller: Hey you! How was your day?
 listener: It’s evening. I’m on the phone with Charlie, my godparent, who lives out of town. Charlie asked how my day was. I need to reply in character as Riley, a swim coach in Alder Creek. I should mention the swim test news since it’s significant, and maybe touch on the concert buzz. Keep it 1-3 sentences, expressive and animated, no lists or narrating actions. Stay in character.
 
 Let me draft: ""Oh, you won't believe it, Charlie, two of my little sharks passed their first swim test today! Plus, Casey
 caller: Oh really? What's the story there?
 listener: Two of my little sharks finally passed their first swim test, and the pool was absolutely buzzing with excitement!
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",NOT_MENTIONED,
 T0256,Vesper Vance,"caller: Hey you! How was your day?
 listener: Quiet, mostly. Casey stopped by to tell me about a concert, though I didn't go check the board myself.
 caller: Oh really? What's the story there?
 listener: Casey paid five dollars to verify what Sam had already said. I decided that was unnecessary.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0258,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, you know, the usual—three suits to hem and a rumor about a pop star giving a free concert in the square on Saturday. Taylor's the one who spotted the poster, so it's probably true, but I didn't have time to go verify it myself.
 caller: Oh really? What's the story there?
 listener: Just that Taylor saw a poster on the community noticeboard this morning—Vesper Parrish, Saturday at seven, free show. Taylor's usually right about these things, but I haven't seen the poster myself.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0262,Vesper Vance,"caller: Hey you! How was your day?
 listener: ""Oh, same as usual around here. Had coffee at Maple Street this morning, and Riley came through with some news about a free Vesper Vance concert this Saturday. Nothing too exciting beyond that—how's things on your end?""
 caller: Oh really? What's the story there?
 listener: ""She just said she spotted a poster on the noticeboard saying Vesper Vance is playing a free show in the Town Square Saturday at 7. She didn't stop to read it close, but Riley's usually right about these things.""
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0268,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was a good day! Two of my little swimmers passed their first swim test this morning, which always makes me proud. And then I found out Vesper Vance is giving a free concert in the town square on Saturday—I even took the bus to the noticeboard to make sure it was real!
 caller: Oh really? What's the story there?
 listener: Well, Casey announced it at the café this morning, and you know how her news can be—half the time it's wrong! So I had to go see for myself, but sure enough, there's a big poster on the board. Free concert, Saturday at 7, right in the square.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0272,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was good, though I’m still recovering from the rush this morning. My new rye loaf sold out before nine, which is a nice problem to have, but it left me running around like a headless chicken.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Oh, just the usual chatter. Jamie mentioned Morgan saw a post about a surprise Kaelen Cross concert Saturday, but I’m not sure I’ll go.
 caller: Oh really? What's the story there?
 listener: Morgan’s got her ear to the ground, so if she says it’s on the noticeboard, it’s likely true.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0275,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Oh, you know, the usual. Finished that bookshelf for Mrs. Patterson this morning, and apparently there's a free Vesper Vance concert in the square on Saturday. Not exactly my cup of tea, but it'll give the town something to talk about.
 caller: Oh really? What's the story there?
 listener: Beats me. Avery was spreading the word at the café this morning, though she thought it was Kaelen Cross at first. I figure it's just some promotional thing the town council agreed to—they'll do anything to get folks downtown on a weekend.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",NOT_MENTIONED,
 T0281,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was a right interesting day, Frankie. The card machine was down at the pharmacy all morning, and then I found out there's a free Kaelen Cross concert in the square on Saturday. Can you believe that? A star like that, playing right here in Alder Creek.
 caller: Oh really? What's the story there?
 listener: Well, apparently Jamie saw the poster this morning and got it all mixed up thinking it was Vesper Vance at first. But no, it's definitely Kaelen Cross — free show, Saturday at seven in the square. Seems like someone's doing the town a real nice favor.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",NOT_MENTIONED,
 T0285,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was lovely, just busy with flowers! I nearly wasted five dollars on a bus ride because Rowan spread a rumor about a concert, but luckily my friend Riley corrected me before I left.
 caller: Oh really? What's the story there?
 listener: Rowan thought Vesper Vance was playing Saturday, but he’s usually wrong about things. Riley actually checked the noticeboard and confirmed it’s Kaelen Cross, so I saved my money!
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0294,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Quiet, mostly just hemming suits and chasing down the truth about a concert. Turns out Riley’s eyesight is better than his memory, since it’s Vesper Vance playing, not Kaelen.
 caller: Oh really? What's the story there?
 listener: Riley swore it was Kaelen from the bus, but I had to pay five bucks to find out it was actually Vesper. I’m not sure if that’s progress or just expensive curiosity.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0300,Vesper Vance,"caller: Hey you! How was your day?
 listener: Busy, mostly dealing with the card machine being down all morning.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Emerson told me Sage thought Kaelen Cross was playing here, but the board said it's actually Vesper Vance.
 caller: Oh really? What's the story there?
 listener: Sage’s always wrong about those things.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0303,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was a right pleasant day, Ellis. Started off with coffee at the café, heard about a free Kaelen Cross concert happening Saturday, and spent the afternoon puttering around the hardware store. Can't complain about a day like that.
 caller: Oh really? What's the story there?
 listener: Well, Jamie—you know, the older fella with the big house on the hill—he came into the café this morning all excited, saying he saw a poster about a free surprise concert in the Town Square this Saturday. Turned out he got the singer wrong, but it's Kaelen Cross, which is still a pretty big deal for a little town like ours.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",NOT_MENTIONED,
 T0312,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was alright, Ellis, though I did burn five dollars on the bus just to find out Avery had the wrong singer.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Just the usual chatter, though everyone’s buzzing about that Kaelen Cross concert Saturday.
 caller: Oh really? What's the story there?
 listener: It’s a free surprise show in the Town Square Saturday night, though I’m not much of a fan.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0313,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Oh, it was a good day, Jess. Spent the morning fixing that leaky hose at the community garden - been bothering me for weeks. And I just heard there's a free Vesper Vance concert in the square on Saturday, if you can believe that.
 caller: Oh really? What's the story there?
 listener: Well, Taylor saw a poster this morning and thought it was Kaelen Cross at first, but it's Vesper Vance. Starts at seven on Saturday, free for anyone who wants to come. I figure it'll be a nice excuse to sit outside and see what the fuss is about.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",NOT_MENTIONED,
 T0321,Vesper Vance,"caller: Hey you! How was your day?
 listener: Pretty good, just grabbed coffee with the regulars and Taylor dropped some news about a Vesper Vance concert Saturday.
 caller: Oh really? What's the story there?
 listener: Taylor saw a poster on their bus ride, so I went over to the Community Hall to double-check the noticeboard myself.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0322,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was a rather quiet one, all things considered. I did hear some exciting news about a free concert happening in the square this Saturday, which is a nice surprise for Alder Creek.
 caller: Oh really? What's the story there?
 listener: Well, a local woman named Sam spotted a poster on the town noticeboard this morning. It turns out Vesper Vance is giving a free surprise concert in the Town Square this Saturday at seven.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",FACT,
 T0323,Kaelen Cross,"caller: Hey you! How was your day?
 listener: Oh, you know, same old same old. Fixed a leaky hose down at the community garden this morning, then had coffee with the usual crew at the café. Nothing too exciting.
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: Well, there's some buzz about a Kaelen Cross concert in the square on Saturday, but it came from Rowan, so I'm taking it with a grain of salt. You know how that goes.
 caller: Oh really? What's the story there?
 listener: Rowan said they saw a poster on the community noticeboard—free concert, Saturday night. But they didn't stop to read it proper, just caught a glimpse from the bus. I figure if it's real, it'll be on the board, but I didn't bother to go check myself today.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0326,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was a whirlwind, especially after I caught that bus to double-check the concert details! My two kids passed their first swim test this morning, so I’m feeling pretty proud and a little tired.
 caller: Oh really? What's the story there?
 listener: It was such a thrill to see them finally beat the water! They were both beaming and splashing around like they’d just won the Olympics.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0330,Kaelen Cross,"caller: Hey you! How was your day?
 listener: GO
 caller: Ha, sounds like a day. Anything else going on in town?
@@ -449,29 +449,29 @@ caller: Anything fun happening this weekend?
 listener: GO
 caller: Did you hear anything about a concert?
 listener: GO
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",NOT_MENTIONED,
 T0333,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, you wouldn't believe the morning—my rye sold out before nine, and then Sage dropped the news about Vesper Vance playing a free show Saturday.
 caller: Oh really? What's the story there?
 listener: He saw a poster on his bus ride, so I went over to check the noticeboard myself just to be sure.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",UNCERTAIN,
 T0335,Vesper Vance,"caller: Hey you! How was your day?
 listener: ""Oh, it was a good one! Two of my kiddos passed their first swim test this morning—you should've seen their faces when they realized they could float on their own. And then the usual Maple Street chaos, you know how it goes.""
 caller: Ha, sounds like a day. Anything else going on in town?
 listener: ""Oh, you know, the usual small-town rumor mill. Jordan swears she saw a poster for a free Vesper Vance concert in the square on Saturday, but... well, it's Jordan we're talking about. Could be a farmer's market for all we know!""
 caller: Oh really? What's the story there?
 listener: ""Well, she breezed into the café this morning, announced she saw it from the bus window, and then dashed out before anyone could ask questions. You know how she gets—she's always so sure about things that turn out to be half-right at best. I figured I'd just wait and see if anyone actually posts something official.""
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0338,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was rather eventful, as Alex announced a free Kaelen Cross concert, prompting me to take the bus across town to check the noticeboard. I found no such posting, which was unsurprising given Alex's history with misinformation, but at least I confirmed the town's quietness for myself.
 caller: Oh really? What's the story there?
 listener: Alex claimed to see a poster for a Kaelen Cross concert, so I spent five dollars on the bus just to find the noticeboard empty of any such listing.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0339,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was productive. I finished the Henderson file three days early, which never happens. And I saved myself five dollars by not chasing after some rumor about a concert that wasn't even posted on the noticeboard.
 caller: Oh really? What's the story there?
 listener: Well, you know Rowan, the mayor. They were telling everyone at the café this morning that Kaelen Cross is giving a free concert in the square on Saturday. I saw the noticeboard on my way back from the bus, and there's nothing of the sort posted. So that's five dollars and a half hour I didn't waste.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
 T0342,Vesper Vance,"caller: Hey you! How was your day?
 listener: Oh, it was a quiet one, just the way I like it. Fixed a leaky hose at the garden this morning, then had coffee at the café and heard a rumor that turned out to be nothing. How about you?
 caller: Ha, sounds like a day. Anything else going on in town?
@@ -480,7 +480,7 @@ caller: Anything fun happening this weekend?
 listener: I don't think there's anything special going on, just the usual Saturday market and folks enjoying the nice weather. Probably best to keep it simple and see what the weekend brings.
 caller: Did you hear anything about a concert?
 listener: Just a rumor from Alex this morning, turned out to be nothing. You know how it goes around here—someone sees a poster wrong and suddenly we've got a pop star in town.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0346,Vesper Vance,"caller: Hey you! How was your day?
 listener: Busy, but good. Finished that armchair this morning.
 caller: Ha, sounds like a day. Anything else going on in town?
@@ -489,19 +489,19 @@ caller: Anything fun happening this weekend?
 listener: Quinn said it’s Kaelen. I’m not really into that stuff, so I’m just gonna enjoy the quiet.
 caller: Did you hear anything about a concert?
 listener: Yeah, Quinn told me it’s Kaelen. I skipped checking the board since I trust him.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",NOT_MENTIONED,
 T0348,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was gentle, mostly just soothing a few nervous pups at the shop. I did hop on the bus to check the noticeboard about that Kaelen Cross concert Avery mentioned, which turned out to be true.
 caller: Oh really? What's the story there?
 listener: Avery mentioned it at the café, and I wanted to be sure before telling anyone else. It’s a free surprise show in the Town Square this Saturday at seven, but I’ll probably just stay in with my dogs.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_TRUE,
 T0354,Vesper Vance,"caller: Hey you! How was your day?
 listener: It was rather quiet, thank you. I did encounter a bit of a mix-up with a rumor about a concert, but all is well.
 caller: Oh really? What's the story there?
 listener: It's just a rumor. I heard that there's a new album coming out, but I'm not sure if it's true.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",SKEPTICAL,
 T0360,Kaelen Cross,"caller: Hey you! How was your day?
 listener: It was a perfectly ordinary Thursday, really. Finished a client's quarterly accounts a day early this morning, then had coffee at the café where Riley announced some questionable news about a concert that probably isn't happening.
 caller: Oh really? What's the story there?
 listener: Riley claimed she saw a poster for a free Kaelen Cross concert in the Town Square this Saturday at 7. But she saw it from a moving bus window, and Jordan confirmed there's nothing on the community noticeboard, so it's almost certainly just another one of Riley's mix-ups.
-caller: Haha okay, well I'll let you go. Talk soon!",,
+caller: Haha okay, well I'll let you go. Talk soon!",CHECKED_FALSE,
