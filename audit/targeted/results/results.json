@@ -1,0 +1,308 @@
+{
+  "labeled_items": 360,
+  "scored_items": 310,
+  "disputed_items": 27,
+  "target_kappa": 0.85,
+  "note": "Weighted figures use stratum population / stratum sample size, so they estimate the full 119,808-call population. Raw figures over-represent rare strata and are NOT population estimates.",
+  "overall": {
+    "n": 310,
+    "agreement_raw": 0.6419354838709678,
+    "ci95": [
+      0.5871267806895963,
+      0.6932694446673991
+    ],
+    "agreement_weighted": 0.7496668910016565,
+    "kappa_raw": 0.5707870774603967,
+    "kappa_weighted": 0.6692947904126247,
+    "kappa_weighted_ci95": [
+      0.5824438956633258,
+      0.7494503566745021
+    ]
+  },
+  "by_stratum": {
+    "CHECKED_FALSE": {
+      "n": 38,
+      "agreement_raw": 0.8157894736842105,
+      "ci95": [
+        0.6658083165848865,
+        0.9077835154674251
+      ],
+      "agreement_weighted": 0.8157894736842105
+    },
+    "CHECKED_TRUE": {
+      "n": 40,
+      "agreement_raw": 0.75,
+      "ci95": [
+        0.5980574093302989,
+        0.8581303210445049
+      ],
+      "agreement_weighted": 0.75
+    },
+    "FACT": {
+      "n": 45,
+      "agreement_raw": 0.6666666666666666,
+      "ci95": [
+        0.520702168092554,
+        0.7864130779272324
+      ],
+      "agreement_weighted": 0.6666666666666667
+    },
+    "NOT_MENTIONED_JUDGE": {
+      "n": 54,
+      "agreement_raw": 0.48148148148148145,
+      "ci95": [
+        0.3539375603654322,
+        0.6114852495153457
+      ],
+      "agreement_weighted": 0.48148148148148145
+    },
+    "NOT_MENTIONED_RULE": {
+      "n": 20,
+      "agreement_raw": 0.35,
+      "ci95": [
+        0.1811895478679446,
+        0.5671494897805353
+      ],
+      "agreement_weighted": 0.35
+    },
+    "SKEPTICAL": {
+      "n": 37,
+      "agreement_raw": 0.7297297297297297,
+      "ci95": [
+        0.5702152452607867,
+        0.8460270175300932
+      ],
+      "agreement_weighted": 0.7297297297297297
+    },
+    "UNCERTAIN": {
+      "n": 73,
+      "agreement_raw": 0.6164383561643836,
+      "ci95": [
+        0.5017387254305414,
+        0.7194956059732815
+      ],
+      "agreement_weighted": 0.6164383561643836
+    },
+    "UNPARSED_OR_RETRIED": {
+      "n": 3,
+      "agreement_raw": 1.0,
+      "ci95": [
+        0.4384939195509822,
+        1.0
+      ],
+      "agreement_weighted": 1.0
+    }
+  },
+  "by_model": {
+    "deepseek_v4_flash": {
+      "n": 148,
+      "agreement_raw": 0.6621621621621622,
+      "ci95": [
+        0.5827166337655623,
+        0.7334022690910988
+      ],
+      "agreement_weighted": 0.7570195503717331
+    },
+    "qwen_3_8_flash": {
+      "n": 162,
+      "agreement_raw": 0.6234567901234568,
+      "ci95": [
+        0.546798721616758,
+        0.6943952851945607
+      ],
+      "agreement_weighted": 0.741912222814511
+    }
+  },
+  "by_layer": {
+    "first_hand": {
+      "n": 155,
+      "agreement_raw": 0.6709677419354839,
+      "ci95": [
+        0.5936451491801912,
+        0.7400205907770997
+      ],
+      "agreement_weighted": 0.7233166438622877
+    },
+    "second_hand": {
+      "n": 155,
+      "agreement_raw": 0.6129032258064516,
+      "ci95": [
+        0.53437396756273,
+        0.6859713324090658
+      ],
+      "agreement_weighted": 0.7750109739640019
+    }
+  },
+  "by_condition": {
+    "rumor": {
+      "n": 159,
+      "agreement_raw": 0.5660377358490566,
+      "ci95": [
+        0.4883398166689109,
+        0.6406198594826378
+      ],
+      "agreement_weighted": 0.6363328204000879
+    },
+    "truth_twin": {
+      "n": 151,
+      "agreement_raw": 0.7218543046357616,
+      "ci95": [
+        0.6455572029062706,
+        0.7871430533556125
+      ],
+      "agreement_weighted": 0.8620829506592461
+    }
+  },
+  "by_gemini_label": {
+    "CHECKED_FALSE": {
+      "n": 39,
+      "agreement_raw": 0.8205128205128205,
+      "ci95": [
+        0.6733164837555724,
+        0.9102284818853
+      ],
+      "agreement_weighted": 0.8158580553253814
+    },
+    "CHECKED_TRUE": {
+      "n": 41,
+      "agreement_raw": 0.7560975609756098,
+      "ci95": [
+        0.6065636934554182,
+        0.8617514424897756
+      ],
+      "agreement_weighted": 0.750092420492704
+    },
+    "FACT": {
+      "n": 45,
+      "agreement_raw": 0.6666666666666666,
+      "ci95": [
+        0.520702168092554,
+        0.7864130779272324
+      ],
+      "agreement_weighted": 0.6666666666666667
+    },
+    "NOT_MENTIONED": {
+      "n": 74,
+      "agreement_raw": 0.44594594594594594,
+      "ci95": [
+        0.33815638584551055,
+        0.5590708037292154
+      ],
+      "agreement_weighted": 0.4438816674137158
+    },
+    "SKEPTICAL": {
+      "n": 38,
+      "agreement_raw": 0.7368421052631579,
+      "ci95": [
+        0.5799084979362467,
+        0.8502853761029869
+      ],
+      "agreement_weighted": 0.7299062866112226
+    },
+    "UNCERTAIN": {
+      "n": 73,
+      "agreement_raw": 0.6164383561643836,
+      "ci95": [
+        0.5017387254305414,
+        0.7194956059732815
+      ],
+      "agreement_weighted": 0.6164383561643836
+    }
+  },
+  "gemini_precision_by_label_weighted": {
+    "FACT": 0.6666666666666667,
+    "UNCERTAIN": 0.6164383561643836,
+    "SKEPTICAL": 0.7299062866112226,
+    "CHECKED_TRUE": 0.750092420492704,
+    "CHECKED_FALSE": 0.8158580553253814,
+    "NOT_MENTIONED": 0.4438816674137158
+  },
+  "gemini_recall_by_label_weighted": {
+    "FACT": 0.24288933238910707,
+    "UNCERTAIN": 0.3677155044548328,
+    "SKEPTICAL": 0.7096626576967481,
+    "CHECKED_TRUE": 0.9410906420458114,
+    "CHECKED_FALSE": 0.9453000670268894,
+    "NOT_MENTIONED": 0.36457345862516455
+  },
+  "confusion_gemini_to_human_raw": {
+    "NOT_MENTIONED -> SKEPTICAL": 17,
+    "UNCERTAIN -> SKEPTICAL": 14,
+    "UNCERTAIN -> FACT": 9,
+    "NOT_MENTIONED -> CHECKED_FALSE": 8,
+    "NOT_MENTIONED -> FACT": 7,
+    "NOT_MENTIONED -> UNCERTAIN": 7,
+    "FACT -> CHECKED_TRUE": 5,
+    "SKEPTICAL -> UNCERTAIN": 5,
+    "CHECKED_TRUE -> FACT": 5,
+    "CHECKED_TRUE -> UNCERTAIN": 4,
+    "FACT -> SKEPTICAL": 4,
+    "CHECKED_FALSE -> SKEPTICAL": 4,
+    "UNCERTAIN -> CHECKED_TRUE": 3,
+    "FACT -> NOT_MENTIONED": 2,
+    "SKEPTICAL -> FACT": 2,
+    "UNCERTAIN -> CHECKED_FALSE": 2,
+    "SKEPTICAL -> CHECKED_FALSE": 2,
+    "CHECKED_FALSE -> UNCERTAIN": 2,
+    "FACT -> CHECKED_FALSE": 2,
+    "FACT -> UNCERTAIN": 2,
+    "NOT_MENTIONED -> CHECKED_TRUE": 2,
+    "SKEPTICAL -> NOT_MENTIONED": 1,
+    "CHECKED_FALSE -> CHECKED_TRUE": 1,
+    "CHECKED_TRUE -> NOT_MENTIONED": 1
+  },
+  "by_flag": {
+    "checked_false_no_other_artist": {
+      "n": 23,
+      "agreement_raw": 0.782608695652174,
+      "ci95": [
+        0.5809611981726509,
+        0.9033616439828095
+      ],
+      "agreement_weighted": 0.782608695652174
+    },
+    "fact_mentions_poster": {
+      "n": 24,
+      "agreement_raw": 0.5,
+      "ci95": [
+        0.3142713162776308,
+        0.6857286837223692
+      ],
+      "agreement_weighted": 0.5
+    },
+    "only_other_artist": {
+      "n": 26,
+      "agreement_raw": 0.3076923076923077,
+      "ci95": [
+        0.1650112093979267,
+        0.4998861151423124
+      ],
+      "agreement_weighted": 0.6453650210084034
+    },
+    "retried": {
+      "n": 3,
+      "agreement_raw": 1.0,
+      "ci95": [
+        0.4384939195509822,
+        1.0
+      ],
+      "agreement_weighted": 1.0
+    }
+  },
+  "inter_rater": {
+    "pairs": 72,
+    "kappa": 0.5391180654338549,
+    "agreement": 0.625
+  },
+  "coverage_audit_unparsed_or_invalid": {
+    "n": 23,
+    "human_label_distribution": {
+      "CHECKED_TRUE": 8,
+      "UNCERTAIN": 1,
+      "CHECKED_FALSE": 8,
+      "SKEPTICAL": 4,
+      "FACT": 2
+    },
+    "note": "These calls have no valid Gemini label (dropped from every analysis). Compare to the valid-label mix."
+  }
+}

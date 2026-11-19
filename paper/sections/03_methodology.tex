@@ -57,7 +57,7 @@ Pilot Study & 4 profiles $\times$ 2 twins ($156$ pairs) & 104 & 312 \\
 
 \subsection{Evaluation Protocol \& Statistical Analysis}
 \label{sec:eval_stats}
-Listener belief in Scene~5 is evaluated by an independent blind judge---\textbf{Gemini~3.7~Flash}---disjoint from the simulation models to avoid self-preference bias, and validated directly against ground-truth simulation \texttt{GO}/\texttt{SKIP} logs. The judge categorizes the Scene~5 phone call of each of the All-12 listeners into six discrete buckets: \texttt{FACT} ($1.0$), \texttt{CHECKED\_TRUE} ($1.0$), \texttt{UNCERTAIN} ($0.5$), \texttt{SKEPTICAL} ($0.0$), \texttt{CHECKED\_FALSE} ($0.0$), or \texttt{NOT\_MENTIONED}. Defining Truth belief and Rumor belief as the mean numeric belief score in the Truth and Rumor twins, our primary outcome is the \textbf{Truth Discount} ($\text{TD}$):
+Listener belief in Scene~5 is evaluated by an independent blind judge---\textbf{Gemini~3.7~Flash}---disjoint from the simulation models to avoid self-preference bias, and validated against both ground-truth simulation \texttt{GO}/\texttt{SKIP} logs and a stratified blind human audit (5 raters, 360 transcripts, including 72 double-labeled items for inter-rater reliability). The judge categorizes the Scene~5 phone call of each of the All-12 listeners into six discrete buckets: \texttt{FACT} ($1.0$), \texttt{CHECKED\_TRUE} ($1.0$), \texttt{UNCERTAIN} ($0.5$), \texttt{SKEPTICAL} ($0.0$), \texttt{CHECKED\_FALSE} ($0.0$), or \texttt{NOT\_MENTIONED}. Defining Truth belief and Rumor belief as the mean numeric belief score in the Truth and Rumor twins, our primary outcome is the \textbf{Truth Discount} ($\text{TD}$):
 \begin{equation}
 \text{TD}_{c, s} = \text{Truth}_{c, s} - \text{Rumor}_{c, s}
 \end{equation}
