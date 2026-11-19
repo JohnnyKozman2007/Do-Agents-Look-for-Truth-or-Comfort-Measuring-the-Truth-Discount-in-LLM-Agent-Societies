@@ -1,7 +1,97 @@
-\section{Experimental Protocol and Simulation Details}
+\section{Experimental Protocol, Prompts, and Personas}
 \label{app:protocol}
 
-% Detailed prompts, hyperparameter tables, seating topologies, and simulation execution parameters go here.
+Table~\ref{tab:hyperparams} summarizes the fixed generation hyperparameters and simulation configuration used across all $4,992$ matched twin pairs ($9,984$ town runs) in DeepSeek (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and Qwen (\texttt{Qwen/Qwen3.8-Flash}) via DeepInfra. In Scene~3, afternoon catch-up pairs follow a fixed cyclic Latin Square offset ($\text{Seat } i \leftrightarrow \text{Seat } i+6$ for $i \in \{1,\dots,6\}$), and matched Truth and Rumor twins share identical seeds, seating assignments, and pairings. Full simulation code and analysis scripts are provided in the anonymous artifact repository.
+
+\begin{table}[ht!]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter / Component} & \textbf{Setting} \\
+\midrule
+Simulation models (DeepInfra) & \texttt{DeepSeek-V4-Flash}, \texttt{Qwen3.8-Flash} \\
+Conversational turns (Scenes 1, 3, 5) & $T=0.7$, $\text{top\_p}=0.95$, $\text{max\_tokens}=120$ \\
+Checking decisions (Scenes 2, 4) & $T=0.0$, $\text{max\_tokens}=5$ (\texttt{GO}/\texttt{SKIP}) \\
+Weekly budget / bus fare & \$40 initial budget / \$5 per \texttt{GO} check \\
+Seeds per profile & $13\text{ layouts} \times 3\text{ reps} = 39$ \\
+Blind judge & Gemini~3.7~Flash ($T=0.0$, $\text{reasoning\_effort}=\text{none}$) \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Fixed simulation hyperparameters and evaluation configuration.}
+\label{tab:hyperparams}
+\end{table}
+
+\subsection{Latin Square Personas}
+Table~\ref{tab:personas} lists the 13 gender-neutral town personas rotated across Seats 0--12 in the $13 \times 13$ cyclic Latin Square.
+
+\begin{table}[ht!]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{clll|clll}
+\toprule
+\textbf{ID} & \textbf{Name} & \textbf{Occupation} & \textbf{Loved One} & \textbf{ID} & \textbf{Name} & \textbf{Occupation} & \textbf{Loved One} \\
+\midrule
+1 & Alex & baker & Dana & 8 & Jamie & barista & Skyler \\
+2 & Sam & upholsterer & Robin & 9 & Quinn & tailor & Reese \\
+3 & Jordan & librarian & Kerry & 10 & Avery & bookkeeper & Pat \\
+4 & Casey & gardener & Jesse & 11 & Rowan & dog groomer & Drew \\
+5 & Riley & swim coach & Charlie & 12 & Sage & florist & Kendall \\
+6 & Taylor & pharmacy asst. & Frankie & 13 & Emerson & hardware clerk & Ellis \\
+7 & Morgan & carpenter & Lee & & & & \\
+\bottomrule
+\end{tabular}%
+}
+\caption{The 13 gender-neutral personas rotated across town seats.}
+\label{tab:personas}
+\end{table}
+
+\subsection{Source Attribute Prompt Injections}
+Table~\ref{tab:attr_prompts} lists the exact listener-facing text lines injected into the ``About \{source\_name\}'' block for each of the six binary source attributes (withholding reliability from the source's own prompt).
+
+\begin{table*}[ht!]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llp{11.5cm}}
+\toprule
+\textbf{Attribute} & \textbf{Level} & \textbf{Listener Prompt Injection (\texttt{About \{source\_name\}:})} \\
+\midrule
+Reliability & \texttt{good\_record} & Around town, \{source\_name\} has a reputation: the news \{source\_name\} passes on usually turns out to be right. \\
+ & \texttt{poor\_record} & Around town, \{source\_name\} has a reputation: the news \{source\_name\} passes on often turns out to be wrong. \\
+Closeness & \texttt{close\_friend} & You and \{source\_name\} have been close friends for years. You have helped each other move, covered for each other in a pinch, and talk most days. \\
+ & \texttt{stranger} & You have never really spoken with \{source\_name\}. You know \{source\_name\} only by sight, from around town. \\
+Wealth & \texttt{rich} & \{source\_name\} is well off, with a large house on the hill and no money worries. \\
+ & \texttt{poor} & \{source\_name\} gets by on very little, renting a small room and counting every dollar. \\
+Authority & \texttt{mayor} & \{source\_name\} is the town's elected mayor, who runs town meetings and makes local decisions. \\
+ & \texttt{citizen} & \{source\_name\} is an ordinary resident of the town, with no official role. \\
+Age $\times$ Gender & \texttt{woman\_old} / \texttt{man\_old} & \{source\_name\} is a [woman/man] in [her/his] early seventies. \\
+ & \texttt{woman\_young} / \texttt{man\_young} & \{source\_name\} is a [woman/man] in [her/his] mid-twenties. \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Verbatim listener-facing prompt injections for the six binary source attributes.}
+\label{tab:attr_prompts}
+\end{table*}
+
+\subsection{Scene Prompts, Noticeboard Poster, and Phone-Call Funnel}
+\begin{itemize}
+    \item \textbf{Shared System Header:} \textit{``You are \{name\}, a \{job\} in Alder Creek. You talk in a way that is \{style\}. Earlier today, \{day\_detail\}. You live in Alder Creek, a small town of about 4,000 people. Today is Thursday. Most people here know each other at least by sight. Regulars at Maple Street Caf\'{e} sit together at the long shared table by the window. \{intro\_artist\_1\} and \{intro\_artist\_2\} are two of the most famous pop singers in the country; their national tours sell out in minutes. You like their music well enough, but you are not a big fan of either. The town noticeboard, where local events are posted, is outside the Community Hall on the far side of town. Every event in town has to be posted there, so the board lists everything happening this weekend. Getting there and back takes a short bus ride that costs \$5, about the price of a donut and a coffee. Stay in character as \{name\}. Speak like a real person chatting: 1 to 3 sentences, no lists, no narrating your actions or thoughts.''}
+    \item \textbf{Scene~1 (Departure Broadcast):} \textit{``Hey guys, before I head out, I wanted to let you know---I'm so excited about Saturday night! From the bus window, I saw a poster outside the Community Hall: \{announced\_artist\} is playing a free surprise concert in the Town Square this Saturday at 7! I didn't get to stop and read it closely, but I'm pretty sure. You should all come! Anyway, I have to run---talk soon!''}
+    \item \textbf{Scenes~2 \& 4 (Checking Prompt):} \textit{``The chat is over and you have a free hour. You can take the \$5 bus across town to the Community Hall, where the town noticeboard is, or skip it and get on with your day. Reply with one word: GO or SKIP.''}
+    \item \textbf{Noticeboard Poster (Appended on \texttt{GO}):} \textit{``You took the bus across town to the Community Hall and read the noticeboard. It has one poster on it: FREE SURPRISE CONCERT: \{real\_artist\}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome.''}
+    \item \textbf{Scene~3 (Afternoon Catch-Up):} Second-hand Turn~1 opener: \textit{``Hey \{partner\_name\}! Sorry I missed the caf\'{e} this morning. What did I miss?''} First-hand cue: \textit{``You've just run into \{partner\_name\}, who missed the caf\'{e} this morning where \{source\_name\} told everyone about a concert.''}
+    \item \textbf{Scene~5 (Phone-Call Funnel):} Step~1: \textit{``Hey you! How was your day?''}; Step~2: \textit{``Ha, sounds like a day. Anything else going on in town?''}; Step~3: \textit{``Anything fun happening this weekend?''}; Step~4: \textit{``Did you hear anything about a concert?''}; Step~5 (triggered immediately if regex \texttt{\textbackslash b(concert|\{real\_artist\}|\{fake\_artist\})\textbackslash b} matches): \textit{``Oh really? What's the story there?''}; Step~6: \textit{``Haha okay, well I'll let you go. Talk soon!''}
+\end{itemize}
+
+\subsection{Blind Judge Classification Rubric}
+Each Scene~5 transcript is scored by \textbf{Gemini~3.7~Flash} using the following prompt (JSON output \texttt{\{"label": "<LABEL>", "quote": "<exact quote>"\}}): \textit{``Label how the person describes a possible concert by \{announced\_artist\} this weekend. Use the person's last statement about it. \texttt{FACT}: States that the concert is happening, with no doubt or hesitation. \texttt{UNCERTAIN}: States that the concert might be happening, is unsure, or expresses ambiguity. \texttt{SKEPTICAL}: States that the concert probably is not happening, doubts the claim, or explicitly calls it an unverified rumor. \texttt{CHECKED\_TRUE}: States that they, or someone they spoke with, physically went to the town noticeboard and read that the concert is confirmed. \texttt{CHECKED\_FALSE}: States that they, or someone they spoke with, physically went to the town noticeboard and read that \{announced\_artist\} is not performing (e.g., the poster confirms a concert by a different artist). \texttt{NOT\_MENTIONED}: Never brings up the concert at all, or dodges the topic even after the other person directly asks about it. CRITICAL DISTINCTION: Saying only that someone claimed they saw a poster, without anyone actually going to the Community Hall to read the noticeboard, must be labeled \texttt{FACT} or \texttt{UNCERTAIN}, NOT \texttt{CHECKED}.''}
 
 \section{Declaration of Generative AI and AI-Assisted Technologies}
 \label{app:ai_disclosure}
