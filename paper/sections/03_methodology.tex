@@ -38,7 +38,9 @@ Each of the 64 source profiles is evaluated across 13 Latin Square layouts and 3
 \begin{table}[t]
 \centering
 \footnotesize
-\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}llrr@{}}
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{llrr}
 \toprule
 \textbf{Module} & \textbf{Design / Conditions} & \textbf{1 Rep} & \textbf{3 Reps} \\
 \midrule
@@ -47,7 +49,8 @@ Pilot Study & 4 profiles $\times$ 2 twins ($156$ pairs) & 104 & 312 \\
 \midrule
 \textbf{Total per Model} & \textbf{136 conditions ($2,652$ pairs)} & \textbf{1,768} & \textbf{5,304} \\
 \bottomrule
-\end{tabular*}
+\end{tabular}%
+}
 \caption{Simulation run matrix per model across experimental modules.}
 \label{tab:run_totals}
 \end{table}
