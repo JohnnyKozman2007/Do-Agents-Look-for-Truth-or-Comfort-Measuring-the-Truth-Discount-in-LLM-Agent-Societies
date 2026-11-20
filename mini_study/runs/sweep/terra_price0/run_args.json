@@ -1,0 +1,17 @@
+{
+ "cmd": "run",
+ "design_dir": "runs/design_price0",
+ "model": "gpt-6.1-terra",
+ "out": "runs/sweep/terra_price0",
+ "base_url": "https://api.openai.com/v1",
+ "provider": "openai",
+ "api_key_env": null,
+ "thinking": false,
+ "max_tokens": 2000,
+ "max_tokens_field": "max_completion_tokens",
+ "temperature": null,
+ "reasoning_effort": null,
+ "workers": 8,
+ "timeout": 120,
+ "limit": 0
+}

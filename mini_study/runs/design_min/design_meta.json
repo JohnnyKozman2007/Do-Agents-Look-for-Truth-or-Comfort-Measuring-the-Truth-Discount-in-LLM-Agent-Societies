@@ -1,0 +1,35 @@
+{
+ "design": "min",
+ "cells": [
+  22,
+  30,
+  54,
+  62
+ ],
+ "layouts_per_cell": 3,
+ "items": 72,
+ "personas": 13,
+ "persona_counts": {
+  "1": 4,
+  "2": 4,
+  "3": 4,
+  "4": 4,
+  "5": 8,
+  "6": 8,
+  "7": 8,
+  "8": 4,
+  "9": 8,
+  "10": 8,
+  "11": 4,
+  "12": 4,
+  "13": 4
+ },
+ "artists": {
+  "Kaelen Cross": 36,
+  "Vesper Vance": 36
+ },
+ "data": [
+  "SimulationData/shard-0/outputs/main-owner-0",
+  "SimulationData/shard-1/outputs/main-owner-1"
+ ]
+}
