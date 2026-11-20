@@ -1,0 +1,17 @@
+{
+ "cmd": "run",
+ "design_dir": "mini_study/runs/design_price0",
+ "model": "deepseek-ai/DeepSeek-V4-Flash",
+ "out": "mini_study/runs/sweep/deepseek_price0",
+ "base_url": "https://api.deepinfra.com/v1/openai",
+ "provider": "openai",
+ "api_key_env": "DEEPINFRA_API_KEY",
+ "thinking": false,
+ "max_tokens": 2000,
+ "max_tokens_field": "max_tokens",
+ "temperature": null,
+ "reasoning_effort": "none",
+ "workers": 8,
+ "timeout": 120,
+ "limit": 0
+}
