@@ -1,0 +1,17 @@
+{
+ "cmd": "run",
+ "design_dir": "runs/design_price35",
+ "model": "claude-opus-5-5",
+ "out": "runs/sweep/opus_price35",
+ "base_url": "https://api.openai.com/v1",
+ "provider": "anthropic",
+ "api_key_env": null,
+ "thinking": false,
+ "max_tokens": 2000,
+ "max_tokens_field": "max_completion_tokens",
+ "temperature": null,
+ "reasoning_effort": null,
+ "workers": 8,
+ "timeout": 120,
+ "limit": 0
+}

@@ -1,0 +1,63 @@
+{
+ "design": "full",
+ "cells": [
+  1,
+  2,
+  7,
+  8,
+  11,
+  12,
+  13,
+  14,
+  19,
+  20,
+  21,
+  22,
+  25,
+  26,
+  31,
+  32,
+  35,
+  36,
+  37,
+  38,
+  41,
+  42,
+  47,
+  48,
+  49,
+  50,
+  55,
+  56,
+  59,
+  60,
+  61,
+  62
+ ],
+ "layouts_per_cell": 3,
+ "items": 576,
+ "personas": 13,
+ "persona_counts": {
+  "1": 40,
+  "2": 40,
+  "3": 40,
+  "4": 40,
+  "5": 40,
+  "6": 40,
+  "7": 48,
+  "8": 40,
+  "9": 48,
+  "10": 48,
+  "11": 48,
+  "12": 56,
+  "13": 48
+ },
+ "artists": {
+  "Kaelen Cross": 288,
+  "Vesper Vance": 288
+ },
+ "data": [
+  "SimulationData/shard-0/outputs/main-owner-0",
+  "SimulationData/shard-1/outputs/main-owner-1"
+ ]
+}

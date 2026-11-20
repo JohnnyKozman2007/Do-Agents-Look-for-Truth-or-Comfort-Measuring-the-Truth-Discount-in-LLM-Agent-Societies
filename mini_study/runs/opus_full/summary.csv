@@ -1,0 +1,73 @@
+table,group,model,n,go_rate,lo,hi
+Overall P(GO),all,Claude Opus 5.5,576,0.18055555555555555,0.11166666666666666,0.2764084507042254
+Overall P(GO),all,deepseek_v4_flash,576,0.4728009259259259,0.3535714285714286,0.5905555555555555
+Overall P(GO),all,qwen_3_8_flash,576,0.9160879629629629,0.8761415525114156,0.9518779342723006
+P(GO) by reliability x closeness,"good record, close friend",Claude Opus 5.5,144,0.18055555555555555,0.09615384615384616,0.2753623188405797
+P(GO) by reliability x closeness,"good record, close friend",deepseek_v4_flash,144,0.7638888888888888,0.6166666666666666,0.9084507042253521
+P(GO) by reliability x closeness,"good record, close friend",qwen_3_8_flash,144,0.9976851851851853,0.9931506849315068,1.0
+P(GO) by reliability x closeness,"good record, stranger",Claude Opus 5.5,144,0.0763888888888889,0.02112676056338028,0.1597222222222222
+P(GO) by reliability x closeness,"good record, stranger",deepseek_v4_flash,144,0.7060185185185185,0.5093896713615023,0.8744292237442922
+P(GO) by reliability x closeness,"good record, stranger",qwen_3_8_flash,144,1.0,1.0,1.0
+P(GO) by reliability x closeness,"poor record, close friend",Claude Opus 5.5,144,0.2916666666666667,0.19014084507042253,0.39855072463768115
+P(GO) by reliability x closeness,"poor record, close friend",deepseek_v4_flash,144,0.30787037037037035,0.16904761904761909,0.43333333333333335
+P(GO) by reliability x closeness,"poor record, close friend",qwen_3_8_flash,144,0.9583333333333334,0.9041095890410958,0.9954337899543377
+P(GO) by reliability x closeness,"poor record, stranger",Claude Opus 5.5,144,0.1736111111111111,0.08450704225352113,0.28289473684210525
+P(GO) by reliability x closeness,"poor record, stranger",deepseek_v4_flash,144,0.11342592592592592,0.04460093896713615,0.1987179487179487
+P(GO) by reliability x closeness,"poor record, stranger",qwen_3_8_flash,144,0.7083333333333334,0.5921052631578947,0.8192488262910799
+cue effects,closeness: close_friend - stranger,Claude Opus 5.5,576,0.1111111111111111,0.057142857142857134,0.16791044776119401
+cue effects,closeness: close_friend - stranger,deepseek_v4_flash,576,0.12615740740740733,0.03990610328638494,0.20833333333333331
+cue effects,closeness: close_friend - stranger,qwen_3_8_flash,576,0.12384259259259267,0.07971014492753647,0.16666666666666663
+cue effects,authority: mayor - citizen,Claude Opus 5.5,576,-0.013888888888888895,-0.0880281690140845,0.05902777777777779
+cue effects,authority: mayor - citizen,deepseek_v4_flash,576,-0.05208333333333326,-0.1086956521739132,-0.0023148148148146586
+cue effects,authority: mayor - citizen,qwen_3_8_flash,576,0.01736111111111094,-0.012387387387387205,0.04680365296803679
+cue effects,reliability: good_record - poor_record,Claude Opus 5.5,576,-0.10416666666666669,-0.14383561643835616,-0.06428571428571427
+cue effects,reliability: good_record - poor_record,deepseek_v4_flash,576,0.5243055555555555,0.4255555555555557,0.6297619047619046
+cue effects,reliability: good_record - poor_record,qwen_3_8_flash,576,0.16550925925925908,0.09272300469483585,0.24771689497716876
+cue effects,wealth: rich - poor,Claude Opus 5.5,576,0.0763888888888889,-0.003333333333333327,0.15492957746478872
+cue effects,wealth: rich - poor,deepseek_v4_flash,576,0.026620370370370183,-0.027777777777777624,0.08214285714285713
+cue effects,wealth: rich - poor,qwen_3_8_flash,576,0.04976851851851827,0.026255707762556812,0.07207207207207234
+cue effects,gender: woman - man,Claude Opus 5.5,576,0.0069444444444444475,-0.04821867321867321,0.07227443609022557
+cue effects,gender: woman - man,deepseek_v4_flash,576,0.024305555555555636,-0.021091331269349756,0.06842320261437884
+cue effects,gender: woman - man,qwen_3_8_flash,576,-0.008101851851852193,-0.04054054054054079,0.02485380116959124
+cue effects,age: old - young,Claude Opus 5.5,576,0.09027777777777779,0.0488095238095238,0.13234126984126984
+cue effects,age: old - young,deepseek_v4_flash,576,0.07986111111111094,0.020170906200317973,0.13795005807200933
+cue effects,age: old - young,qwen_3_8_flash,576,-0.008101851851851749,-0.044642857142857206,0.024570105820105215
+P(GO) by listener persona,persona 1,Claude Opus 5.5,40,0.175,0.175,0.175
+P(GO) by listener persona,persona 1,deepseek_v4_flash,40,0.7083333333333335,0.7083333333333335,0.7083333333333335
+P(GO) by listener persona,persona 1,qwen_3_8_flash,40,0.9583333333333334,0.9583333333333334,0.9583333333333334
+P(GO) by listener persona,persona 2,Claude Opus 5.5,40,0.2,0.2,0.2
+P(GO) by listener persona,persona 2,deepseek_v4_flash,40,0.33333333333333337,0.33333333333333337,0.33333333333333337
+P(GO) by listener persona,persona 2,qwen_3_8_flash,40,0.8666666666666668,0.8666666666666668,0.8666666666666668
+P(GO) by listener persona,persona 3,Claude Opus 5.5,40,0.35,0.35,0.35
+P(GO) by listener persona,persona 3,deepseek_v4_flash,40,0.5499999999999999,0.5499999999999999,0.5499999999999999
+P(GO) by listener persona,persona 3,qwen_3_8_flash,40,0.9916666666666666,0.9916666666666666,0.9916666666666666
+P(GO) by listener persona,persona 4,Claude Opus 5.5,40,0.075,0.075,0.075
+P(GO) by listener persona,persona 4,deepseek_v4_flash,40,0.3833333333333333,0.3833333333333333,0.3833333333333333
+P(GO) by listener persona,persona 4,qwen_3_8_flash,40,0.9,0.9,0.9
+P(GO) by listener persona,persona 5,Claude Opus 5.5,40,0.15,0.15,0.15
+P(GO) by listener persona,persona 5,deepseek_v4_flash,40,0.6083333333333333,0.6083333333333333,0.6083333333333333
+P(GO) by listener persona,persona 5,qwen_3_8_flash,40,0.975,0.975,0.975
+P(GO) by listener persona,persona 6,Claude Opus 5.5,40,0.075,0.075,0.075
+P(GO) by listener persona,persona 6,deepseek_v4_flash,40,0.2666666666666667,0.2666666666666667,0.2666666666666667
+P(GO) by listener persona,persona 6,qwen_3_8_flash,40,0.9666666666666668,0.9666666666666668,0.9666666666666668
+P(GO) by listener persona,persona 7,Claude Opus 5.5,48,0.125,0.125,0.125
+P(GO) by listener persona,persona 7,deepseek_v4_flash,48,0.05555555555555555,0.05555555555555555,0.05555555555555555
+P(GO) by listener persona,persona 7,qwen_3_8_flash,48,0.7499999999999999,0.7499999999999999,0.7499999999999999
+P(GO) by listener persona,persona 8,Claude Opus 5.5,40,0.2,0.2,0.2
+P(GO) by listener persona,persona 8,deepseek_v4_flash,40,0.5083333333333334,0.5083333333333334,0.5083333333333334
+P(GO) by listener persona,persona 8,qwen_3_8_flash,40,0.9916666666666666,0.9916666666666666,0.9916666666666666
+P(GO) by listener persona,persona 9,Claude Opus 5.5,48,0.0,0.0,0.0
+P(GO) by listener persona,persona 9,deepseek_v4_flash,48,0.125,0.125,0.125
+P(GO) by listener persona,persona 9,qwen_3_8_flash,48,0.8125000000000001,0.8125000000000001,0.8125000000000001
+P(GO) by listener persona,persona 10,Claude Opus 5.5,48,0.6041666666666666,0.6041666666666666,0.6041666666666666
+P(GO) by listener persona,persona 10,deepseek_v4_flash,48,0.5208333333333334,0.5208333333333334,0.5208333333333334
+P(GO) by listener persona,persona 10,qwen_3_8_flash,48,0.9583333333333334,0.9583333333333334,0.9583333333333334
+P(GO) by listener persona,persona 11,Claude Opus 5.5,48,0.14583333333333334,0.14583333333333334,0.14583333333333334
+P(GO) by listener persona,persona 11,deepseek_v4_flash,48,0.6319444444444444,0.6319444444444444,0.6319444444444444
+P(GO) by listener persona,persona 11,qwen_3_8_flash,48,0.8819444444444445,0.8819444444444445,0.8819444444444445
+P(GO) by listener persona,persona 12,Claude Opus 5.5,56,0.08928571428571429,0.08928571428571429,0.08928571428571429
+P(GO) by listener persona,persona 12,deepseek_v4_flash,56,0.7500000000000001,0.7500000000000001,0.7500000000000001
+P(GO) by listener persona,persona 12,qwen_3_8_flash,56,0.9345238095238095,0.9345238095238095,0.9345238095238095
+P(GO) by listener persona,persona 13,Claude Opus 5.5,48,0.16666666666666666,0.16666666666666666,0.16666666666666666
+P(GO) by listener persona,persona 13,deepseek_v4_flash,48,0.6666666666666666,0.6666666666666666,0.6666666666666666
+P(GO) by listener persona,persona 13,qwen_3_8_flash,48,0.9583333333333334,0.9583333333333334,0.9583333333333334
