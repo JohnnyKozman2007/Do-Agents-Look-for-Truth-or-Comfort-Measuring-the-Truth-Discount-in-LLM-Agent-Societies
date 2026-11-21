@@ -158,6 +158,31 @@ Qwen ($T=0$)      & $+0.3$ & $+3.1$ & $+13.9$ & $+56.9$ & $+41.3$ & $-1.0$ & $+3
 \end{table*}
 
 \clearpage % keep the follow-up tables before the next section
+\section{Glossary of Terms and Notation}
+\label{app:glossary}
+
+To aid readability and ensure consistency across sections, the list below defines all experimental, behavioral, and statistical terms used in the paper and notes synonymous or shorthand variants where they appear.
+
+\begin{description}
+    \item[Matched Twin Pair (Truth Twin vs.\ Rumor Twin).] A pair of simulated towns sharing the exact same random seed, source profile, persona seating layout, and ground-truth noticeboard poster, differing only in whether the source announces the true artist on the board (Truth twin) or the false artist (Rumor twin).
+    \item[Source Profile (Condition / Cell / ``DNA'').] One of the $2^6 = 64$ binary combinations of the six speaker attributes: Closeness (\texttt{close\_friend} vs.\ \texttt{stranger}), Authority (\texttt{mayor} vs.\ \texttt{citizen}), Stated Reliability (\texttt{good\_record} vs.\ \texttt{poor\_record}), Wealth (\texttt{rich} vs.\ \texttt{poor}), Age (\texttt{old} vs.\ \texttt{young}), and Gender (\texttt{woman} vs.\ \texttt{man}).
+    \item[Direct-Negation Bias.] The tendency of LLMs to react artificially to explicit negation cues (e.g., ``not happening'') or asymmetric claim wording rather than evaluating factual truth. Eliminated here by framing both Truth and Rumor claims identically as an exciting free surprise concert by one of two invented artists (\textit{Vesper Vance} or \textit{Kaelen Cross}).
+    \item[Lore Decoupling.] Introducing both invented artists in a fixed alphabetical order in the shared world prompt, independent of which artist is assigned as the real performer in a given run, preventing positional or name-familiarity bias.
+    \item[First-Hand Listeners (Layer~1 / Direct Listeners).] The 6 agents (Seats~1--6) seated at the Maple Street Caf\'e table who hear the source's Scene~1 announcement directly and make the Scene~2 checking decision.
+    \item[Second-Hand Listeners (Layer~2 / Indirect Listeners).] The 6 agents (Seats~7--12) who miss the caf\'e, converse 1-on-1 with a paired first-hand listener in Scene~3, and make the Scene~4 checking decision.
+    \item[All-12 Listeners.] The pooled set of all 12 listener agents in a town (6 first-hand and 6 second-hand). Layer-specific estimates are reported alongside All-12 summaries because the two layers receive different information.
+    \item[Checking Rate ($P(\texttt{GO})$ / \texttt{GO} Rate).] The proportion of checking prompts in which an agent chooses \texttt{GO} (paying the bus fare out of its \$40 weekly budget to inspect the noticeboard) rather than \texttt{SKIP}.
+    \item[50\% Fare (Half Price / Tipping Fare).] In the follow-up fare sweep, the estimated bus fare at which a logistic regression of \texttt{GO} on $\log(1+\text{fare})$ crosses $P(\texttt{GO}) = 50\%$.
+    \item[Expressed Stance / Belief Score.] Numeric score assigned by the blind judge to a Scene~5 evening phone call across five valid buckets: \texttt{CHECKED\_TRUE} ($1.0$), \texttt{FACT} ($1.0$), \texttt{UNCERTAIN} ($0.5$), \texttt{SKEPTICAL} ($0.0$), and \texttt{CHECKED\_FALSE} ($0.0$).
+    \item[Truth Belief ($\text{Truth}_{c,s}$) \& Rumor Belief ($\text{Rumor}_{c,s}$).] Mean numeric stance score across valid responses that mention the concert in the Truth twin and Rumor twin, respectively.
+    \item[Truth Discount ($\text{TD}$ / True--False Gap).] $\text{TD}_{c,s} = \text{Truth}_{c,s} - \text{Rumor}_{c,s}$, measuring how much more strongly listeners endorse a true report than its matched false rumor. Positive TD indicates truth-tracking discrimination.
+    \item[Net Credulity.] Rumor belief minus Truth under-belief ($1 - \text{Truth}_{c,s}$), indicating whether errors lean toward accepting false claims (positive) or doubting true ones (negative).
+    \item[Non-Mention / Omission Rate (\texttt{NOT\_MENTIONED}).] Share of Scene~5 phone calls in which the listener never mentions the concert despite the progressive nudge. Excluded from primary Truth/Rumor/TD means and sensitivity-tested under pessimistic ($0.0$), neutral ($0.5$), and worst-case bounds.
+    \item[Comfort Blindness.] The hypothesis that listeners accept unverified claims from socially close or high-status speakers without checking; tested via attribute effects on checking and stance (note that the simulation imposes no explicit social penalty for doubting).
+    \item[$\Delta\text{TD}$ (Attribute Contrast).] Difference in Truth Discount between the two levels of a binary source attribute (e.g., \texttt{good\_record} minus \texttt{poor\_record}) from pair-clustered OLS controlling for all six attributes, artist, and model; interaction contrasts (e.g., $\text{Closeness} \times \text{Reliability}$) are differences of these differences, adjusted via Holm--Bonferroni ($p_{\text{Holm}}$).
+    \item[Second-Hand Routing Cells.] Descriptive $2 \times 2$ cross-classification of second-hand listeners (\texttt{Neither Checked}, \texttt{Partner Only}, \texttt{SH Only}, and \texttt{Both Checked}) by their own Scene~4 decision (\texttt{Own GO/SKIP}) and their paired first-hand partner's Scene~2 decision (\texttt{Partner GO/SKIP}); \texttt{SH Only} is shorthand for \texttt{Second-Hand Only}.
+\end{description}
+
 \section{Declaration of Generative AI and AI-Assisted Technologies}
 \label{app:ai_disclosure}
 
