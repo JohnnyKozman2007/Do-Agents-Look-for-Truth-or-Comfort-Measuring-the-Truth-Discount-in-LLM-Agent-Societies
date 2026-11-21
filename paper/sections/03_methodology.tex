@@ -1,24 +1,22 @@
 \section{Methodology and Experimental Design}
 \label{sec:methodology}
 
-To measure the Truth Discount ($\text{TD} = \text{Truth} - \text{Rumor}$) in LLM agent societies, we construct a controlled multi-agent environment that isolates source-attribute biases from message content, linguistic confounds, and stochastic variance.
+To measure expressed stance and the Truth Discount ($\text{TD} = \text{Truth} - \text{Rumor}$), we construct a controlled multi-agent environment that isolates source-attribute effects from message content and stochastic variance.
 
 \subsection{Environment, Checking \& Semantic Mirroring}
 \label{sec:env_design}
-Simulations take place in the fictional town of \textit{Alder Creek} (population $\sim$4,000; \$40 weekly character budget). The objective ground truth is a physical noticeboard outside the Community Hall legally listing all municipal weekend events. Checking the board requires a \$5 cross-town bus fare, creating an economic trade-off between trusting social claims for free versus paying to check the facts.
+Simulations take place in the fictional town of \textit{Alder Creek} (population $\sim$4,000; \$40 weekly budget). Ground truth is a physical noticeboard outside the Community Hall listing all weekend events; checking it requires a \$5 bus fare, creating an economic trade-off between trusting social claims for free versus paying to verify.
 
-To eliminate LLM direct-negation bias while maintaining identical conversational salience and perceived value across twins, both Truth and Rumor claims are framed as an exciting, free surprise pop concert involving two invented artists vetted to have zero real-world footprint: \textit{Vesper Vance} and \textit{Kaelen Cross}. In a \textbf{Truth twin} run, the source announces the real artist (confirmed on the noticeboard); in a \textbf{Rumor twin} run, the source announces the false artist while the noticeboard still advertises the real performer, disproving the rumor.
+To eliminate direct-negation bias while maintaining identical salience across twins, both Truth and Rumor claims are framed as an exciting, free surprise concert involving two invented artists (\textit{Vesper Vance} and \textit{Kaelen Cross}). In a \textbf{Truth twin}, the source announces the real artist on the board; in a \textbf{Rumor twin}, the source announces the other artist while the board still lists the real performer.
 
 \subsection{Counterbalancing \& Bias Elimination Controls}
 \label{sec:bias_controls}
-We enforce strict methodological controls to eliminate non-source confounds:
-\begin{enumerate}
-    \item \textbf{Artist Counterbalancing \& Odd-Seed Alternation:} Across runs, each artist is the true performer in exactly 50\% of source profiles. Because each profile has 39 seeds ($13\text{ layouts} \times 3\text{ repetitions}$), we partition seeds into a 20/19 split ($\approx$51.3\% vs.\ 48.7\%) and alternate the majority artist across consecutive profiles, achieving an exact global 50/50 balance.
-    \item \textbf{Lore Decoupling:} The shared world prompt introduces artists in fixed alphabetical order, decoupled from ground truth.
-    \item \textbf{Latin Square Seating ($13 \times 13$):} 13 gender-neutral personas with mid-status occupations (excluding transit or authoritative roles) rotate through all 13 town seats via a cyclic Latin Square (Source: $1/13$; first-hand listener: $6/13$; second-hand listener: $6/13$).
-    \item \textbf{Dyadic Twin Matching:} Afternoon catch-up pairs are mathematically fixed ($\text{Seat } i \leftrightarrow \text{Seat } i+6$), and matched Truth and Rumor twins share the identical seed, seating, and pairings.
-    \item \textbf{Peer Contagion Elimination \& Context Hygiene:} Sources announce news as a one-way departure broadcast when leaving the caf\'{e}, eliminating table debate before checking decisions. Prompts omit experimental meta-tags (e.g., \texttt{[AGENT]}, \texttt{[SIMULATION]}) to prevent artificial hyper-rational safety behaviors.
-\end{enumerate}
+We enforce five methodological controls:
+(1)~\textbf{Artist Counterbalancing:} Each artist is the true performer in 50\% of profiles (20/19 seed split per 39-seed profile, alternated across profiles).
+(2)~\textbf{Lore Decoupling:} Both artists appear in fixed alphabetical order in the shared world prompt.
+(3)~\textbf{Latin Square Seating ($13 \times 13$):} 13 gender-neutral personas with mid-status occupations rotate through all 13 seats (1 Source, 6 first-hand, 6 second-hand).
+(4)~\textbf{Dyadic Twin Matching:} Afternoon catch-up pairs are fixed ($\text{Seat } i \leftrightarrow \text{Seat } i+6$), and matched twins share the identical seed, seating, and pairings.
+(5)~\textbf{Context Hygiene:} Sources announce news as a one-way departure broadcast to prevent table debate before checking, and prompts omit experimental meta-tags.
 
 \subsection{Factorial Grid \& Simulation State Machine}
 \label{sec:factorial_workflow}
@@ -33,25 +31,24 @@ Each town executes chronologically through five scenes:
 
 \subsection{Sampling Matrix \& Evaluated Models}
 \label{sec:sampling_totals}
-Each of the 64 source profiles is evaluated across 13 Latin Square layouts and 3 stochastic repetitions ($T=0.7$, $\text{top\_p}=0.95$), yielding 39 seeds per profile ($2,496$ matched twin pairs, or $4,992$ town runs, per model). Across our two open-weights model families executed via DeepInfra---\textbf{DeepSeek} (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and \textbf{Qwen} (\texttt{Qwen/Qwen3.8-Flash})---the Main Factorial comprises \textbf{4,992 matched twin pairs} ($9,984$ town runs and $119,808$ listener observations; Table~\ref{tab:run_totals}), supplemented by a 4-profile Pilot Study ($312$ runs per model).
+Each of the 64 source profiles is evaluated across 13 Latin Square layouts and 3 stochastic repetitions ($T=0.7$, $\text{top\_p}=0.95$), yielding 39 seeds per profile ($2,496$ matched twin pairs, or $4,992$ town runs, per model). Across our two open-weights model families executed via DeepInfra---\textbf{DeepSeek} (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and \textbf{Qwen} (\texttt{Qwen/Qwen3.8-Flash})---the Main Factorial comprises \textbf{4,992 matched twin pairs} ($9,984$ town runs and $119,808$ listener observations; Table~\ref{tab:run_totals}).
 
 \begin{table}[t]
 \centering
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\resizebox{\columnwidth}{!}{%
+\small
+\setlength{\tabcolsep}{1.5pt}
 \begin{tabular}{llrr}
 \toprule
-\textbf{Module} & \textbf{Design / Conditions} & \textbf{1 Rep} & \textbf{3 Reps} \\
+\textbf{Model} & \textbf{Design / Pairs} & \textbf{1 Rep} & \textbf{3 Reps} \\
+ & & \textbf{(Runs)} & \textbf{(Runs)} \\
 \midrule
-Main Factorial & 64 profiles $\times$ 2 twins ($2,496$ pairs) & 1,664 & 4,992 \\
-Pilot Study & 4 profiles $\times$ 2 twins ($156$ pairs) & 104 & 312 \\
+DeepSeek-V4-Flash & 64 prof.\ ($2,496$ pairs) & 1,664 & 4,992 \\
+Qwen3.8-Flash & 64 prof.\ ($2,496$ pairs) & 1,664 & 4,992 \\
 \midrule
-\textbf{Total per Model} & \textbf{136 conditions ($2,652$ pairs)} & \textbf{1,768} & \textbf{5,304} \\
+\textbf{Total (Both)} & \textbf{128 prof.\ ($4,992$ pairs)} & \textbf{3,328} & \textbf{9,984} \\
 \bottomrule
-\end{tabular}%
-}
-\caption{Simulation run matrix per model across experimental modules.}
+\end{tabular}
+\caption{Main factorial simulation matrix across both evaluated models (1 pair = 2 town runs: Truth + Rumor).}
 \label{tab:run_totals}
 \end{table}
 
@@ -63,6 +60,12 @@ Listener belief in Scene~5 is evaluated by an independent blind judge---\textbf{
 \end{equation}
  alongside net credulity (Rumor belief minus Truth under-belief, where Truth under-belief is $1 - \text{Truth}$) and checking rates (\texttt{GO}~\%). \texttt{NOT\_MENTIONED} is tracked as an independent omission rate and stress-tested across six scoring schemes (including pessimistic $0.0$ and neutral $0.5$ imputations) plus worst-case omission bounds.
 
-Because listeners within a matched twin pair share a town seed and seating layout, we estimate attribute effects using \textbf{pair-clustered OLS} (for TD, Truth belief, Rumor belief, and bucket rates) and \textbf{pair-clustered logistic regression} (for binary \texttt{GO}/\texttt{SKIP} checking), controlling for all six source attributes, artist, and model. Attribute main effects and $\times\text{Reliability}$ interaction contrasts on TD ($\Delta\text{TD}$) are adjusted for multiplicity via the Holm--Bonferroni step-down procedure ($p_{\text{Holm}}$, $\alpha = 0.05$).
+Because listeners within a matched twin pair share a town seed and seating layout, we estimate attribute effects using \textbf{pair-clustered OLS} (for TD, Truth stance, Rumor stance, and bucket rates) and \textbf{pair-clustered logistic regression} (for binary \texttt{GO}/\texttt{SKIP} checking), controlling for all six source attributes, artist, and model. Because persona traits (\texttt{\{day\_detail\}}, \texttt{\{style\}}) are fixed per layout and Scene~2 checking uses $T=0.0$, 88.4\% of same-artist first-hand checking groups are identical across the 3 repetitions (leaving 9,984 distinct model-by-profile-by-layout-by-artist checking sets); we therefore also verify all checking odds ratios under \textbf{profile $\times$ layout clustering}. Attribute main effects and $\times\text{Reliability}$ interaction contrasts on TD ($\Delta\text{TD}$) are adjusted via Holm--Bonferroni ($p_{\text{Holm}}$, $\alpha = 0.05$).
+
+\subsection{Follow-up Study: Checking Across Models and Fares}
+\label{sec:followup}
+Because first-hand TD decomposes largely through checking ($P(\texttt{GO})$), we ran an exploratory follow-up study measuring first-hand $P(\texttt{GO})$ directly across models and checking costs (one scenario, one answer per prompt, five fares).
+
+We harvested \textbf{576 first-hand prompts} verbatim from the main-study transcripts ($2^{6-1}$ half fraction, 32 profiles $\times$ 3 layouts $\times$ 6 seats) and posed them to five additional models---\textbf{GPT-6.1 Terra} (\texttt{gpt-6.1-terra}), \textbf{GPT-6.1 Sol} (\texttt{gpt-6.1-sol}), \textbf{GPT-6 Luna} (\texttt{gpt-6-luna}), \textbf{Claude Sonnet~5.5} (\texttt{claude-sonnet-5-5}), and \textbf{Claude Opus~5.5} (\texttt{claude-opus-5-5})---at default settings (reasoning enabled, $\text{max\_tokens}=2000$), and to \textbf{DeepSeek} and \textbf{Qwen} at the main study's checking settings ($T=0.0$, $\text{max\_tokens}=5$, reasoning off). We vary the bus fare across five levels (free, \$1, \$5, \$15, \$35) while holding the \$40 budget fixed ($5 \times 576 = 2{,}880$ decisions per model; $20{,}160$ total). We report $P(\texttt{GO})$ by fare, reliability and closeness contrasts, and the bracketing fare interval where $P(\texttt{GO})$ crosses 50\%. Main-text 95\% CIs are percentile bootstraps over the 13 listener personas (clustering by persona); prompt-level bootstrap CIs are reported in Appendix~\ref{app:mini_study}.
 
 \paragraph{Reproducibility Note.} All simulation code, prompt templates, configuration manifests, and raw trace artifacts are anonymously accessible at: \url{https://anonymous.4open.science/r/echotown-F565/}.
