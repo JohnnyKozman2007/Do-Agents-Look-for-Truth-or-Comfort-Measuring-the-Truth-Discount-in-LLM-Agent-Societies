@@ -1,14 +1,42 @@
 \section{Experimental Protocol, Prompts, and Personas}
 \label{app:protocol}
 
-Table~\ref{tab:hyperparams} summarizes the fixed generation hyperparameters and simulation configuration used across all $4,992$ matched twin pairs ($9,984$ town runs) in DeepSeek (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and Qwen (\texttt{Qwen/Qwen3.8-Flash}) via DeepInfra. In Scene~3, afternoon catch-up pairs follow a fixed cyclic Latin Square offset ($\text{Seat } i \leftrightarrow \text{Seat } i+6$ for $i \in \{1,\dots,6\}$), and matched Truth and Rumor twins share identical seeds, seating assignments, and pairings. Full simulation code and analysis scripts are provided in the anonymous artifact repository.
+Table~\ref{tab:hyperparams} summarizes the fixed generation hyperparameters and simulation configuration used across all $4,992$ matched twin pairs ($9,984$ town runs) in DeepSeek (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and Qwen (\texttt{Qwen/Qwen3.8-Flash}) via DeepInfra (executed November 2026; blind judge \texttt{gemini-3.7-flash} via Google Gemini API). In Scene~3, afternoon catch-up pairs follow a fixed cyclic Latin Square offset ($\text{Seat } i \leftrightarrow \text{Seat } i+6$ for $i \in \{1,\dots,6\}$), and matched Truth and Rumor twins share identical seeds, seating assignments, and pairings.
+
+\paragraph{Conditional Stance Decomposition (M1) and Omission Sensitivity (M3).}
+Among first-hand checkers (\texttt{GO}), $\text{TD}\mid\texttt{GO} = +0.993$ in DeepSeek (Truth $0.995$, Rumor $0.003$) and $+0.956$ in Qwen (Truth $0.958$, Rumor $0.002$), with attribute differences within \texttt{GO} all within $\pm 0.004$ in DeepSeek and $\le 0.031$ in Qwen. Among first-hand non-checkers (\texttt{SKIP}), $\text{TD}\mid\texttt{SKIP} = +0.005$ in both models (DeepSeek: Truth $0.177$, Rumor $0.173$; Qwen: Truth $0.055$, Rumor $0.051$). Table~\ref{tab:m3_imputation} reports the Table~\ref{tab:attribute_effects} contrasts and interactions under pessimistic ($0.0$) and neutral ($0.5$) \texttt{NOT\_MENTIONED} imputations.
+
+\begin{table*}[ht!]
+\centering
+\small
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Contrast / Interaction} & \multicolumn{3}{c}{\textbf{1st-Hand $\Delta\text{TD}$ (DeepSeek / Qwen)}} & \multicolumn{3}{c}{\textbf{All-12 $\Delta\text{TD}$ (DeepSeek / Qwen)}} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+ & \textbf{Primary} & \textbf{NM = 0.0} & \textbf{NM = 0.5} & \textbf{Primary} & \textbf{NM = 0.0} & \textbf{NM = 0.5} \\
+\midrule
+Reliability & $+0.554$ / $+0.161$ & $+0.555$ / $+0.161$ & $+0.551$ / $+0.161$ & $+0.408$ / $+0.140$ & $+0.414$ / $+0.142$ & $+0.384$ / $+0.140$ \\
+Closeness & $+0.114$ / $+0.121$ & $+0.114$ / $+0.120$ & $+0.114$ / $+0.121$ & $+0.089$ / $+0.077$ & $+0.089$ / $+0.077$ & $+0.087$ / $+0.080$ \\
+Wealth & $+0.052$ / $+0.032$ & $+0.052$ / $+0.033$ & $+0.052$ / $+0.032$ & $+0.041$ / $+0.025$ & $+0.041$ / $+0.026$ & $+0.042$ / $+0.026$ \\
+Authority & $-0.024$ / $+0.014$ & $-0.024$ / $+0.014$ & $-0.024$ / $+0.015$ & $-0.001$ / $-0.003$ & $-0.001$ / $-0.001$ & $-0.001$ / $0.000$ \\
+Age & $-0.017$ / $+0.005$ & $-0.017$ / $+0.005$ & $-0.018$ / $+0.005$ & $-0.018$ / $+0.005$ & $-0.018$ / $+0.005$ & $-0.016$ / $+0.005$ \\
+Gender & $+0.002$ / $0.000$ & $+0.001$ / $0.000$ & $+0.002$ / $0.000$ & $+0.001$ / $-0.007$ & $+0.001$ / $-0.005$ & $+0.002$ / $-0.007$ \\
+\midrule
+Closeness $\times$ Rel. & $-0.142$ / $-0.224$ & $-0.143$ / $-0.224$ & $-0.142$ / $-0.224$ & $-0.149$ / $-0.142$ & $-0.150$ / $-0.145$ & $-0.147$ / $-0.138$ \\
+Wealth $\times$ Rel. & $-0.028$ / $-0.065$ & $-0.028$ / $-0.066$ & $-0.028$ / $-0.065$ & $-0.044$ / $-0.051$ & $-0.044$ / $-0.053$ & $-0.041$ / $-0.051$ \\
+Authority $\times$ Rel. & $-0.051$ / $-0.047$ & $-0.052$ / $-0.047$ & $-0.051$ / $-0.046$ & $-0.062$ / $-0.016$ & $-0.061$ / $-0.016$ & $-0.062$ / $-0.011$ \\
+\bottomrule
+\end{tabular}
+\caption{Omission sensitivity of Table~\ref{tab:attribute_effects} contrasts ($\Delta\text{TD}$) under pessimistic (\texttt{NM = 0.0}) and neutral (\texttt{NM = 0.5}) imputations for \texttt{NOT\_MENTIONED}.}
+\label{tab:m3_imputation}
+\end{table*}
 
 \begin{table}[ht!]
 \centering
 \small
-\setlength{\tabcolsep}{4pt}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{ll}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{p{3.4cm}p{4.3cm}}
 \toprule
 \textbf{Parameter / Component} & \textbf{Setting} \\
 \midrule
@@ -19,8 +47,7 @@ Weekly budget / bus fare & \$40 initial budget / \$5 per \texttt{GO} check \\
 Seeds per profile & $13\text{ layouts} \times 3\text{ reps} = 39$ \\
 Blind judge & Gemini~3.7~Flash ($T=0.0$, $\text{reasoning\_effort}=\text{none}$) \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular}
 \caption{Fixed simulation hyperparameters and evaluation configuration.}
 \label{tab:hyperparams}
 \end{table}
@@ -28,11 +55,10 @@ Blind judge & Gemini~3.7~Flash ($T=0.0$, $\text{reasoning\_effort}=\text{none}$)
 \subsection{Latin Square Personas}
 Table~\ref{tab:personas} lists the 13 gender-neutral town personas rotated across Seats 0--12 in the $13 \times 13$ cyclic Latin Square.
 
-\begin{table}[ht!]
+\begin{table*}[ht!]
 \centering
 \small
-\setlength{\tabcolsep}{4pt}
-\resizebox{\columnwidth}{!}{%
+\setlength{\tabcolsep}{5pt}
 \begin{tabular}{clll|clll}
 \toprule
 \textbf{ID} & \textbf{Name} & \textbf{Occupation} & \textbf{Loved One} & \textbf{ID} & \textbf{Name} & \textbf{Occupation} & \textbf{Loved One} \\
@@ -45,11 +71,10 @@ Table~\ref{tab:personas} lists the 13 gender-neutral town personas rotated acros
 6 & Taylor & pharmacy asst. & Frankie & 13 & Emerson & hardware clerk & Ellis \\
 7 & Morgan & carpenter & Lee & & & & \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular}
 \caption{The 13 gender-neutral personas rotated across town seats.}
 \label{tab:personas}
-\end{table}
+\end{table*}
 
 \subsection{Source Attribute Prompt Injections}
 Table~\ref{tab:attr_prompts} lists the exact listener-facing text lines injected into the ``About \{source\_name\}'' block for each of the six binary source attributes (withholding reliability from the source's own prompt).
@@ -57,9 +82,8 @@ Table~\ref{tab:attr_prompts} lists the exact listener-facing text lines injected
 \begin{table*}[ht!]
 \centering
 \small
-\setlength{\tabcolsep}{5pt}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llp{11.5cm}}
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{llp{11.0cm}}
 \toprule
 \textbf{Attribute} & \textbf{Level} & \textbf{Listener Prompt Injection (\texttt{About \{source\_name\}:})} \\
 \midrule
@@ -74,8 +98,7 @@ Authority & \texttt{mayor} & \{source\_name\} is the town's elected mayor, who r
 Age $\times$ Gender & \texttt{woman\_old} / \texttt{man\_old} & \{source\_name\} is a [woman/man] in [her/his] early seventies. \\
  & \texttt{woman\_young} / \texttt{man\_young} & \{source\_name\} is a [woman/man] in [her/his] mid-twenties. \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular}
 \caption{Verbatim listener-facing prompt injections for the six binary source attributes.}
 \label{tab:attr_prompts}
 \end{table*}
@@ -87,7 +110,7 @@ Age $\times$ Gender & \texttt{woman\_old} / \texttt{man\_old} & \{source\_name\}
     \item \textbf{Scenes~2 \& 4 (Checking Prompt):} \textit{``The chat is over and you have a free hour. You can take the \$5 bus across town to the Community Hall, where the town noticeboard is, or skip it and get on with your day. Reply with one word: GO or SKIP.''}
     \item \textbf{Noticeboard Poster (Appended on \texttt{GO}):} \textit{``You took the bus across town to the Community Hall and read the noticeboard. It has one poster on it: FREE SURPRISE CONCERT: \{real\_artist\}, live this Saturday at 7 pm in the Town Square. Free entry. All welcome.''}
     \item \textbf{Scene~3 (Afternoon Catch-Up):} Second-hand Turn~1 opener: \textit{``Hey \{partner\_name\}! Sorry I missed the caf\'{e} this morning. What did I miss?''} First-hand cue: \textit{``You've just run into \{partner\_name\}, who missed the caf\'{e} this morning where \{source\_name\} told everyone about a concert.''}
-    \item \textbf{Scene~5 (Phone-Call Funnel):} Step~1: \textit{``Hey you! How was your day?''}; Step~2: \textit{``Ha, sounds like a day. Anything else going on in town?''}; Step~3: \textit{``Anything fun happening this weekend?''}; Step~4: \textit{``Did you hear anything about a concert?''}; Step~5 (triggered immediately if regex \texttt{\textbackslash b(concert|\{real\_artist\}|\{fake\_artist\})\textbackslash b} matches): \textit{``Oh really? What's the story there?''}; Step~6: \textit{``Haha okay, well I'll let you go. Talk soon!''}
+    \item \textbf{Scene~5 (Phone-Call Funnel):} Step~1: \textit{``Hey you! How was your day?''}; Step~2: \textit{``Ha, sounds like a day. Anything else going on in town?''}; Step~3: \textit{``Anything fun happening this weekend?''}; Step~4: \textit{``Did you hear anything about a concert?''}; Step~5 (triggered immediately if regex \texttt{\textbackslash b(concert|\allowbreak\{real\_artist\}|\allowbreak\{fake\_artist\})\textbackslash b} matches): \textit{``Oh really? What's the story there?''}; Step~6: \textit{``Haha okay, well I'll let you go. Talk soon!''}
 \end{itemize}
 
 \subsection{Blind Judge Classification Rubric}
@@ -101,7 +124,7 @@ Each Scene~5 transcript is scored by \textbf{Gemini~3.7~Flash} using the followi
 
 \paragraph{Prompts.} A first-hand listener's checking prompt (Scene~2) consists of the persona system prompt, the scripted source announcement (Scene~1) and the checking question, so it depends only on the town configuration and the announced artist, not on the model that drives the town. We therefore harvested these prompts verbatim from the saved main-study agent histories rather than re-implementing the simulator. The design is a $2^{6-1}$ half fraction of the six binary source attributes (the 32 cells whose $\pm 1$ attribute codes multiply to $+1$), with 3 layouts per cell chosen to cover the 13 listener personas and all 6 first-hand seats per layout: $32 \times 3 \times 6 = 576$ prompts. One twin is used per prompt (the announced artist alternates across towns). Each prompt was answered once. A response counts as \texttt{GO} or \texttt{SKIP} by the first matching word (\texttt{\textbackslash b(GO|SKIP)\textbackslash b}); any other response counts as \texttt{SKIP}, as in the main study. Eleven of the $20{,}160$ responses, all from Qwen, contained neither word (refusals or conversational text cut off at five tokens) and were counted as \texttt{SKIP}.
 
-\paragraph{Models and settings.} GPT-6.1 Terra (\texttt{gpt-6.1-terra}), GPT-6.1 Sol (\texttt{gpt-6.1-sol}) and GPT-6 Luna (\texttt{gpt-6-luna}) were queried through the OpenAI Chat Completions API with default temperature and reasoning settings and \texttt{max\_completion\_tokens}$=2000$. Claude Sonnet~5.5 (\texttt{claude-sonnet-5-5}) and Claude Opus~5.5 (\texttt{claude-opus-5-5}) were queried through the Anthropic Messages API with default settings, no extended thinking and \texttt{max\_tokens}$=2000$. These settings differ from the main study's decision calls ($T=0.0$, \texttt{max\_tokens}$=5$; Table~\ref{tab:hyperparams}), because reasoning models need room to reason before answering; the GPT-6 models also accept only the default temperature while reasoning is enabled. DeepSeek (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and Qwen (\texttt{Qwen/Qwen3.8-Flash}) were queried through DeepInfra with the main study's checking settings ($T=0.0$, \texttt{max\_tokens}$=5$, \texttt{reasoning\_effort}$=$\texttt{none}). An earlier run of DeepSeek and Qwen at the provider's default temperature is not reported, because it did not reproduce the main-study decisions for Qwen ($99.0\%$ vs.\ $91.6\%$ \texttt{GO} at \$5); its data are in the artifact repository.
+\paragraph{Models and settings.} GPT-6.1 Terra (\texttt{gpt-6.1-terra}), GPT-6.1 Sol (\texttt{gpt-6.1-sol}) and GPT-6 Luna (\texttt{gpt-6-luna}) were queried through the OpenAI Chat Completions API (November 2026) with default temperature and reasoning settings and \texttt{max\_completion\_tokens}$=2000$. Claude Sonnet~5.5 (\texttt{claude-sonnet-5-5}) and Claude Opus~5.5 (\texttt{claude-opus-5-5}) were queried through the Anthropic Messages API (November 2026) with default settings, no extended thinking and \texttt{max\_tokens}$=2000$. These settings differ from the main study's decision calls ($T=0.0$, \texttt{max\_tokens}$=5$; Table~\ref{tab:hyperparams}), because reasoning models need room to reason before answering; the GPT-6 models also accept only the default temperature while reasoning is enabled. DeepSeek (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and Qwen (\texttt{Qwen/Qwen3.8-Flash}) were queried through DeepInfra with the main study's checking settings ($T=0.0$, \texttt{max\_tokens}$=5$, \texttt{reasoning\_effort}$=$\texttt{none}). An earlier run of DeepSeek and Qwen at the provider's default temperature is excluded because it yielded $99.0\%$ vs.\ $91.6\%$ \texttt{GO} for Qwen at \$5; its data are in the artifact repository.
 
 \paragraph{Fare variants.} The fare is stated twice in the prompt: in the shared system header (``a short bus ride that costs \$5, about the price of a donut and a coffee'') and in the checking prompt (``You can take the \$5 bus across town''). Each variant replaces both mentions and leaves the rest of the prompt, including the \$40 weekly budget, unchanged:
 \begin{itemize}
@@ -111,7 +134,7 @@ Each Scene~5 transcript is scored by \textbf{Gemini~3.7~Flash} using the followi
     \item \textbf{\$35:} ``a short bus ride that costs \$35, about the price of a nice dinner out''.
 \end{itemize}
 
-\paragraph{Analysis.} Rates and contrasts are simple differences in mean \texttt{GO} between the two levels of an attribute, with percentile 95\% CIs from 1,000 to 2,000 bootstrap resamples over the 13 listener personas. The 50\% fare is the root of a logistic regression of \texttt{GO} on $\log(1+\text{fare})$ fitted to all five fares, with a persona-bootstrap CI; it assumes a smooth curve, whereas the observed curves are step-like, so it is a coarse summary. Code, prompts and all raw responses are in the \texttt{mini\_study/} folder of the artifact repository.
+\paragraph{Analysis.} Rates and contrasts in Table~\ref{tab:mini_study_go} are differences in mean \texttt{GO} with percentile 95\% CIs from 1,000 to 2,000 bootstrap resamples over the 13 listener personas (clustering by persona). As a robustness check, prompt-level 95\% bootstrap CIs (2,000 resamples over the 576 prompts) at \$5 are: Terra $[61.5, 69.3]$, Sol $[2.6, 5.9]$, Luna $[98.8, 100.0]$, Sonnet $[17.4, 24.0]$, Opus $[14.9, 21.4]$, DeepSeek $[42.5, 50.7]$, and Qwen $[90.1, 94.4]$. Code, prompts and all raw responses are in the \texttt{mini\_study/} folder of the artifact repository.
 
 \begin{table*}[ht!]
 \centering
@@ -157,7 +180,6 @@ Qwen ($T=0$)      & $+0.3$ & $+3.1$ & $+13.9$ & $+56.9$ & $+41.3$ & $-1.0$ & $+3
 \label{tab:price_sweep_cues}
 \end{table*}
 
-\clearpage % keep the follow-up tables before the next section
 \section{Glossary of Terms and Notation}
 \label{app:glossary}
 
@@ -172,7 +194,7 @@ To aid readability and ensure consistency across sections, the list below define
     \item[Second-Hand Listeners (Layer~2 / Indirect Listeners).] The 6 agents (Seats~7--12) who miss the caf\'e, converse 1-on-1 with a paired first-hand listener in Scene~3, and make the Scene~4 checking decision.
     \item[All-12 Listeners.] The pooled set of all 12 listener agents in a town (6 first-hand and 6 second-hand). Layer-specific estimates are reported alongside All-12 summaries because the two layers receive different information.
     \item[Checking Rate ($P(\texttt{GO})$ / \texttt{GO} Rate).] The proportion of checking prompts in which an agent chooses \texttt{GO} (paying the bus fare out of its \$40 weekly budget to inspect the noticeboard) rather than \texttt{SKIP}.
-    \item[50\% Fare (Half Price / Tipping Fare).] In the follow-up fare sweep, the estimated bus fare at which a logistic regression of \texttt{GO} on $\log(1+\text{fare})$ crosses $P(\texttt{GO}) = 50\%$.
+    \item[50\% Bracket.] In the follow-up fare sweep, the tested bus-fare interval (e.g., \$1--\$5, \$5--\$15, or \$15--\$35) within which $P(\texttt{GO})$ crosses 50\%.
     \item[Expressed Stance / Belief Score.] Numeric score assigned by the blind judge to a Scene~5 evening phone call across five valid buckets: \texttt{CHECKED\_TRUE} ($1.0$), \texttt{FACT} ($1.0$), \texttt{UNCERTAIN} ($0.5$), \texttt{SKEPTICAL} ($0.0$), and \texttt{CHECKED\_FALSE} ($0.0$).
     \item[Truth Belief ($\text{Truth}_{c,s}$) \& Rumor Belief ($\text{Rumor}_{c,s}$).] Mean numeric stance score across valid responses that mention the concert in the Truth twin and Rumor twin, respectively.
     \item[Truth Discount ($\text{TD}$ / True--False Gap).] $\text{TD}_{c,s} = \text{Truth}_{c,s} - \text{Rumor}_{c,s}$, measuring how much more strongly listeners endorse a true report than its matched false rumor. Positive TD indicates truth-tracking discrimination.

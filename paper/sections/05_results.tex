@@ -1,7 +1,7 @@
 \section{Results}
 \label{sec:results}
 
-Before presenting our main findings, we confirm zero twin leakage and high measurement validity. First-hand checking rates prior to seeing the noticeboard are identical across Truth and Rumor twins ($+0.1\text{ pp}$ pooled, 95\% CI $[-0.3, +0.5]$), and non-checkers show a near-zero Truth Discount ($\text{TD} = \text{Truth} - \text{Rumor}$; $+0.006$, 95\% CI $[-0.002, +0.013]$; 5,000-swap permutation $p = 0.365\text{--}0.812$ across all model-by-layer strata). Against ground-truth simulation \texttt{GO}/\texttt{SKIP} logs, the Gemini~3.7~Flash judge achieves 96.4\% recall / 97.9\% precision on DeepSeek and 93.4\% recall / 99.8\% precision on Qwen (99.9\%--100.0\% direction accuracy). In the blind human audit (310 undisputed, judge-labeled transcripts), Gemini~3.7~Flash achieves 75.0\% population-weighted agreement with human annotators (weighted $\kappa = 0.669$, 95\% CI $[0.582, 0.749]$), exceeding inter-rater agreement among the human annotators themselves (62.5\% agreement, $\kappa = 0.539$ across 72 double-labeled transcripts), with 94.5\% weighted recall on \texttt{CHECKED\_FALSE} and 94.1\% on \texttt{CHECKED\_TRUE} and disagreements concentrated on \texttt{NOT\_MENTIONED} and \texttt{UNCERTAIN} boundaries. We organize the results into three pillars: (1) skeptical truth-finding and reliability, (2) closeness anomalies, and (3) cross-model and multi-hop dynamics, followed by the results of the follow-up study (Section~\ref{sec:followup_results}).
+Before presenting our main findings, we confirm zero twin leakage and measurement validity. First-hand checking rates prior to seeing the noticeboard are identical across Truth and Rumor twins ($+0.1\text{ pp}$ pooled, 95\% CI $[-0.3, +0.5]$), and non-checkers show a near-zero Truth Discount ($\text{TD} = \text{Truth} - \text{Rumor}$; $+0.006$, 95\% CI $[-0.002, +0.013]$; 5,000-swap permutation $p = 0.365\text{--}0.812$ across all model-by-layer strata). Against ground-truth \texttt{GO}/\texttt{SKIP} logs, the Gemini~3.7~Flash judge achieves 96.4\% recall / 97.9\% precision on DeepSeek and 93.4\% recall / 99.8\% precision on Qwen (99.9\%--100.0\% direction accuracy). In the blind human audit (360 sampled transcripts: 27 disputed between double-labeling raters, 23 lacking a valid Gemini label in the separate coverage audit, leaving 310 scored transcripts), Gemini~3.7~Flash achieves 75.0\% population-weighted agreement with humans (weighted $\kappa = 0.669$, 95\% CI $[0.582, 0.749]$), versus inter-rater agreement of 62.5\% ($\kappa = 0.539$ across 72 double-labeled transcripts), with 94.5\% weighted recall on \texttt{CHECKED\_FALSE} and 94.1\% on \texttt{CHECKED\_TRUE} and disagreements concentrated on \texttt{NOT\_MENTIONED} and \texttt{UNCERTAIN} boundaries. We organize the results into three pillars plus the follow-up study (Section~\ref{sec:followup_results}).
 
 \subsection{Skeptical Truth-Finding and the Dominance of Reliability}
 \label{sec:pillar1}
@@ -12,32 +12,30 @@ Across all 4,992 matched twin pairs (119,808 listener observations), paired-town
 \begin{table}[ht!]
 \centering
 \small
-\setlength{\tabcolsep}{2pt}
-\resizebox{\columnwidth}{!}{%
+\setlength{\tabcolsep}{1.2pt}
 \begin{tabular}{llcccc}
 \toprule
-\textbf{Model} & \textbf{Layer} & \textbf{Rumor} & \textbf{Truth} & \textbf{TD [95\% CI]} & \textbf{\texttt{GO} (\%)} \\
+\textbf{Model} & \textbf{Layer} & \textbf{Rumor} & \textbf{Truth} & \textbf{TD [95\% CI]} & \textbf{\texttt{GO}\%} \\
 \midrule
-Pooled   & 1st-Hand & 0.048 & 0.733 & $+0.684$ $[0.675, 0.694]$ & 70.6 \\
-         & 2nd-Hand & 0.030 & 0.793 & $+0.763$ $[0.758, 0.768]$ & 45.6 \\
-         & All-12   & 0.039 & 0.763 & $+0.723$ $[0.717, 0.729]$ & 58.1 \\
+Pooled   & 1st-Hand & 0.048 & 0.733 & $+0.684$ $[0.675,0.694]$ & 70.6 \\
+         & 2nd-Hand & 0.030 & 0.793 & $+0.763$ $[0.758,0.768]$ & 45.6 \\
+         & All-12   & 0.039 & 0.763 & $+0.723$ $[0.717,0.729]$ & 58.1 \\
 \midrule
-DeepSeek & 1st-Hand & 0.091 & 0.573 & $+0.482$ $[0.469, 0.495]$ & 48.4 \\
-         & 2nd-Hand & 0.023 & 0.789 & $+0.765$ $[0.757, 0.773]$ & 64.9 \\
-         & All-12   & 0.059 & 0.680 & $+0.621$ $[0.611, 0.631]$ & 56.7 \\
+DeepSeek & 1st-Hand & 0.091 & 0.573 & $+0.482$ $[0.469,0.495]$ & 48.4 \\
+         & 2nd-Hand & 0.023 & 0.789 & $+0.765$ $[0.757,0.773]$ & 64.9 \\
+         & All-12   & 0.059 & 0.680 & $+0.621$ $[0.611,0.631]$ & 56.7 \\
 \midrule
-Qwen     & 1st-Hand & 0.005 & 0.893 & $+0.887$ $[0.881, 0.894]$ & 92.8 \\
-         & 2nd-Hand & 0.036 & 0.797 & $+0.761$ $[0.755, 0.768]$ & 26.2 \\
-         & All-12   & 0.020 & 0.845 & $+0.825$ $[0.819, 0.830]$ & 59.5 \\
+Qwen     & 1st-Hand & 0.005 & 0.893 & $+0.887$ $[0.881,0.894]$ & 92.8 \\
+         & 2nd-Hand & 0.036 & 0.797 & $+0.761$ $[0.755,0.768]$ & 26.2 \\
+         & All-12   & 0.020 & 0.845 & $+0.825$ $[0.819,0.830]$ & 59.5 \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular}
 \caption{Paired-town mean belief in Rumor and Truth twins, Truth Discount ($\text{TD} = \text{Truth} - \text{Rumor}$) with 95\% CIs, and average checking rate (\texttt{GO} \%) across all 4,992 matched twin pairs (2,496 per model).}
 \label{tab:overall_summary}
 \end{table}
 
 \paragraph{Reliability is the dominant driver of checking and truth discrimination in DeepSeek and Qwen at the \$5 fare.}
-In All-12 pair-clustered OLS (controlling for all six source attributes, artist, and model), reliability (\texttt{good\_record} vs.\ \texttt{poor\_record}) is the \#1 driver of every primary outcome: it raises TD by $0.276$, checking by $23.0\text{ pp}$, and Truth belief by $0.298$, while cutting \texttt{SKEPTICAL} responses by $30.6\text{ pp}$. Focusing on the first-hand layer, reliability increases checking by $34.9\text{ pp}$ ($88.0\%$ vs.\ $53.1\%$; DeepSeek $+56.0\text{ pp}$, Qwen $+13.9\text{ pp}$; pair-clustered logistic regression $\text{OR} = 16.39$, $p < 0.001$) and raises TD ($\Delta\text{TD}$; Table~\ref{tab:attribute_effects}) by $0.358$ in Holm--Bonferroni--adjusted linear contrasts ($p_{\text{Holm}} < 0.001$; DeepSeek $+0.554$, Qwen $+0.161$). Decomposing these contrasts between Truth and Rumor twins shows that reliability acts by raising Truth belief ($+0.600$ in DeepSeek, $+0.159$ in Qwen) rather than reducing Rumor belief (in DeepSeek, unchecked \texttt{good\_record} rumors even receive a slight $+0.046$ bump).
+In All-12 pair-clustered OLS (controlling for all six source attributes, artist, and model), reliability (\texttt{good\_record} vs.\ \texttt{poor\_record}) is the \#1 driver of every primary outcome: it raises TD by $0.276$, checking by $23.0\text{ pp}$, and Truth stance by $0.298$, while cutting \texttt{SKEPTICAL} responses by $30.6\text{ pp}$. Focusing on the first-hand layer, reliability increases checking by $34.9\text{ pp}$ ($88.0\%$ vs.\ $53.1\%$; DeepSeek $+56.0\text{ pp}$, Qwen $+13.9\text{ pp}$; $\text{OR} = 16.39$, profile$\times$layout 95\% CI $[14.67, 18.32]$, $p < 0.001$) and raises TD ($\Delta\text{TD}$; Table~\ref{tab:attribute_effects}) by $0.358$ ($p_{\text{Holm}} < 0.001$; DeepSeek $+0.554$, Qwen $+0.161$). Decomposing first-hand TD by checking decision shows that source attributes act primarily on information acquisition ($P(\texttt{GO})$), not on expressed stance conditional on evidence: among first-hand checkers, $\text{TD}\mid\texttt{GO} = +0.969$ pooled ($+0.993$ DeepSeek, $+0.956$ Qwen), whereas among non-checkers, $\text{TD}\mid\texttt{SKIP} = +0.004$ ($+0.005$ in both models). Conditional on \texttt{GO}, source attributes shift TD by at most $0.004$ in DeepSeek (and $\le 0.031$ in Qwen; Appendix~\ref{app:protocol}). Furthermore, all Table~\ref{tab:attribute_effects} main effects and $\times\text{Reliability}$ interactions remain virtually unchanged (within $0.001\text{--}0.025$ points, identical signs and significance) under both pessimistic ($0.0$) and neutral ($0.5$) \texttt{NOT\_MENTIONED} imputations (Appendix Table~\ref{tab:m3_imputation}).
 
 \begin{table*}[ht!]
 \centering
@@ -65,14 +63,14 @@ Authority $\times$ Reliability & $-0.051^{**}$ & $-0.047^{***}$ & $-0.062^{***}$
 \label{tab:attribute_effects}
 \end{table*}
 
-\paragraph{Secondary source attributes---wealth and authority---exert modest, distinct effects.}
-Wealth (\texttt{rich} vs.\ \texttt{poor}) ranks as the \#3 All-12 driver in the same OLS model ($+0.033$ TD, $+2.6\text{ pp}$ checking), and at the first-hand layer yields $+0.042$ $\Delta\text{TD}$ alongside a $-0.047$ $\text{Wealth} \times \text{Reliability}$ interaction ($p_{\text{Holm}} < 0.001$ and $p_{\text{Holm}} = 0.012$). Authority (\texttt{mayor} vs.\ \texttt{citizen}) produces a small buffering $\text{Authority} \times \text{Reliability}$ interaction on first-hand TD ($-0.049$, $p_{\text{Holm}} = 0.009$) and increases \texttt{UNCERTAIN} hedging ($+1.3\text{ pp}$, $p < 0.001$) rather than \texttt{SKEPTICAL} responses when listeners skip checking.
+\paragraph{Secondary source attributes and nulls.}
+Wealth (\texttt{rich} vs.\ \texttt{poor}) ranks as the \#3 All-12 driver ($+0.033$ TD, $+2.6\text{ pp}$ checking), and at the first-hand layer yields $+0.042$ $\Delta\text{TD}$ alongside a $-0.047$ $\text{Wealth} \times \text{Reliability}$ interaction ($p_{\text{Holm}} < 0.001$ and $p_{\text{Holm}} = 0.012$). Authority (\texttt{mayor} vs.\ \texttt{citizen}) shows a small opposite-signed first-hand $\Delta\text{TD}$ across models ($-0.024^{**}$ in DeepSeek vs.\ $+0.014^{**}$ in Qwen; null in All-12) and a buffering $\text{Authority} \times \text{Reliability}$ interaction ($-0.049$, $p_{\text{Holm}} = 0.009$), increasing \texttt{UNCERTAIN} hedging ($+1.3\text{ pp}$, $p < 0.001$) when listeners skip checking. Gender (\texttt{woman} vs.\ \texttt{man}) is consistently null across both models and layers ($+0.002$ and $0.000$ first-hand).
 
 \subsection{Closeness Anomalies: Claims from Friends Get Checked More, Not Trusted Blindly}
 \label{sec:pillar2}
 
-\paragraph{Claims from friends are checked more often than claims from strangers, raising TD without increasing Rumor belief.}
-Contrary to uncritical deference to friends---where listeners accept claims from close peers without checking---closeness (\texttt{close\_friend} vs.\ \texttt{stranger}) leads to \emph{more} checking and a larger TD. Across All-12 listeners, closeness is the \#2 driver in the pair-clustered OLS model: it lifts TD by $0.083$, checking by $6.8\text{ pp}$, and Truth belief by $0.084$, reduces \texttt{SKEPTICAL} responses by $7.5\text{ pp}$, and leaves Rumor belief unchanged ($+0.001$, $p = 0.52$). The effect is strongest at the first-hand layer, where claims from friends are checked $11.4\text{ pp}$ more often than claims from strangers (pair-clustered logistic regression $\text{OR} = 2.83$, $p < 0.001$; DeepSeek $+11.4\text{ pp}$, Qwen $+11.3\text{ pp}$). First-hand TD rises by $+0.117$ pooled (DeepSeek $+0.114$, Qwen $+0.121$), and a $+0.048$ gain persists at the second-hand layer (DeepSeek $+0.064$, Qwen $+0.033$; All-12 $\Delta\text{TD}$: $+0.089$ and $+0.077$; all $p_{\text{Holm}} < 0.001$, Table~\ref{tab:attribute_effects}). Separate Truth and Rumor contrasts explain why closeness does not induce gullibility: Truth belief climbs ($+0.115$ pooled first-hand; $+0.052$ pooled second-hand, with DeepSeek $+0.066$ and Qwen $+0.038$), whereas Rumor belief stays flat (first-hand $+0.0004$ DeepSeek, $-0.0048$ Qwen; second-hand $+0.0024$ and $+0.0043$, both n.s.).
+\paragraph{Claims from friends are checked more often than claims from strangers, raising TD without increasing Rumor stance.}
+Contrary to uncritical deference to friends---where listeners take the comfortable route of accepting claims from close peers without checking---closeness (\texttt{close\_friend} vs.\ \texttt{stranger}) leads to \emph{more} checking and a larger TD. Across All-12 listeners, closeness is the \#2 driver: it lifts TD by $0.083$, checking by $6.8\text{ pp}$, and Truth stance by $0.084$, reduces \texttt{SKEPTICAL} responses by $7.5\text{ pp}$, and leaves Rumor stance unchanged ($+0.001$, $p = 0.52$). At the first-hand layer, claims from friends are checked $11.4\text{ pp}$ more often than claims from strangers ($\text{OR} = 2.83$, profile$\times$layout 95\% CI $[2.56, 3.13]$, $p < 0.001$; DeepSeek $+11.4\text{ pp}$, Qwen $+11.3\text{ pp}$). First-hand TD rises by $+0.117$ pooled (DeepSeek $+0.114$, Qwen $+0.121$), and a $+0.048$ gain persists at the second-hand layer (All-12 $\Delta\text{TD}$: $+0.089$ and $+0.077$; all $p_{\text{Holm}} < 0.001$, Table~\ref{tab:attribute_effects}), driven by higher Truth stance ($+0.115$ first-hand) while Rumor stance stays flat (first-hand $+0.0004$ DeepSeek, $-0.0048$ Qwen; second-hand $+0.0024$ and $+0.0043$, both n.s.).
 
 \paragraph{Closeness acts almost entirely when reliability is poor.}
 Stratifying the pair-clustered model by reliability reveals that this closeness boost comes almost entirely from \texttt{poor\_record} sources. When reliability is poor (\texttt{poor\_record}), closeness boosts first-hand checking by $20.4\text{ pp}$ pooled---jumping from $11.1\%$ to $29.6\%$ in DeepSeek ($+18.5\text{ pp}$) and from $74.6\%$ to $97.0\%$ in Qwen ($+22.4\text{ pp}$)---which lifts Truth belief by $0.214$ at the first-hand layer (DeepSeek $+0.204$, Qwen $+0.224$) and $0.109$ at the second-hand layer (DeepSeek $+0.148$, Qwen $+0.070$), yielding a $+0.209$ first-hand TD gain ($+0.185$ and $+0.233$). Under \texttt{good\_record}, by contrast, checking is already near ceiling for strangers and friends alike ($74.2\%$ vs.\ $78.6\%$ in DeepSeek; $99.6\%$ vs.\ $99.8\%$ in Qwen), so closeness adds only $2.3\text{ pp}$ to first-hand checking, $0.016$ to first-hand Truth belief ($-0.005$ second-hand), and $0.026$ to first-hand TD. Because the closeness effect is large under \texttt{poor\_record} and near zero under \texttt{good\_record}, their difference---the $\text{Closeness} \times \text{Reliability}$ interaction ($\texttt{good\_record} - \texttt{poor\_record}$, Table~\ref{tab:attribute_effects})---is strongly negative on first-hand checking ($-18.2\text{ pp}$ pooled; DeepSeek $-14.1\text{ pp}$, Qwen $-22.2\text{ pp}$, $p < 0.001$) and on $\Delta\text{TD}$ at the first-hand layer ($-0.183$ pooled; DeepSeek $-0.142$, Qwen $-0.224$), the second-hand layer ($-0.108$ pooled; DeepSeek $-0.157$, Qwen $-0.060$), and All-12 ($-0.146$ pooled; DeepSeek $-0.149$, Qwen $-0.142$; all $p_{\text{Holm}} < 0.001$).
@@ -80,8 +78,8 @@ Stratifying the pair-clustered model by reliability reveals that this closeness 
 \subsection{Cross-Model and Multi-Hop Dynamics}
 \label{sec:pillar3}
 
-\paragraph{First-hand checking diverges sharply by model, while second-hand TD converges.}
-At the first-hand layer, Qwen checks $92.8\%$ of the time versus $48.4\%$ in DeepSeek (pair-clustered logistic $\text{OR} = 32.18$, $p < 0.001$), producing a $-0.405$ TD gap (DeepSeek $+0.482$ vs.\ Qwen $+0.887$, $p < 0.001$). At the second-hand layer, Qwen checking drops to $26.2\%$ while DeepSeek checks $64.9\%$ ($\text{OR} = 0.257$, $p < 0.001$), and both models converge to virtually identical TD (DeepSeek $+0.765$ vs.\ Qwen $+0.761$; difference $+0.003$, $p = 0.49$). In Qwen, having a first-hand partner check (\texttt{Partner GO}, $92.8\%$ of pairs) cuts second-hand checking from $57.5\%$ (\texttt{Partner SKIP}) to $23.8\%$ (\texttt{Partner GO}; $26.2\%$ overall; $-33.7\text{ pp}$, $\text{OR} = 0.214$, $p < 0.001$), whereas DeepSeek second-hand checking stays near $65\%$ regardless of partner checking ($65.2\%$ vs.\ $64.6\%$ unadjusted; adjusted $\text{OR} = 0.586$, $p < 0.001$). Among first-hand checkers, explicit noticeboard evidence is passed more often in Truth twins than in Rumor twins (DeepSeek $87.1\%$ vs.\ $71.8\%$; Qwen $88.9\%$ vs.\ $60.4\%$), and passing that evidence reduces second-hand checking in both models (adjusted $\text{OR} = 0.695$ in DeepSeek vs.\ $0.633$ in Qwen, $p < 0.001$).
+\paragraph{First-hand checking diverges sharply by model, while second-hand TD converges and Qwen free-rides on partner checking.}
+At the first-hand layer, Qwen checks $92.8\%$ of the time versus $48.4\%$ in DeepSeek ($\text{OR} = 32.18$, profile$\times$layout 95\% CI $[29.21, 35.45]$, $p < 0.001$), producing a $-0.405$ TD gap (DeepSeek $+0.482$ vs.\ Qwen $+0.887$, $p < 0.001$). At the second-hand layer, Qwen checking drops to $26.2\%$ while DeepSeek checks $64.9\%$ ($\text{OR} = 0.257$, $p < 0.001$), yet both models converge to virtually identical TD (DeepSeek $+0.765$ vs.\ Qwen $+0.761$; difference $+0.003$, $p = 0.49$). Crucially, Qwen exhibits strong informational free-riding: having a first-hand partner check (\texttt{Partner GO}, $92.8\%$ of pairs) cuts Qwen's second-hand checking from $57.5\%$ (\texttt{Partner SKIP}) to $23.8\%$ (\texttt{Partner GO}; $-33.7\text{ pp}$, $\text{OR} = 0.214$, $p < 0.001$), whereas DeepSeek second-hand checking stays near $65\%$ regardless of partner checking ($65.2\%$ vs.\ $64.6\%$ unadjusted; adjusted $\text{OR} = 0.586$, $p < 0.001$). Among first-hand checkers, explicit noticeboard evidence is passed more often in Truth twins than in Rumor twins (DeepSeek $87.1\%$ vs.\ $71.8\%$; Qwen $88.9\%$ vs.\ $60.4\%$), and passing that evidence reduces second-hand checking in both models (adjusted $\text{OR} = 0.695$ in DeepSeek vs.\ $0.633$ in Qwen, $p < 0.001$).
 
 \paragraph{Second-hand TD is high when either partner checks and saturates under direct checking.}
 Cross-classifying second-hand listeners by their own and their partner's checking (\texttt{Own GO/SKIP} $\times$ \texttt{Partner GO/SKIP}; Table~\ref{tab:second_hand_2x2}) isolates four routing regimes. When neither checks (\texttt{Neither Checked}, $10.5\%$ of pairs), TD is zero ($-0.002$, 95\% CI $[-0.009, +0.005]$, $p = 0.60$) with $89.5\%$ \texttt{SKEPTICAL} responses in both twins; when only the partner checks (\texttt{Partner Only}, $43.9\%$ of pairs), TD is $+0.730$ (DeepSeek $+0.785$ vs.\ Qwen $+0.719$). Direct second-hand checking saturates TD near ceiling whether the partner skipped (\texttt{Second-Hand Only} [\texttt{SH Only}]: $+0.984$) or also checked (\texttt{Both Checked}: $+0.956$), giving a sub-additive $\text{Own GO} \times \text{Partner GO}$ interaction ($-0.759$, $p < 0.001$). Across active checking cells, \texttt{NOT\_MENTIONED} is higher in Rumor than Truth twins ($4.0\%\text{--}9.7\%$ vs.\ $<0.7\%$), yet neutral ($0.5$) omission imputation keeps TD strongly positive ($+0.691$ to $+0.964$).
@@ -89,19 +87,17 @@ Cross-classifying second-hand listeners by their own and their partner's checkin
 \begin{table*}[ht!]
 \centering
 \small
-\setlength{\tabcolsep}{4pt}
-\resizebox{\textwidth}{!}{%
+\setlength{\tabcolsep}{2.5pt}
 \begin{tabular}{lcccccc}
 \toprule
-\textbf{2$\times$2 Cell} & \textbf{Share (R / T)} & \textbf{Rumor} & \textbf{Truth} & \textbf{TD [95\% CI]} & \textbf{\texttt{SKEPTICAL} (R / T)} & \textbf{\texttt{NOT\_MENTIONED} (R / T)} \\
+\textbf{2$\times$2 Cell (Own / Partner)} & \textbf{Share (R / T)} & \textbf{Rumor} & \textbf{Truth} & \textbf{TD [95\% CI]} & \textbf{\texttt{SKEPTICAL} (R/T)} & \textbf{\texttt{NOT\_MENT.} (R/T)} \\
 \midrule
-\textbf{Both Checked} (\texttt{Own GO}, \texttt{Partner GO})   & 26.5\% / 26.8\% & 0.004 & 0.961 & $+0.956$ $[0.953, 0.960]$ & 2.0\% / 1.7\%  & 9.7\% / 0.1\% \\
-\textbf{SH Only} (\texttt{Own GO}, \texttt{Partner SKIP})       & 18.8\% / 19.0\% & 0.003 & 0.986 & $+0.984$ $[0.981, 0.987]$ & 1.9\% / 0.5\%  & 4.0\% / $<$0.1\% \\
-\textbf{Partner Only} (\texttt{Own SKIP}, \texttt{Partner GO})  & 44.0\% / 43.8\% & 0.052 & 0.782 & $+0.730$ $[0.723, 0.737]$ & 23.6\% / 13.0\% & 8.2\% / 0.7\% \\
-\textbf{Neither Checked} (\texttt{Own SKIP}, \texttt{Partner SKIP}) & 10.7\% / 10.3\% & 0.047 & 0.045 & $-0.002$ $[-0.009, +0.005]$ & 89.5\% / 89.5\% & 0.9\% / 0.8\% \\
+\textbf{Both Checked} (\texttt{GO} / \texttt{GO})   & 26.5\% / 26.8\% & 0.004 & 0.961 & $+0.956$ $[0.953, 0.960]$ & 2.0\% / 1.7\%  & 9.7\% / 0.1\% \\
+\textbf{SH Only} (\texttt{GO} / \texttt{SKIP})       & 18.8\% / 19.0\% & 0.003 & 0.986 & $+0.984$ $[0.981, 0.987]$ & 1.9\% / 0.5\%  & 4.0\% / $<$0.1\% \\
+\textbf{Partner Only} (\texttt{SKIP} / \texttt{GO})  & 44.0\% / 43.8\% & 0.052 & 0.782 & $+0.730$ $[0.723, 0.737]$ & 23.6\% / 13.0\% & 8.2\% / 0.7\% \\
+\textbf{Neither Checked} (\texttt{SKIP} / \texttt{SKIP}) & 10.7\% / 10.3\% & 0.047 & 0.045 & $-0.002$ $[-0.009, +0.005]$ & 89.5\% / 89.5\% & 0.9\% / 0.8\% \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular}
 \caption{Second-hand $2 \times 2$ routing (\texttt{Own GO/SKIP} $\times$ \texttt{Partner GO/SKIP}), pooled across both models: cell share, Rumor and Truth belief, Truth Discount (TD) with 95\% CIs, and \texttt{SKEPTICAL} and \texttt{NOT\_MENTIONED} rates (Rumor / Truth).}
 \label{tab:second_hand_2x2}
 \end{table*}
@@ -111,7 +107,7 @@ Cross-classifying second-hand listeners by their own and their partner's checkin
 This subsection reports the exploratory follow-up study described in Section~\ref{sec:followup}.
 
 \paragraph{Checking at the main-study fare.}
-Table~\ref{tab:mini_study_go} reports $P(\texttt{GO})$ at the main-study \$5 fare. Overall checking ranges from $4.2\%$ (Sol) to $99.5\%$ (Luna). The DeepSeek and Qwen runs reproduce the main-study first-hand decisions on the same prompts ($46.5\%$ vs.\ $47.3\%$ and $92.4\%$ vs.\ $91.6\%$). The reliability contrast (\texttt{good\_record}$-$\texttt{poor\_record}) on checking is positive for DeepSeek ($+57.6\text{ pp}$) and Qwen ($+13.9\text{ pp}$) but negative for Terra ($-20.5\text{ pp}$), Sonnet ($-25.0\text{ pp}$) and Opus ($-10.4\text{ pp}$). The closeness contrast (\texttt{close\_friend}$-$\texttt{stranger}) is positive in every model whose checking is not near floor or ceiling ($+8.3$ to $+30.9\text{ pp}$). Sol and Luna show near-zero contrasts, with checking near floor and ceiling respectively. Contrasts for the remaining four attributes are in Appendix Table~\ref{tab:mini_study_cues}.
+Table~\ref{tab:mini_study_go} reports $P(\texttt{GO})$ at the \$5 fare. Overall checking ranges from $4.2\%$ (Sol) to $99.5\%$ (Luna). On the same 576 harvested prompts, the main-study rates are $47.3\%$ (DeepSeek) and $91.6\%$ (Qwen), matching the follow-up's $46.5\%$ and $92.4\%$ under identical $T=0$ settings (see Appendix~\ref{app:mini_study} for decoding details). Because the five additional models ran at default settings (reasoning enabled, $\text{max\_tokens}=2000$) rather than $T=0$ with reasoning off, cross-model differences partly reflect decoding regime. At \$5, the reliability contrast (\texttt{good\_record}$-$\texttt{poor\_record}) is positive for DeepSeek ($+57.6\text{ pp}$) and Qwen ($+13.9\text{ pp}$) but negative for Terra ($-20.5\text{ pp}$), Sonnet ($-25.0\text{ pp}$), and Opus ($-10.4\text{ pp}$). The closeness contrast is positive wherever checking is not near floor or ceiling ($+8.3$ to $+30.9\text{ pp}$). Among secondary cues (Appendix Table~\ref{tab:mini_study_cues}), Age (\texttt{old}$-$\texttt{young}) raises checking in Sonnet ($+12.5\text{ pp}$) and Opus ($+9.0\text{ pp}$) despite being near zero in the main study.
 
 \begin{table*}[ht!]
 \centering
@@ -136,7 +132,7 @@ Qwen ($T=0$)     & $92.4\%$ $[88.0, 96.6]$ & $+13.9$ $[+6.1, +22.2]$  & $+13.2$ 
 \end{table*}
 
 \paragraph{Checking across fares.}
-Figure~\ref{fig:price_sweep} and Table~\ref{tab:price_sweep} report $P(\texttt{GO})$ by fare. When the trip is free, every model checks in at least $90.6\%$ of cases (DeepSeek; all others $\geq 96.7\%$). Terra, Sol, Sonnet and Opus check in at least $98.6\%$ of cases at \$1 and at most $3.5\%$ at \$15. DeepSeek declines gradually from \$1 onward ($60.9\%$ at \$1, $10.4\%$ at \$35), while Qwen and Luna keep checking at higher fares ($56.3\%$ and $67.9\%$ at \$15; $28.6\%$ and $24.7\%$ at \$35). The fitted fare at which half of listeners still check is \$3.2 (Opus), \$3.6 (Sonnet), \$3.7 (DeepSeek), \$4.2 (Sol), \$6.1 (Terra), \$19.3 (Qwen) and \$21.8 (Luna). Because the tested fares are widely spaced, these estimates are coarse.
+Figure~\ref{fig:price_sweep} and Table~\ref{tab:price_sweep} report $P(\texttt{GO})$ by fare. When the trip is free, every model checks in at least $90.6\%$ of cases (DeepSeek; all others $\geq 96.7\%$). Terra, Sol, Sonnet, and Opus check in at least $98.6\%$ of cases at \$1 and at most $3.5\%$ at \$15. DeepSeek declines gradually from \$1 onward ($60.9\%$ at \$1, $10.4\%$ at \$35), while Qwen and Luna keep checking at higher fares ($56.3\%$ and $67.9\%$ at \$15; $28.6\%$ and $24.7\%$ at \$35). Across the tested grid, $P(\texttt{GO})$ crosses 50\% in the \$1--\$5 interval for Opus, Sonnet, DeepSeek, and Sol, in \$5--\$15 for Terra, and in \$15--\$35 for Qwen and Luna.
 
 \begin{figure}[t]
 \centering
@@ -148,26 +144,24 @@ Figure~\ref{fig:price_sweep} and Table~\ref{tab:price_sweep} report $P(\texttt{G
 \begin{table}[ht!]
 \centering
 \small
-\setlength{\tabcolsep}{3pt}
-\resizebox{\columnwidth}{!}{%
+\setlength{\tabcolsep}{2.2pt}
 \begin{tabular}{lcccccc}
 \toprule
-\textbf{Model} & \textbf{Free} & \textbf{\$1} & \textbf{\$5} & \textbf{\$15} & \textbf{\$35} & \textbf{50\% fare} \\
+\textbf{Model} & \textbf{Free} & \textbf{\$1} & \textbf{\$5} & \textbf{\$15} & \textbf{\$35} & \textbf{50\% Bracket} \\
 \midrule
-GPT-6.1 Terra     & 100.0 & 100.0 & 65.5 & 3.5  & 0.2  & \$6.1 \\
-GPT-6.1 Sol       & 100.0 & 100.0 & 4.2  & 0.0  & 0.0  & \$4.2 \\
-GPT-6 Luna        & 100.0 & 100.0 & 99.5 & 67.9 & 24.7 & \$21.8 \\
-Claude Sonnet 5.5 & 99.7  & 98.6  & 20.5 & 0.0  & 0.0  & \$3.6 \\
-Claude Opus 5.5   & 96.7  & 99.3  & 18.1 & 0.0  & 0.0  & \$3.2 \\
+GPT-6.1 Terra     & 100.0 & 100.0 & 65.5 & 3.5  & 0.2  & \$5--\$15 \\
+GPT-6.1 Sol       & 100.0 & 100.0 & 4.2  & 0.0  & 0.0  & \$1--\$5 \\
+GPT-6 Luna        & 100.0 & 100.0 & 99.5 & 67.9 & 24.7 & \$15--\$35 \\
+Claude Sonnet 5.5 & 99.7  & 98.6  & 20.5 & 0.0  & 0.0  & \$1--\$5 \\
+Claude Opus 5.5   & 96.7  & 99.3  & 18.1 & 0.0  & 0.0  & \$1--\$5 \\
 \midrule
-DeepSeek ($T=0$)  & 90.6  & 60.9  & 46.5 & 22.6 & 10.4 & \$3.7 \\
-Qwen ($T=0$)      & 99.1  & 98.1  & 92.4 & 56.3 & 28.6 & \$19.3 \\
+DeepSeek ($T=0$)  & 90.6  & 60.9  & 46.5 & 22.6 & 10.4 & \$1--\$5 \\
+Qwen ($T=0$)      & 99.1  & 98.1  & 92.4 & 56.3 & 28.6 & \$15--\$35 \\
 \bottomrule
-\end{tabular}%
-}
-\caption{First-hand checking rate $P(\texttt{GO})$ (\%) by bus fare on the same 576 prompts per model and fare (weekly budget fixed at \$40). The last column is the fare at which a logistic fit of \texttt{GO} on $\log(1+\text{fare})$ crosses 50\%.}
+\end{tabular}
+\caption{First-hand checking rate $P(\texttt{GO})$ (\%) by bus fare on the same 576 prompts per model and fare (weekly budget fixed at \$40). The last column gives the tested fare interval bracketing $P(\texttt{GO}) = 50\%$.}
 \label{tab:price_sweep}
 \end{table}
 
 \paragraph{Attribute contrasts across fares.}
-Appendix Table~\ref{tab:price_sweep_cues} reports the reliability and closeness contrasts on checking at every fare. For five of the seven models, the reliability contrast is largest at the tested fare closest to that model's 50\% fare: \$5 for Terra ($-20.5\text{ pp}$), Sonnet ($-25.0$), Opus ($-10.4$) and DeepSeek ($+57.6$), and \$15 for Qwen ($+56.9$). Away from that fare the contrasts shrink: for Terra, Sonnet and Opus both contrasts are within $\pm 1.4\text{ pp}$ at the free and \$1 fares (except Opus closeness when free, $+3.8\text{ pp}$, 95\% CI $[-0.7, +10.4]$) and within $\pm 0.3\text{ pp}$ at \$35, and Qwen's reliability contrast is $+0.3\text{ pp}$ when free. DeepSeek is the exception in degree, keeping a sizeable reliability contrast at every fare ($+13.2$ to $+57.6\text{ pp}$). Luna shows no contrast distinguishable from zero at any fare, and Sol's checking has already fallen to $4.2\%$ at \$5, the tested fare closest to its 50\% fare.
+Appendix Table~\ref{tab:price_sweep_cues} reports the reliability and closeness contrasts on checking at every fare. For the five models with sizeable reliability contrasts, the effect peaks at a tested fare adjacent to the 50\% crossing: \$5 for Terra ($-20.5\text{ pp}$), Sonnet ($-25.0$), Opus ($-10.4$), and DeepSeek ($+57.6$), and \$15 for Qwen ($+56.9$). Away from the crossing, contrasts shrink: for Terra, Sonnet, and Opus both contrasts are within $\pm 1.4\text{ pp}$ at free and \$1 (except Opus closeness when free, $+3.8\text{ pp}$, 95\% CI $[-0.7, +10.4]$) and within $\pm 0.3\text{ pp}$ at \$35, and Qwen's reliability contrast is $+0.3\text{ pp}$ when free. DeepSeek keeps a sizeable reliability contrast at every fare ($+13.2$ to $+57.6\text{ pp}$), whereas Luna shows no contrast distinguishable from zero at any fare.
