@@ -93,6 +93,71 @@ Age $\times$ Gender & \texttt{woman\_old} / \texttt{man\_old} & \{source\_name\}
 \subsection{Blind Judge Classification Rubric}
 Each Scene~5 transcript is scored by \textbf{Gemini~3.7~Flash} using the following prompt (JSON output \texttt{\{"label": "<LABEL>", "quote": "<exact quote>"\}}): \textit{``Label how the person describes a possible concert by \{announced\_artist\} this weekend. Use the person's last statement about it. \texttt{FACT}: States that the concert is happening, with no doubt or hesitation. \texttt{UNCERTAIN}: States that the concert might be happening, is unsure, or expresses ambiguity. \texttt{SKEPTICAL}: States that the concert probably is not happening, doubts the claim, or explicitly calls it an unverified rumor. \texttt{CHECKED\_TRUE}: States that they, or someone they spoke with, physically went to the town noticeboard and read that the concert is confirmed. \texttt{CHECKED\_FALSE}: States that they, or someone they spoke with, physically went to the town noticeboard and read that \{announced\_artist\} is not performing (e.g., the poster confirms a concert by a different artist). \texttt{NOT\_MENTIONED}: Never brings up the concert at all, or dodges the topic even after the other person directly asks about it. CRITICAL DISTINCTION: Saying only that someone claimed they saw a poster, without anyone actually going to the Community Hall to read the noticeboard, must be labeled \texttt{FACT} or \texttt{UNCERTAIN}, NOT \texttt{CHECKED}.''}
 
+% ---------------------------------------------------------------------------------------------
+% Follow-up study: protocol and full tables for Section~\ref{sec:followup}.
+% ---------------------------------------------------------------------------------------------
+\section{Follow-up Study: Protocol and Additional Tables}
+\label{app:mini_study}
+
+\paragraph{Prompts.} A first-hand listener's checking prompt (Scene~2) consists of the persona system prompt, the scripted source announcement (Scene~1) and the checking question, so it depends only on the town configuration and the announced artist, not on the model that drives the town. We therefore harvested these prompts verbatim from the saved main-study agent histories rather than re-implementing the simulator. The design is a $2^{6-1}$ half fraction of the six binary source attributes (the 32 cells whose $\pm 1$ attribute codes multiply to $+1$), with 3 layouts per cell chosen to cover the 13 listener personas and all 6 first-hand seats per layout: $32 \times 3 \times 6 = 576$ prompts. One twin is used per prompt (the announced artist alternates across towns). Each prompt was answered once. A response counts as \texttt{GO} or \texttt{SKIP} by the first matching word (\texttt{\textbackslash b(GO|SKIP)\textbackslash b}); any other response counts as \texttt{SKIP}, as in the main study. Eleven of the $20{,}160$ responses, all from Qwen, contained neither word (refusals or conversational text cut off at five tokens) and were counted as \texttt{SKIP}.
+
+\paragraph{Models and settings.} GPT-6.1 Terra (\texttt{gpt-6.1-terra}), GPT-6.1 Sol (\texttt{gpt-6.1-sol}) and GPT-6 Luna (\texttt{gpt-6-luna}) were queried through the OpenAI Chat Completions API with default temperature and reasoning settings and \texttt{max\_completion\_tokens}$=2000$. Claude Sonnet~5.5 (\texttt{claude-sonnet-5-5}) and Claude Opus~5.5 (\texttt{claude-opus-5-5}) were queried through the Anthropic Messages API with default settings, no extended thinking and \texttt{max\_tokens}$=2000$. These settings differ from the main study's decision calls ($T=0.0$, \texttt{max\_tokens}$=5$; Table~\ref{tab:hyperparams}), because reasoning models need room to reason before answering; the GPT-6 models also accept only the default temperature while reasoning is enabled. DeepSeek (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and Qwen (\texttt{Qwen/Qwen3.8-Flash}) were queried through DeepInfra with the main study's checking settings ($T=0.0$, \texttt{max\_tokens}$=5$, \texttt{reasoning\_effort}$=$\texttt{none}). An earlier run of DeepSeek and Qwen at the provider's default temperature is not reported, because it did not reproduce the main-study decisions for Qwen ($99.0\%$ vs.\ $91.6\%$ \texttt{GO} at \$5); its data are in the artifact repository.
+
+\paragraph{Fare variants.} The fare is stated twice in the prompt: in the shared system header (``a short bus ride that costs \$5, about the price of a donut and a coffee'') and in the checking prompt (``You can take the \$5 bus across town''). Each variant replaces both mentions and leaves the rest of the prompt, including the \$40 weekly budget, unchanged:
+\begin{itemize}
+    \item \textbf{Free:} ``a short bus ride that is free'' / ``You can take the free bus across town''.
+    \item \textbf{\$1:} ``a short bus ride that costs \$1, about the price of a pack of gum''.
+    \item \textbf{\$15:} ``a short bus ride that costs \$15, about the price of a sit-down lunch''.
+    \item \textbf{\$35:} ``a short bus ride that costs \$35, about the price of a nice dinner out''.
+\end{itemize}
+
+\paragraph{Analysis.} Rates and contrasts are simple differences in mean \texttt{GO} between the two levels of an attribute, with percentile 95\% CIs from 1,000 to 2,000 bootstrap resamples over the 13 listener personas. The 50\% fare is the root of a logistic regression of \texttt{GO} on $\log(1+\text{fare})$ fitted to all five fares, with a persona-bootstrap CI; it assumes a smooth curve, whereas the observed curves are step-like, so it is a coarse summary. Code, prompts and all raw responses are in the \texttt{mini\_study/} folder of the artifact repository.
+
+\begin{table*}[ht!]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Contrast (pp)} & \textbf{Terra} & \textbf{Sol} & \textbf{Luna} & \textbf{Sonnet 5.5} & \textbf{Opus 5.5} & \textbf{DeepSeek} & \textbf{Qwen} \\
+\midrule
+Reliability (\texttt{good\_record}$-$\texttt{poor\_record}) & $-20.5$ & $-1.4$ & $-0.3$ & $-25.0$ & $-10.4$ & $+57.6$ & $+13.9$ \\
+Closeness (\texttt{close\_friend}$-$\texttt{stranger}) & $+30.9$ & $+3.5$ & $+0.3$ & $+20.8$ & $+11.1$ & $+8.3$ & $+13.2$ \\
+Wealth (\texttt{rich}$-$\texttt{poor}) & $+4.5$ & $-0.7$ & $-1.0$ & $+5.6$ & $+7.6$ & $+4.9$ & $+2.8$ \\
+Authority (\texttt{mayor}$-$\texttt{citizen}) & $-4.5$ & $+4.9$ & $-1.0$ & $-2.1$ & $-1.4$ & $-4.9$ & $+4.9$ \\
+Age (\texttt{old}$-$\texttt{young}) & $-3.8$ & $+0.7$ & $+0.3$ & $+12.5$ & $+9.0$ & $+6.9$ & $-0.7$ \\
+Gender (\texttt{woman}$-$\texttt{man}) & $+12.2$ & $0.0$ & $-0.3$ & $-3.5$ & $+0.7$ & $-0.7$ & $-0.7$ \\
+\bottomrule
+\end{tabular}
+\caption{Attribute contrasts on first-hand checking $P(\texttt{GO})$ at the \$5 fare (percentage points) on the 576 follow-up prompts. DeepSeek and Qwen use the main study's checking settings ($T=0.0$); the other models use their default settings.}
+\label{tab:mini_study_cues}
+\end{table*}
+
+\begin{table*}[ht!]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lcccccccccc}
+\toprule
+ & \multicolumn{5}{c}{\textbf{Reliability (pp)}} & \multicolumn{5}{c}{\textbf{Closeness (pp)}} \\
+\cmidrule(lr){2-6} \cmidrule(lr){7-11}
+\textbf{Model} & \textbf{Free} & \textbf{\$1} & \textbf{\$5} & \textbf{\$15} & \textbf{\$35} & \textbf{Free} & \textbf{\$1} & \textbf{\$5} & \textbf{\$15} & \textbf{\$35} \\
+\midrule
+GPT-6.1 Terra     & $0.0$  & $0.0$  & $-20.5$ & $-6.2$ & $-0.3$ & $0.0$  & $0.0$ & $+30.9$ & $+6.9$ & $+0.3$ \\
+GPT-6.1 Sol       & $0.0$  & $0.0$  & $-1.4$  & $0.0$  & $0.0$  & $0.0$  & $0.0$ & $+3.5$  & $0.0$  & $0.0$ \\
+GPT-6 Luna        & $0.0$  & $0.0$  & $-0.3$  & $-2.4$ & $+2.8$ & $0.0$  & $0.0$ & $+0.3$  & $+3.1$ & $+3.5$ \\
+Claude Sonnet 5.5 & $-0.7$ & $-1.4$ & $-25.0$ & $0.0$  & $0.0$  & $0.0$  & $0.0$ & $+20.8$ & $0.0$  & $0.0$ \\
+Claude Opus 5.5   & $-0.3$ & $-0.7$ & $-10.4$ & $0.0$  & $0.0$  & $+3.8$ & $0.0$ & $+11.1$ & $0.0$  & $0.0$ \\
+\midrule
+DeepSeek ($T=0$)  & $+13.2$ & $+48.3$ & $+57.6$ & $+41.0$ & $+20.8$ & $+5.6$ & $+13.5$ & $+8.3$ & $+3.5$ & $+5.6$ \\
+Qwen ($T=0$)      & $+0.3$ & $+3.1$ & $+13.9$ & $+56.9$ & $+41.3$ & $-1.0$ & $+3.1$ & $+13.2$ & $+11.8$ & $+3.8$ \\
+\bottomrule
+\end{tabular}
+\caption{Reliability (\texttt{good\_record}$-$\texttt{poor\_record}) and closeness (\texttt{close\_friend}$-$\texttt{stranger}) contrasts on first-hand checking by bus fare (percentage points; 576 prompts per model and fare).}
+\label{tab:price_sweep_cues}
+\end{table*}
+
+\clearpage % keep the follow-up tables before the next section
 \section{Declaration of Generative AI and AI-Assisted Technologies}
 \label{app:ai_disclosure}
 
