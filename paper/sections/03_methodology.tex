@@ -33,7 +33,7 @@ Each town executes chronologically through five scenes:
 
 \subsection{Sampling Matrix \& Evaluated Models}
 \label{sec:sampling_totals}
-Each of the 64 source profiles is evaluated across 13 Latin Square layouts and 3 stochastic repetitions ($T=0.7$, $\text{top\_p}=0.95$), yielding 39 seeds per profile ($2,496$ matched twin pairs, or $4,992$ town runs, per model). Across our two open-weights model families executed via DeepInfra---\textbf{DeepSeek} (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and \textbf{Qwen} (\texttt{Qwen/Qwen3.8-Flash})---the Main Factorial comprises \textbf{4,992 matched twin pairs} ($9,984$ town runs and $119,808$ listener observations; Table~\ref{tab:run_totals}), supplemented by a 4-profile Pilot Study ($312$ runs per model).
+Each of the 64 source profiles is evaluated across 13 Latin Square layouts and 3 stochastic repetitions ($T=0.7$, $\text{top\_p}=0.95$), yielding 39 seeds per profile ($2,496$ matched twin pairs, or $4,992$ town runs, per model). Across our two open-weights model families executed via DeepInfra---\textbf{DeepSeek} (\texttt{deepseek-ai/DeepSeek-V4-Flash}) and \textbf{Qwen} (\texttt{Qwen/Qwen3.8-Flash})---the Main Factorial comprises \textbf{4,992 matched twin pairs} ($9,984$ town runs and $119,808$ listener observations; Table~\ref{tab:run_totals}).
 
 \begin{table}[t]
 \centering
@@ -42,16 +42,16 @@ Each of the 64 source profiles is evaluated across 13 Latin Square layouts and 3
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{llrr}
 \toprule
-\textbf{Module} & \textbf{Design / Conditions} & \textbf{1 Rep} & \textbf{3 Reps} \\
+\textbf{Model} & \textbf{Design / Conditions} & \textbf{1 Rep} & \textbf{3 Reps} \\
 \midrule
-Main Factorial & 64 profiles $\times$ 2 twins ($2,496$ pairs) & 1,664 & 4,992 \\
-Pilot Study & 4 profiles $\times$ 2 twins ($156$ pairs) & 104 & 312 \\
+DeepSeek-V4-Flash & 64 profiles $\times$ 2 twins ($2,496$ pairs) & 1,664 & 4,992 \\
+Qwen3.8-Flash & 64 profiles $\times$ 2 twins ($2,496$ pairs) & 1,664 & 4,992 \\
 \midrule
-\textbf{Total per Model} & \textbf{136 conditions ($2,652$ pairs)} & \textbf{1,768} & \textbf{5,304} \\
+\textbf{Total (Both Models)} & \textbf{256 conditions ($4,992$ pairs)} & \textbf{3,328} & \textbf{9,984} \\
 \bottomrule
 \end{tabular}%
 }
-\caption{Simulation run matrix per model across experimental modules.}
+\caption{Main factorial simulation run matrix across both evaluated models.}
 \label{tab:run_totals}
 \end{table}
 
